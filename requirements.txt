@@ -5,3 +5,4 @@ folium>=0.15
 streamlit-folium>=0.18
 plotly>=5.18
 gfw-api-python-client>=1.0
+google-genai>=1.0
