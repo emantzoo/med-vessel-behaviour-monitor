@@ -143,6 +143,27 @@ def is_safe_code(code):
     return True
 
 
+# ========================= HELPERS =========================
+def classify_med_zone(lon, lat):
+    """Classify a point into a Mediterranean sub-region."""
+    if lon < 0:
+        return "Strait of Gibraltar"
+    elif lon < 5:
+        return "Alboran Sea"
+    elif lon < 12:
+        return "Western Med"
+    elif lon < 16:
+        return "Tyrrhenian / Central"
+    elif lon < 22:
+        return "Ionian / Adriatic"
+    elif lon < 28:
+        return "Aegean"
+    elif lon < 32:
+        return "Levantine"
+    else:
+        return "Eastern Med / Near East"
+
+
 # ========================= CONFIG & SETUP =========================
 st.set_page_config(
     page_title="Med Vessel Behaviour Monitor",
@@ -159,7 +180,7 @@ st.sidebar.header("Filters & Controls")
 try:
     token = st.secrets["gfw_token"]
 except (FileNotFoundError, KeyError):
-    token = st.sidebar.text_input("GFW API Token (free)", type="password", help="Register at globalfishingwatch.org → Our APIs")
+    token = st.sidebar.text_input("GFW API Token (free)", type="password", help="Register at globalfishingwatch.org -> Our APIs")
 
 use_live = st.sidebar.toggle("Use Live GFW API", value=False, help="Requires valid token. Static demo data is always available.")
 
@@ -177,7 +198,7 @@ if len(date_range) < 2:
 min_duration = st.sidebar.slider("Minimum event duration (hours)", 2, 48, 12)
 
 # Advanced: editable risk weights
-with st.sidebar.expander("Advanced — Risk Weights (optional)"):
+with st.sidebar.expander("Advanced -- Risk Weights (optional)"):
     gap_weight = st.number_input("Gap weight", value=3.2, min_value=0.1, step=0.1)
     loitering_weight = st.number_input("Loitering weight", value=2.0, min_value=0.1, step=0.1)
     encounter_weight = st.number_input("Encounter weight", value=5.0, min_value=0.1, step=0.1)
@@ -185,7 +206,7 @@ with st.sidebar.expander("Advanced — Risk Weights (optional)"):
 # ========================= DATA LOADING =========================
 @st.cache_data
 def load_static_data():
-    """Proper static fallback dataset (80 realistic Med events)."""
+    """Rich static fallback dataset (80 realistic Med events with extended fields)."""
     csv_path = os.path.join(os.path.dirname(__file__), "data", "med_events_static.csv")
     if os.path.exists(csv_path):
         return pd.read_csv(csv_path, parse_dates=["date"])
@@ -193,7 +214,7 @@ def load_static_data():
     rng = np.random.default_rng(42)
 
     n = 80
-    event_types = (["GAP"] * 25 + ["LOITERING"] * 30 + ["ENCOUNTER"] * 25)
+    event_types = ["GAP"] * 25 + ["LOITERING"] * 30 + ["ENCOUNTER"] * 25
     flags = (["RUS"] * 12 + ["IRN"] * 8 + ["PAN"] * 15 + ["LBR"] * 15
              + ["GRC"] * 10 + ["TUR"] * 8 + ["ITA"] * 7 + ["MLT"] * 5)
 
@@ -201,38 +222,94 @@ def load_static_data():
     dur_map = {"GAP": (6, 72), "LOITERING": (4, 48), "ENCOUNTER": (2, 12)}
     durations = [round(rng.uniform(*dur_map[et]), 1) for et in event_types]
 
-    # Sea-only coordinate clusters — verified open water, no land overlap
+    # Sea-only coordinate clusters
     sea_zones = [
-        # (lat_min, lat_max, lon_min, lon_max)
-        (35.5, 36.5, -1.0, 2.0),    # Alboran Sea (south of Spain)
-        (38.5, 39.5, 5.0, 7.5),     # west of Sardinia
-        (37.5, 39.0, 11.0, 13.0),   # Tyrrhenian Sea (north of Sicily)
-        (33.0, 34.5, 13.0, 15.5),   # central Med (off Libya, south of Malta)
-        (35.5, 36.5, 17.5, 19.5),   # Ionian Sea (west of Greece)
-        (34.0, 35.0, 23.0, 26.5),   # south of Crete (open water)
-        (32.5, 33.5, 30.0, 33.0),   # Levantine basin (off Egypt coast)
+        (35.5, 36.5, -1.0, 2.0),
+        (38.5, 39.5, 5.0, 7.5),
+        (37.5, 39.0, 11.0, 13.0),
+        (33.0, 34.5, 13.0, 15.5),
+        (35.5, 36.5, 17.5, 19.5),
+        (34.0, 35.0, 23.0, 26.5),
+        (32.5, 33.5, 30.0, 33.0),
     ]
     zone_idx = rng.integers(0, len(sea_zones), size=n)
     lats = np.array([rng.uniform(sea_zones[z][0], sea_zones[z][1]) for z in zone_idx]).round(2)
     lons = np.array([rng.uniform(sea_zones[z][2], sea_zones[z][3]) for z in zone_idx]).round(2)
 
-    # Dates spread across a 30-day window
     base = datetime(2026, 3, 1)
     dates = [(base + timedelta(days=int(d))).strftime("%Y-%m-%d")
              for d in rng.integers(0, 30, size=n)]
 
-    # Unique MMSIs (9-digit, realistic range)
     mmsis = rng.integers(200000000, 800000000, size=n)
+
+    # Vessel names
+    cargo_names = ["ATLANTIC SPIRIT", "COSCO HARMONY", "GOLDEN EAGLE", "SEA PIONEER",
+                   "NORDIC STAR", "AEGEAN WIND", "MED CARRIER", "BLACK SEA EXPRESS"]
+    tanker_names = ["CRUDE VENTURE", "OIL TRADER", "PETRO STAR", "FUEL MASTER"]
+    vessel_names = rng.choice(cargo_names + tanker_names, n)
+
+    # Vessel types
+    type_pool = ["CARRIER", "FISHING", "CARGO", "TANKER", "SUPPORT"]
+    vessel_types = rng.choice(type_pool, n, p=[0.25, 0.30, 0.20, 0.15, 0.10])
+
+    # Distances
+    distance_shore = np.round(rng.uniform(2, 250, n), 1)
+    distance_port = np.round(distance_shore * rng.uniform(1.0, 2.5, n), 1)
+
+    # Nearest ports
+    ports = ["Piraeus", "Valletta", "Genoa", "Barcelona", "Mersin", "Haifa",
+             "Alexandria", "Izmir", "Marseille", "Algeciras"]
+    nearest_ports = rng.choice(ports, n)
+
+    # EEZ
+    eezs = ["Greece", "Italy", "Turkey", "Spain", "Malta", "Libya", "Tunisia",
+            "Egypt", "Cyprus", "International Waters"]
+    eez_vals = rng.choice(eezs, n, p=[0.15, 0.15, 0.10, 0.10, 0.05,
+                                       0.08, 0.07, 0.05, 0.05, 0.20])
 
     df = pd.DataFrame({
         "event_type": event_types,
         "mmsi": mmsis,
         "flag": flags,
+        "vessel_name": vessel_names,
+        "vessel_type": vessel_types,
         "duration_h": durations,
         "lat": lats,
         "lon": lons,
         "date": dates,
+        "distance_from_shore_km": distance_shore,
+        "distance_from_port_km": distance_port,
+        "nearest_port": nearest_ports,
+        "eez": eez_vals,
     })
+
+    # Gap-specific fields
+    gap_mask = df["event_type"] == "GAP"
+    gap_n = gap_mask.sum()
+    df.loc[gap_mask, "gap_distance_km"] = np.round(rng.uniform(10, 500, gap_n), 1)
+    df.loc[gap_mask, "speed_before_gap"] = np.round(rng.uniform(0.5, 14, gap_n), 1)
+    df.loc[gap_mask, "speed_after_gap"] = np.round(rng.uniform(0.5, 14, gap_n), 1)
+
+    # Encounter-specific fields
+    enc_mask = df["event_type"] == "ENCOUNTER"
+    enc_n = enc_mask.sum()
+    enc_names = ["SHADOW CARRIER", "REEFER KING", "COLD STAR", "FISH RUNNER",
+                 "NEPTUNE BULK", "CARGO QUEEN"]
+    df.loc[enc_mask, "encounter_vessel_name"] = rng.choice(enc_names, enc_n)
+    df.loc[enc_mask, "encounter_vessel_flag"] = rng.choice(
+        ["PAN", "LBR", "GRC", "MLT", "RUS", "MHL"], enc_n)
+    df.loc[enc_mask, "encounter_median_distance_km"] = np.round(rng.uniform(0.05, 2.0, enc_n), 2)
+    df.loc[enc_mask, "encounter_median_speed_knots"] = np.round(rng.uniform(0.5, 3.0, enc_n), 1)
+
+    # Loitering-specific fields
+    loit_mask = df["event_type"] == "LOITERING"
+    loit_n = loit_mask.sum()
+    df.loc[loit_mask, "loitering_total_distance_km"] = np.round(rng.uniform(5, 150, loit_n), 1)
+    df.loc[loit_mask, "loitering_avg_speed_knots"] = np.round(rng.uniform(0.3, 2.5, loit_n), 1)
+
+    # Med zone classification
+    df["med_zone"] = df.apply(lambda r: classify_med_zone(r["lon"], r["lat"]), axis=1)
+
     return df
 
 @st.cache_data
@@ -249,7 +326,6 @@ def load_live_data(token, start_date, end_date, _min_dur):
             "public-global-loitering-events:latest",
         ]
 
-        # Mediterranean bounding box as GeoJSON polygon
         med_geometry = {
             "type": "Polygon",
             "coordinates": [[[-6, 30], [36.5, 30], [36.5, 46], [-6, 46], [-6, 30]]],
@@ -271,29 +347,30 @@ def load_live_data(token, start_date, end_date, _min_dur):
             st.warning("No events returned from API for this period.")
             return load_static_data()
 
-        # Normalise columns to match our static schema
         df = df.rename(columns={"type": "event_type", "start": "date"})
 
-        # Extract lat/lon from nested position dict
         if "position" in df.columns:
             df["lat"] = df["position"].apply(lambda p: p.get("lat") if isinstance(p, dict) else None)
             df["lon"] = df["position"].apply(lambda p: p.get("lon") if isinstance(p, dict) else None)
 
-        # Extract flag from nested vessel dict
         if "vessel" in df.columns:
             df["flag"] = df["vessel"].apply(lambda v: v.get("flag", "UNK") if isinstance(v, dict) else "UNK")
             df["mmsi"] = df["vessel"].apply(lambda v: v.get("ssvid", "0") if isinstance(v, dict) else "0")
+            df["vessel_name"] = df["vessel"].apply(lambda v: v.get("name", "") if isinstance(v, dict) else "")
+            df["vessel_type"] = df["vessel"].apply(lambda v: v.get("type", "") if isinstance(v, dict) else "")
 
-        # Compute duration from start/end
         if "duration_h" not in df.columns and "end" in df.columns and "date" in df.columns:
             df["duration_h"] = (
                 (pd.to_datetime(df["end"]) - pd.to_datetime(df["date"]))
                 .dt.total_seconds() / 3600
             ).round(1)
 
-        # Normalise event type to uppercase
         type_map = {"gap": "GAP", "encounter": "ENCOUNTER", "loitering": "LOITERING"}
         df["event_type"] = df["event_type"].str.lower().map(type_map).fillna(df["event_type"])
+
+        # Add med_zone
+        if "lat" in df.columns and "lon" in df.columns:
+            df["med_zone"] = df.apply(lambda r: classify_med_zone(r["lon"], r["lat"]), axis=1)
 
         return df
 
@@ -320,7 +397,6 @@ flag_risks = {
 }
 
 def get_offshore_bonus(lat, lon):
-    # Simple deep-water proxy for central/eastern Med
     return 1.4 if (lon > 15 and abs(lat - 36) < 8) else 1.0
 
 df_filtered = df[df["duration_h"] >= min_duration].copy()
@@ -335,6 +411,9 @@ df_filtered["risk_score"] = df_filtered.apply(
 
 total_risk = df_filtered["risk_score"].sum()
 
+# ========================= COLOR SCHEME =========================
+EVENT_COLORS = {"GAP": "#e74c3c", "LOITERING": "#f39c12", "ENCOUNTER": "#8e44ad"}
+
 # ========================= MAIN LAYOUT =========================
 col1, col2 = st.columns([3, 1])
 
@@ -343,39 +422,55 @@ with col1:
     if not df_filtered.empty:
         m = folium.Map(location=[37.0, 18.0], zoom_start=5, tiles="CartoDB positron")
         color_map = {"GAP": "red", "LOITERING": "orange", "ENCOUNTER": "purple"}
-        
+
         for _, row in df_filtered.iterrows():
+            popup_text = f"""
+            <b>Event:</b> {row['event_type']}<br>
+            <b>Flag:</b> {row['flag']}<br>
+            <b>Duration:</b> {row['duration_h']} h<br>
+            <b>Risk Score:</b> {row['risk_score']:.1f}
+            """
+            if "vessel_name" in row and pd.notna(row.get("vessel_name")):
+                popup_text = f"<b>{row['vessel_name']}</b><br>" + popup_text
+
             folium.CircleMarker(
                 location=[row["lat"], row["lon"]],
                 radius=8,
                 color=color_map.get(row["event_type"], "blue"),
-                popup=f"""
-                <b>Event:</b> {row['event_type']}<br>
-                <b>Flag:</b> {row['flag']}<br>
-                <b>Duration:</b> {row['duration_h']} h<br>
-                <b>Risk Score:</b> {row['risk_score']:.1f}
-                """,
+                popup=popup_text,
                 fill=True
             ).add_to(m)
-        
+
         st_folium(m, width=700, height=500)
     else:
         st.info("No events match the selected filters.")
 
 with col2:
     st.metric("Mediterranean Behavioral Risk Index", f"{total_risk:.0f}")
-    st.caption("Encounters weighted highest • Russian/Iranian flags boosted")
+    st.caption("Encounters weighted highest . Russian/Iranian flags boosted")
+
+    # Quick stats
+    if not df_filtered.empty:
+        st.metric("Events", len(df_filtered))
+        st.metric("Unique Vessels", df_filtered["mmsi"].nunique())
+        st.metric("Flags", df_filtered["flag"].nunique())
 
 # ========================= TABS =========================
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
-    "Daily Risk Trend",
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11 = st.tabs([
+    "Daily Trend",
     "Flag Breakdown",
-    "Event Type Breakdown",
-    "Top 10 Riskiest Vessels",
-    "Methodology & About",
+    "Event Types",
+    "Duration Analysis",
+    "Geographic Risk",
+    "Risk Heatmap",
+    "Repeat Offenders",
+    "Gap Behaviour",
+    "Encounter Analysis",
+    "Top Vessels",
     "AI Analyst",
 ])
 
+# --- Tab 1: Daily Risk Trend ---
 with tab1:
     st.subheader("Daily Behavioral Risk Trend")
     if not df_filtered.empty:
@@ -386,79 +481,339 @@ with tab1:
     else:
         st.info("No data.")
 
+# --- Tab 2: Flag Breakdown ---
 with tab2:
     st.subheader("Breakdown by Flag State")
     if not df_filtered.empty:
-        flag_risk = df_filtered.groupby("flag")["risk_score"].sum().reset_index().sort_values("risk_score", ascending=False)
+        flag_risk = (df_filtered.groupby("flag")["risk_score"].sum()
+                     .reset_index().sort_values("risk_score", ascending=False))
         fig = px.bar(flag_risk, x="risk_score", y="flag", orientation="h",
                      title="Total risk by flag (sorted)")
         st.plotly_chart(fig)
     else:
         st.info("No data.")
 
+# --- Tab 3: Event Type Breakdown ---
 with tab3:
     st.subheader("Breakdown by Event Type")
     if not df_filtered.empty:
         type_risk = df_filtered.groupby("event_type")["risk_score"].sum().reset_index()
         fig = px.pie(type_risk, names="event_type", values="risk_score",
+                     color="event_type", color_discrete_map=EVENT_COLORS,
                      title="Risk contribution by event type")
         st.plotly_chart(fig)
     else:
         st.info("No data.")
 
+# --- Tab 4: Duration Analysis ---
 with tab4:
+    st.subheader("Event Duration Distribution")
+    if not df_filtered.empty:
+        fig = px.histogram(
+            df_filtered, x="duration_h", color="event_type", nbins=25,
+            barmode="overlay", opacity=0.7,
+            color_discrete_map=EVENT_COLORS,
+            labels={"duration_h": "Duration (hours)", "event_type": "Event Type"},
+            title="Event Duration Distribution",
+        )
+        fig.update_layout(bargap=0.05)
+        st.plotly_chart(fig)
+
+        st.markdown("**Why it matters:** Long gaps (>24h) suggest deliberate AIS disabling. "
+                     "Encounters over 8h point to transshipment. Short loitering may be staging.")
+    else:
+        st.info("No data.")
+
+# --- Tab 5: Geographic Risk ---
+with tab5:
+    st.subheader("Geographic Risk Analysis")
+    if not df_filtered.empty:
+        # Risk bubble scatter
+        fig = px.scatter(
+            df_filtered, x="lon", y="lat", size="risk_score", color="event_type",
+            color_discrete_map=EVENT_COLORS,
+            hover_data=["mmsi", "flag", "duration_h", "risk_score",
+                        "vessel_name"] if "vessel_name" in df_filtered.columns else ["mmsi", "flag"],
+            size_max=25,
+            title="Risk-Weighted Event Map (bubble size = risk score)",
+            labels={"lon": "Longitude", "lat": "Latitude"},
+        )
+        st.plotly_chart(fig)
+
+        # Med zone breakdown
+        if "med_zone" in df_filtered.columns:
+            st.subheader("Risk by Mediterranean Sub-Region")
+            zone_risk = (
+                df_filtered.groupby("med_zone")
+                .agg(total_risk=("risk_score", "sum"), events=("mmsi", "count"))
+                .reset_index()
+                .sort_values("total_risk", ascending=True)
+            )
+            fig2 = px.bar(
+                zone_risk, x="total_risk", y="med_zone", orientation="h",
+                color="events", color_continuous_scale="Blues",
+                title="Risk by Mediterranean Sub-Region",
+                labels={"total_risk": "Total Risk Score", "med_zone": "Region", "events": "Events"},
+            )
+            st.plotly_chart(fig2)
+
+        # EEZ breakdown
+        if "eez" in df_filtered.columns and df_filtered["eez"].notna().any():
+            st.subheader("Risk by Exclusive Economic Zone")
+            eez_risk = (
+                df_filtered.groupby("eez")
+                .agg(total_risk=("risk_score", "sum"), events=("mmsi", "count"))
+                .reset_index()
+                .sort_values("total_risk", ascending=False)
+            )
+            fig3 = px.bar(
+                eez_risk, x="total_risk", y="eez", orientation="h",
+                title="Risk by EEZ",
+                labels={"eez": "EEZ", "total_risk": "Total Risk"},
+            )
+            st.plotly_chart(fig3)
+
+        # Port proximity
+        if "nearest_port" in df_filtered.columns and df_filtered["nearest_port"].notna().any():
+            st.subheader("Risk by Nearest Port")
+            port_events = (
+                df_filtered.groupby("nearest_port")
+                .agg(
+                    total_risk=("risk_score", "sum"),
+                    events=("mmsi", "count"),
+                    avg_distance=("distance_from_port_km", "mean"),
+                )
+                .reset_index()
+                .sort_values("total_risk", ascending=False)
+            )
+            fig4 = px.scatter(
+                port_events, x="avg_distance", y="total_risk", size="events",
+                text="nearest_port",
+                title="Risk by Nearest Port -- Farther from Port = More Suspicious",
+                labels={"avg_distance": "Avg Distance from Port (km)", "total_risk": "Total Risk Score"},
+            )
+            fig4.update_traces(textposition="top center")
+            st.plotly_chart(fig4)
+    else:
+        st.info("No data.")
+
+# --- Tab 6: Risk Heatmap ---
+with tab6:
+    st.subheader("Risk Heatmap: Flag State vs Event Type")
+    if not df_filtered.empty:
+        pivot = df_filtered.pivot_table(
+            values="risk_score", index="flag", columns="event_type",
+            aggfunc="sum", fill_value=0,
+        )
+        pivot["total"] = pivot.sum(axis=1)
+        pivot = pivot.sort_values("total", ascending=True).drop(columns="total")
+
+        fig = go.Figure(data=go.Heatmap(
+            z=pivot.values,
+            x=pivot.columns.tolist(),
+            y=pivot.index.tolist(),
+            colorscale="YlOrRd",
+            text=pivot.values.round(1),
+            texttemplate="%{text}",
+            hovertemplate="Flag: %{y}<br>Event: %{x}<br>Risk: %{z:.1f}<extra></extra>",
+        ))
+        fig.update_layout(
+            title="Risk Heatmap: Flag State vs Event Type",
+            xaxis_title="Event Type", yaxis_title="Flag State",
+            height=500,
+        )
+        st.plotly_chart(fig)
+
+        st.markdown("**Interpretation:** bright cells = high risk combinations. "
+                     "Look for Russian/Iranian flags with high GAP or ENCOUNTER scores.")
+    else:
+        st.info("No data.")
+
+# --- Tab 7: Repeat Offenders ---
+with tab7:
+    st.subheader("Repeat Offenders -- Vessels with Multiple Events")
+    if not df_filtered.empty:
+        vessel_counts = (
+            df_filtered.groupby(["mmsi", "flag"])
+            .agg(
+                event_count=("event_type", "count"),
+                total_risk=("risk_score", "sum"),
+                event_types=("event_type", lambda x: ", ".join(sorted(set(x)))),
+                avg_duration=("duration_h", "mean"),
+            )
+            .reset_index()
+            .sort_values("event_count", ascending=False)
+        )
+
+        # Add vessel_name if available
+        if "vessel_name" in df_filtered.columns:
+            name_map = df_filtered.dropna(subset=["vessel_name"]).drop_duplicates("mmsi").set_index("mmsi")["vessel_name"]
+            vessel_counts["vessel_name"] = vessel_counts["mmsi"].map(name_map).fillna("")
+
+        repeat_vessels = vessel_counts[vessel_counts["event_count"] >= 2]
+
+        if not repeat_vessels.empty:
+            fig = px.bar(
+                repeat_vessels.head(15), x="mmsi", y="event_count",
+                color="total_risk", color_continuous_scale="YlOrRd",
+                hover_data=["flag", "event_types", "avg_duration", "total_risk"],
+                title="Repeat Offenders -- Vessels with Multiple Events",
+                labels={"event_count": "Number of Events", "mmsi": "MMSI"},
+            )
+            fig.update_xaxes(type="category")
+            st.plotly_chart(fig)
+
+            st.dataframe(repeat_vessels.head(15).style.format(
+                {"total_risk": "{:.1f}", "avg_duration": "{:.1f}"}))
+        else:
+            st.info("No vessels with multiple events in filtered data.")
+
+        st.markdown("**Why it matters:** A vessel with 5 events is far more interesting "
+                     "than 5 vessels with 1 event each. Repeat offenders warrant deeper investigation.")
+    else:
+        st.info("No data.")
+
+# --- Tab 8: Gap Behaviour ---
+with tab8:
+    st.subheader("Gap Behaviour Analysis")
+    gap_df = df_filtered[df_filtered["event_type"] == "GAP"].copy()
+
+    if not gap_df.empty and "speed_before_gap" in gap_df.columns and gap_df["speed_before_gap"].notna().any():
+        fig = px.scatter(
+            gap_df, x="speed_before_gap", y="speed_after_gap",
+            size="duration_h", color="flag",
+            hover_data=["mmsi", "duration_h",
+                        "gap_distance_km"] + (["vessel_name"] if "vessel_name" in gap_df.columns else []),
+            title="Gap Behaviour: Speed Before vs After AIS Disabling",
+            labels={"speed_before_gap": "Speed Before Gap (kn)", "speed_after_gap": "Speed After Gap (kn)"},
+        )
+        fig.add_annotation(x=12, y=1, text="Stopped after gap<br>(possible transfer)",
+                           showarrow=False, font=dict(size=10, color="red"))
+        fig.add_annotation(x=1, y=12, text="Accelerated after gap<br>(possible evasion)",
+                           showarrow=False, font=dict(size=10, color="orange"))
+        st.plotly_chart(fig)
+
+        # Gap distance vs duration
+        if "gap_distance_km" in gap_df.columns and gap_df["gap_distance_km"].notna().any():
+            fig2 = px.scatter(
+                gap_df, x="duration_h", y="gap_distance_km", color="flag",
+                hover_data=["mmsi"] + (["vessel_name"] if "vessel_name" in gap_df.columns else []),
+                title="Gap Duration vs Distance Traveled During Gap",
+                labels={"duration_h": "Gap Duration (hours)", "gap_distance_km": "Distance During Gap (km)"},
+            )
+            st.plotly_chart(fig2)
+
+        st.markdown("**Interpretation:** A vessel going fast, then going dark, then "
+                     "reappearing slow suggests a mid-sea transfer. "
+                     "Long gaps covering large distances indicate intentional evasion.")
+    elif not gap_df.empty:
+        st.info("Gap speed data not available. Use live API for detailed gap behaviour.")
+        # Fallback: show gap duration distribution
+        fig = px.histogram(gap_df, x="duration_h", nbins=15, color="flag",
+                           title="Gap Duration Distribution",
+                           labels={"duration_h": "Duration (hours)"})
+        st.plotly_chart(fig)
+    else:
+        st.info("No gap events in filtered data.")
+
+# --- Tab 9: Encounter Analysis ---
+with tab9:
+    st.subheader("Encounter Analysis")
+    enc_df = df_filtered[df_filtered["event_type"] == "ENCOUNTER"].copy()
+
+    if not enc_df.empty and "encounter_median_distance_km" in enc_df.columns:
+        # Proximity vs duration scatter
+        fig = px.scatter(
+            enc_df, x="encounter_median_distance_km", y="duration_h",
+            color="flag", size="risk_score",
+            hover_data=["mmsi", "encounter_vessel_name", "encounter_vessel_flag"]
+                        + (["vessel_name"] if "vessel_name" in enc_df.columns else []),
+            title="Encounter Analysis: Proximity vs Duration",
+            labels={"encounter_median_distance_km": "Median Distance Between Vessels (km)",
+                    "duration_h": "Encounter Duration (hours)"},
+        )
+        fig.add_annotation(x=0.1, y=enc_df["duration_h"].max() * 0.8,
+                           text="Close + Long = HIGH RISK",
+                           showarrow=False, font=dict(size=11, color="red"))
+        st.plotly_chart(fig)
+
+        # Encounter partner flags
+        if "encounter_vessel_flag" in enc_df.columns and enc_df["encounter_vessel_flag"].notna().any():
+            st.subheader("Encounter Partner Flag Analysis")
+            partner_flags = (enc_df.groupby(["flag", "encounter_vessel_flag"])
+                             .agg(encounters=("mmsi", "count"), total_risk=("risk_score", "sum"))
+                             .reset_index()
+                             .sort_values("total_risk", ascending=False))
+            partner_flags.columns = ["Vessel Flag", "Partner Flag", "Encounters", "Total Risk"]
+            st.dataframe(partner_flags.style.format({"Total Risk": "{:.1f}"}))
+
+        st.markdown("**Why it matters:** Two vessels within 100m for 8 hours is almost certainly "
+                     "a transshipment. Look for high-risk flag combinations (e.g. RUS + PAN).")
+    elif not enc_df.empty:
+        st.info("Encounter distance data not available. Use live API for detailed encounter analysis.")
+        # Fallback: basic encounter table
+        cols = ["mmsi", "flag", "duration_h", "risk_score"]
+        if "vessel_name" in enc_df.columns:
+            cols = ["vessel_name"] + cols
+        st.dataframe(enc_df[cols].sort_values("risk_score", ascending=False))
+    else:
+        st.info("No encounter events in filtered data.")
+
+# --- Tab 10: Top Vessels ---
+with tab10:
     st.subheader("Top 10 Riskiest Vessels")
     if not df_filtered.empty:
-        vessel_risk = (df_filtered.groupby(["mmsi", "flag"])
+        group_cols = ["mmsi", "flag"]
+        if "vessel_name" in df_filtered.columns:
+            group_cols.append("vessel_name")
+        if "vessel_type" in df_filtered.columns:
+            group_cols.append("vessel_type")
+
+        vessel_risk = (df_filtered.groupby(group_cols)
                        .agg(risk=("risk_score", "sum"), events=("mmsi", "count"))
                        .reset_index()
                        .sort_values("risk", ascending=False)
                        .head(10))
         st.dataframe(vessel_risk.style.format({"risk": "{:.1f}"}))
+
+        # Vessel type breakdown
+        if "vessel_type" in df_filtered.columns and df_filtered["vessel_type"].notna().any():
+            st.subheader("Risk by Vessel Type")
+            type_risk = (
+                df_filtered.groupby("vessel_type")
+                .agg(total_risk=("risk_score", "sum"), events=("mmsi", "count"))
+                .reset_index()
+                .sort_values("total_risk", ascending=False)
+            )
+            fig = px.bar(
+                type_risk, x="vessel_type", y="total_risk",
+                color="events", color_continuous_scale="Viridis",
+                title="Risk by Vessel Type",
+                labels={"vessel_type": "Vessel Type", "total_risk": "Total Risk"},
+            )
+            st.plotly_chart(fig)
     else:
         st.info("No data.")
 
-with tab5:
-    st.subheader("Methodology & About")
-    st.markdown("""
-    **Risk Score Formula**  
-    `risk = (duration_hours ^ 0.75) × event_weight × flag_multiplier × (offshore_bonus if loitering)`  
-
-    - **Encounters** weighted highest (direct transshipment risk).  
-    - **Gaps** (AIS disabling) next (intentional dark activity).  
-    - **Loitering** weighted for staging behavior + offshore location bonus.  
-    - Russian, Iranian and other high-risk flags receive multipliers based on 2026 sanctions context.  
-
-    **Data Source**  
-    Global Fishing Watch Events API (GAP, ENCOUNTER, LOITERING).  
-    Static fallback uses a realistic synthetic Med dataset derived from public Welch et al. (2022) patterns.
-
-    **Caveats**  
-    Not all dark activity is illegal. AIS coverage has gaps. This tool is for educational/portfolio use only.
-    """)
-
-with tab6:
+# --- Tab 11: AI Analyst ---
+with tab11:
     st.subheader("AI Maritime Analyst")
     st.markdown(
         "Ask questions about the vessel data in natural language. "
         "The AI will explain the findings and generate analytical code."
     )
 
-    # Gemini API key
     try:
         gemini_key = st.secrets["gemini_key"]
     except (FileNotFoundError, KeyError):
         gemini_key = st.text_input(
-            "Gemini API Key",
-            type="password",
+            "Gemini API Key", type="password",
             help="Get a key at aistudio.google.com",
         )
 
-    # Chat history
     if "ai_messages" not in st.session_state:
         st.session_state.ai_messages = []
 
-    # Example questions — pick from dropdown, then click Ask
     examples = [
         "",
         "Which flag states have the highest total risk? Why?",
@@ -473,23 +828,18 @@ with tab6:
     ]
 
     picked = st.selectbox(
-        "Pick a question or type your own below",
-        examples,
-        index=0,
+        "Pick a question or type your own below", examples, index=0,
         format_func=lambda x: "-- Pick an example question --" if x == "" else x,
         key="example_sel",
     )
 
     typed = st.text_input(
-        "Or type your own question",
-        value="",
-        key="typed_q",
+        "Or type your own question", value="", key="typed_q",
         placeholder="Type a question here...",
     )
 
     ask_clicked = st.button("Ask", type="primary")
 
-    # Only fire on button click
     question = None
     if ask_clicked:
         if typed.strip():
@@ -498,7 +848,7 @@ with tab6:
             question = picked
 
     if question and gemini_key:
-        st.session_state.ai_messages = []  # fresh conversation each question
+        st.session_state.ai_messages = []
         st.session_state.ai_messages.append({"role": "user", "parts": [question]})
 
         with st.spinner("Thinking..."):
@@ -533,7 +883,6 @@ with tab6:
             except Exception as e:
                 st.error(f"Gemini API error: {e}")
 
-    # Display conversation
     for msg in st.session_state.ai_messages:
         role = "user" if msg["role"] == "user" else "assistant"
         content = msg["parts"][0] if msg["parts"] else ""
@@ -573,6 +922,25 @@ with tab6:
                         st.warning("Generated code contains restricted operations. Skipping execution.")
             else:
                 st.markdown(content)
+
+# ========================= METHODOLOGY (sidebar) =========================
+with st.sidebar.expander("Methodology & About"):
+    st.markdown("""
+**Risk Score Formula**
+`risk = (duration_h ^ 0.75) x event_weight x flag_multiplier x offshore_bonus`
+
+- **Encounters** weighted highest (transshipment risk)
+- **Gaps** (AIS disabling) next (intentional dark activity)
+- **Loitering** weighted for staging + offshore bonus
+
+**Data Source**
+Global Fishing Watch Events API (GAP, ENCOUNTER, LOITERING).
+Static fallback uses a realistic synthetic Med dataset.
+
+**Caveats**
+Not all dark activity is illegal. AIS coverage has gaps.
+This tool is for educational/portfolio use only.
+    """)
 
 # ========================= DOWNLOAD =========================
 if not df_filtered.empty:
