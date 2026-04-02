@@ -98,7 +98,7 @@ CODE STYLE (critical -- follow exactly):
 - ALWAYS work from `df` directly. Do NOT redefine or overwrite `df`.
 - For bar charts: group first into a small df, then pass that to px.bar()
 - For scatter/map: pass df directly to px.scatter() or px.scatter_geo()
-- For heatmaps: use px.density_heatmap(df, x="lon", y="lat") -- no z param needed
+- For spatial plots: use px.scatter(df, x="lon", y="lat", color=..., size=...) -- NOT density_heatmap (too blocky with small data)
 - NEVER pass a Series where a DataFrame is expected
 - NEVER use chained expressions inside plotly function arguments
 - Test mentally that all column names exist in df before using them
@@ -120,8 +120,9 @@ result_value = f"{{df['risk_score'].sum():.0f}} total risk"
 # Scatter map pattern
 fig = px.scatter(df, x="lon", y="lat", color="event_type", size="risk_score", title="Events")
 
-# Density heatmap pattern
-fig = px.density_heatmap(df, x="lon", y="lat", title="Event Density")
+# Spatial scatter pattern (preferred over density_heatmap)
+fig = px.scatter(df, x="lon", y="lat", color="event_type", size="duration_h",
+                 hover_data=["flag","mmsi","risk_score"], title="Event Locations")
 ```
 """
 
@@ -381,7 +382,7 @@ with tab1:
         daily = df_filtered.groupby("date")["risk_score"].sum().reset_index()
         fig = px.line(daily, x="date", y="risk_score", markers=True,
                       title="Total risk score by day")
-        st.plotly_chart(fig, width="stretch")
+        st.plotly_chart(fig)
     else:
         st.info("No data.")
 
@@ -391,7 +392,7 @@ with tab2:
         flag_risk = df_filtered.groupby("flag")["risk_score"].sum().reset_index().sort_values("risk_score", ascending=False)
         fig = px.bar(flag_risk, x="risk_score", y="flag", orientation="h",
                      title="Total risk by flag (sorted)")
-        st.plotly_chart(fig, width="stretch")
+        st.plotly_chart(fig)
     else:
         st.info("No data.")
 
@@ -401,7 +402,7 @@ with tab3:
         type_risk = df_filtered.groupby("event_type")["risk_score"].sum().reset_index()
         fig = px.pie(type_risk, names="event_type", values="risk_score",
                      title="Risk contribution by event type")
-        st.plotly_chart(fig, width="stretch")
+        st.plotly_chart(fig)
     else:
         st.info("No data.")
 
@@ -465,7 +466,7 @@ with tab6:
             "Are there any vessels with repeated gap events? What pattern do you see?",
             "What's happening in the eastern Mediterranean (longitude > 25)?",
             "Which day had the most suspicious activity and why?",
-            "Create a heatmap of event density by latitude and longitude",
+            "Plot all events on a scatter map colored by event type",
             "Compare risk profiles of FOC-flagged vs Mediterranean-flagged vessels",
             "Find vessels that had both a gap and an encounter -- could this indicate transshipment?",
             "What's the average gap duration by flag state? Any outliers?",
@@ -474,6 +475,7 @@ with tab6:
         for ex in examples:
             if st.button(ex, key=f"ex_{hash(ex)}"):
                 st.session_state.pending_question = ex
+                st.rerun()
 
     # Question input
     question = st.chat_input("Ask about the vessel data...")
@@ -553,9 +555,9 @@ with tab6:
                             exec(code, exec_ns)
 
                             if "fig" in exec_ns and exec_ns["fig"] is not None:
-                                st.plotly_chart(exec_ns["fig"], width="stretch")
+                                st.plotly_chart(exec_ns["fig"])
                             if "result_df" in exec_ns and exec_ns["result_df"] is not None:
-                                st.dataframe(exec_ns["result_df"], width="stretch")
+                                st.dataframe(exec_ns["result_df"])
                             if "result_value" in exec_ns and exec_ns["result_value"] is not None:
                                 st.metric("Result", exec_ns["result_value"])
                         except Exception as e:
