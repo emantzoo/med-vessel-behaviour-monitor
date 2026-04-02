@@ -88,11 +88,41 @@ RULES:
 - Use `df` as the dataframe variable (already in scope)
 - For charts, always use plotly (px or go) and assign to `fig`
 - For tables, assign to `result_df`
-- Keep code concise -- under 30 lines
+- Keep code concise -- under 20 lines
 - If the question cannot be answered from the data, say so clearly
 - Do not fabricate data or make up vessel names/MMSIs
 - When discussing flags, use the domain knowledge to explain risk context
 - When discussing locations, reference relevant Med geography
+
+CODE STYLE (critical -- follow exactly):
+- ALWAYS work from `df` directly. Do NOT redefine or overwrite `df`.
+- For bar charts: group first into a small df, then pass that to px.bar()
+- For scatter/map: pass df directly to px.scatter() or px.scatter_geo()
+- For heatmaps: use px.density_heatmap(df, x="lon", y="lat") -- no z param needed
+- NEVER pass a Series where a DataFrame is expected
+- NEVER use chained expressions inside plotly function arguments
+- Test mentally that all column names exist in df before using them
+- Prefer simple one-step groupby().agg().reset_index() patterns
+- Assign intermediate results to variables, do not nest complex expressions
+
+WORKING CODE PATTERNS (use these):
+```
+# Bar chart pattern
+grouped = df.groupby("flag")["risk_score"].sum().reset_index()
+fig = px.bar(grouped, x="flag", y="risk_score", title="Risk by Flag")
+
+# Table pattern
+result_df = df[df["flag"]=="RUS"][["mmsi","flag","duration_h","risk_score"]]
+
+# Single value pattern
+result_value = f"{{df['risk_score'].sum():.0f}} total risk"
+
+# Scatter map pattern
+fig = px.scatter(df, x="lon", y="lat", color="event_type", size="risk_score", title="Events")
+
+# Density heatmap pattern
+fig = px.density_heatmap(df, x="lon", y="lat", title="Event Density")
+```
 """
 
 
@@ -170,16 +200,16 @@ def load_static_data():
     dur_map = {"GAP": (6, 72), "LOITERING": (4, 48), "ENCOUNTER": (2, 12)}
     durations = [round(rng.uniform(*dur_map[et]), 1) for et in event_types]
 
-    # Sea-only coordinate clusters — tightly bounded to open water
+    # Sea-only coordinate clusters — verified open water, no land overlap
     sea_zones = [
         # (lat_min, lat_max, lon_min, lon_max)
-        (35.5, 37.0, -1.0, 3.0),    # Alboran Sea
-        (38.0, 39.5, 5.0, 8.0),     # west of Sardinia
-        (36.0, 38.0, 9.0, 13.0),    # Tyrrhenian Sea
-        (33.5, 35.5, 12.0, 16.0),   # central Med / off Libya
-        (35.0, 36.5, 17.0, 20.0),   # Ionian Sea
-        (34.5, 35.5, 22.0, 27.0),   # south of Crete (open water)
-        (33.0, 34.5, 30.0, 34.0),   # Levantine basin (off Egypt)
+        (35.5, 36.5, -1.0, 2.0),    # Alboran Sea (south of Spain)
+        (38.5, 39.5, 5.0, 7.5),     # west of Sardinia
+        (37.5, 39.0, 11.0, 13.0),   # Tyrrhenian Sea (north of Sicily)
+        (33.0, 34.5, 13.0, 15.5),   # central Med (off Libya, south of Malta)
+        (35.5, 36.5, 17.5, 19.5),   # Ionian Sea (west of Greece)
+        (34.0, 35.0, 23.0, 26.5),   # south of Crete (open water)
+        (32.5, 33.5, 30.0, 33.0),   # Levantine basin (off Egypt coast)
     ]
     zone_idx = rng.integers(0, len(sea_zones), size=n)
     lats = np.array([rng.uniform(sea_zones[z][0], sea_zones[z][1]) for z in zone_idx]).round(2)
