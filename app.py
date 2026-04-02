@@ -458,70 +458,80 @@ with tab6:
     if "ai_messages" not in st.session_state:
         st.session_state.ai_messages = []
 
-    # Example questions
-    with st.expander("Example questions"):
-        examples = [
-            "Which flag states have the highest total risk? Why?",
-            "Show me all encounters involving Russian-flagged vessels",
-            "Are there any vessels with repeated gap events? What pattern do you see?",
-            "What's happening in the eastern Mediterranean (longitude > 25)?",
-            "Which day had the most suspicious activity and why?",
-            "Plot all events on a scatter map colored by event type",
-            "Compare risk profiles of FOC-flagged vs Mediterranean-flagged vessels",
-            "Find vessels that had both a gap and an encounter -- could this indicate transshipment?",
-            "What's the average gap duration by flag state? Any outliers?",
-            "Rank the top 5 riskiest vessels and explain what makes each one suspicious",
-        ]
-        for ex in examples:
-            if st.button(ex, key=f"ex_{hash(ex)}"):
-                st.session_state.pending_question = ex
-                st.rerun()
+    # Example questions — pick from dropdown, then click Ask
+    examples = [
+        "",
+        "Which flag states have the highest total risk? Why?",
+        "Show me all encounters involving Russian-flagged vessels",
+        "Are there any vessels with repeated gap events?",
+        "What's happening in the eastern Mediterranean (longitude > 25)?",
+        "Which day had the most suspicious activity and why?",
+        "Plot all events on a scatter map colored by event type",
+        "Compare risk profiles of FOC-flagged vs Mediterranean-flagged vessels",
+        "What's the average gap duration by flag state? Any outliers?",
+        "Rank the top 5 riskiest vessels and explain what makes each one suspicious",
+    ]
 
-    # Question input
-    question = st.chat_input("Ask about the vessel data...")
+    picked = st.selectbox(
+        "Pick a question or type your own below",
+        examples,
+        index=0,
+        format_func=lambda x: "-- Pick an example question --" if x == "" else x,
+        key="example_sel",
+    )
 
-    # Check for pending question from examples
-    if "pending_question" in st.session_state:
-        question = st.session_state.pending_question
-        del st.session_state.pending_question
+    typed = st.text_input(
+        "Or type your own question",
+        value="",
+        key="typed_q",
+        placeholder="Type a question here...",
+    )
+
+    ask_clicked = st.button("Ask", type="primary")
+
+    # Only fire on button click
+    question = None
+    if ask_clicked:
+        if typed.strip():
+            question = typed.strip()
+        elif picked:
+            question = picked
 
     if question and gemini_key:
+        st.session_state.ai_messages = []  # fresh conversation each question
         st.session_state.ai_messages.append({"role": "user", "parts": [question]})
 
-        try:
-            from google import genai
+        with st.spinner("Thinking..."):
+            try:
+                from google import genai
 
-            client_ai = genai.Client(api_key=gemini_key)
+                client_ai = genai.Client(api_key=gemini_key)
+                system_ctx = build_system_prompt(df_filtered)
 
-            system_ctx = build_system_prompt(df_filtered)
-
-            # Build contents list for Gemini (history + current question)
-            contents = []
-            for msg in st.session_state.ai_messages[-20:]:
-                contents.append(
-                    genai.types.Content(
-                        role=msg["role"],
-                        parts=[genai.types.Part(text=msg["parts"][0])],
+                contents = []
+                for msg in st.session_state.ai_messages[-20:]:
+                    contents.append(
+                        genai.types.Content(
+                            role=msg["role"],
+                            parts=[genai.types.Part(text=msg["parts"][0])],
+                        )
                     )
+
+                response = client_ai.models.generate_content(
+                    model="gemini-2.5-flash",
+                    contents=contents,
+                    config=genai.types.GenerateContentConfig(
+                        system_instruction=system_ctx,
+                        max_output_tokens=2000,
+                    ),
                 )
 
-            response = client_ai.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=contents,
-                config=genai.types.GenerateContentConfig(
-                    system_instruction=system_ctx,
-                    max_output_tokens=2000,
-                ),
-            )
-            assistant_text = response.text
+                st.session_state.ai_messages.append(
+                    {"role": "model", "parts": [response.text]}
+                )
 
-            st.session_state.ai_messages.append(
-                {"role": "model", "parts": [assistant_text]}
-            )
-
-        except Exception as e:
-            st.error(f"Gemini API error: {e}")
-            assistant_text = None
+            except Exception as e:
+                st.error(f"Gemini API error: {e}")
 
     # Display conversation
     for msg in st.session_state.ai_messages:
@@ -529,16 +539,13 @@ with tab6:
         content = msg["parts"][0] if msg["parts"] else ""
         with st.chat_message(role):
             if role == "assistant":
-                # Extract code blocks
                 code_blocks = re.findall(r"```python\n(.*?)```", content, re.DOTALL)
-                # Display narrative (everything outside code blocks)
                 narrative = re.sub(
                     r"```python\n.*?```", "", content, flags=re.DOTALL
                 ).strip()
                 if narrative:
                     st.markdown(narrative)
 
-                # Execute and display code blocks
                 for code in code_blocks:
                     with st.expander("Generated Code", expanded=True):
                         st.code(code, language="python")
@@ -566,12 +573,6 @@ with tab6:
                         st.warning("Generated code contains restricted operations. Skipping execution.")
             else:
                 st.markdown(content)
-
-    # Clear chat button
-    if st.session_state.ai_messages:
-        if st.button("Clear conversation"):
-            st.session_state.ai_messages = []
-            st.rerun()
 
 # ========================= DOWNLOAD =========================
 if not df_filtered.empty:
