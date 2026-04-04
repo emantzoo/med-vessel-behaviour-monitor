@@ -384,7 +384,12 @@ if use_live and token:
 else:
     df = load_static_data()
 
-# ========================= RISK SCORE =========================
+# ========================= RISK SCORE (GFW-aligned) =========================
+# Aligned with Global Fishing Watch transshipment detection methodology:
+# - Encounters: <500m, >=2h, <2kn, >=10km from shore (Miller et al. 2018)
+# - Likely transshipment: reefer + fishing vessel, >20nm from shore
+# - Potential transshipment: reefer loiters alone (fishing vessel AIS off)
+
 event_weights = {
     "GAP": gap_weight,
     "LOITERING": loitering_weight,
@@ -396,19 +401,88 @@ flag_risks = {
     "LBR": 1.3, "PAN": 1.2, "MHL": 1.2
 }
 
-def get_offshore_bonus(lat, lon):
-    return 1.4 if (lon > 15 and abs(lat - 36) < 8) else 1.0
+# Vessel types with higher transshipment risk (reefers/carriers)
+TRANSSHIPMENT_VESSEL_TYPES = {"CARRIER", "TANKER"}
+
+
+def compute_risk_score(row):
+    """GFW-aligned behavioral risk score."""
+    base = row["duration_h"] ** 0.75
+    ew = event_weights.get(row["event_type"], 1.0)
+    fm = flag_risks.get(row["flag"], 1.0)
+
+    # Shore distance factor (GFW: >=10km encounters, >=20nm loitering)
+    shore_km = row.get("distance_from_shore_km")
+    if pd.notna(shore_km):
+        if shore_km > 37:      # >20nm — high suspicion zone
+            shore_factor = 1.5
+        elif shore_km > 10:    # >10km — GFW encounter threshold
+            shore_factor = 1.2
+        else:
+            shore_factor = 0.8  # near-shore = less suspicious
+    else:
+        shore_factor = 1.0
+
+    # Event-type-specific GFW-aligned factors
+    if row["event_type"] == "ENCOUNTER":
+        # Proximity factor (GFW: <500m = 0.5km)
+        dist = row.get("encounter_median_distance_km")
+        if pd.notna(dist):
+            if dist < 0.5:       # within GFW 500m threshold
+                proximity_factor = 1.8
+            elif dist < 1.0:
+                proximity_factor = 1.3
+            else:
+                proximity_factor = 1.0
+        else:
+            proximity_factor = 1.0
+
+        # Speed factor (GFW: <2 knots = likely transfer)
+        speed = row.get("encounter_median_speed_knots")
+        if pd.notna(speed):
+            speed_factor = 1.5 if speed < 2.0 else 1.0
+        else:
+            speed_factor = 1.0
+
+        # Vessel type factor (reefer/carrier encounters are key transshipment indicator)
+        vtype = str(row.get("vessel_type", "")).upper()
+        vessel_factor = 1.4 if vtype in TRANSSHIPMENT_VESSEL_TYPES else 1.0
+
+        return base * ew * fm * shore_factor * proximity_factor * speed_factor * vessel_factor
+
+    elif row["event_type"] == "LOITERING":
+        # Loitering reefer = GFW "potential transshipment" indicator
+        vtype = str(row.get("vessel_type", "")).upper()
+        vessel_factor = 1.6 if vtype in TRANSSHIPMENT_VESSEL_TYPES else 1.0
+
+        # Low speed = staging behaviour (GFW: avg <2kn)
+        speed = row.get("loitering_avg_speed_knots")
+        if pd.notna(speed):
+            speed_factor = 1.4 if speed < 2.0 else 1.0
+        else:
+            speed_factor = 1.0
+
+        return base * ew * fm * shore_factor * vessel_factor * speed_factor
+
+    elif row["event_type"] == "GAP":
+        # Speed change across gap = evasion indicator
+        spd_before = row.get("speed_before_gap")
+        spd_after = row.get("speed_after_gap")
+        if pd.notna(spd_before) and pd.notna(spd_after):
+            speed_change = abs(spd_before - spd_after)
+            # Large speed change = likely intentional (was moving, went dark, reappeared slow)
+            evasion_factor = 1.5 if speed_change > 5 else (1.2 if speed_change > 2 else 1.0)
+        else:
+            evasion_factor = 1.0
+
+        return base * ew * fm * shore_factor * evasion_factor
+
+    else:
+        return base * ew * fm * shore_factor
+
 
 df_filtered = df[df["duration_h"] >= min_duration].copy()
-
-df_filtered["risk_score"] = df_filtered.apply(
-    lambda row: (row["duration_h"] ** 0.75) *
-                event_weights.get(row["event_type"], 1.0) *
-                flag_risks.get(row["flag"], 1.0) *
-                (get_offshore_bonus(row["lat"], row["lon"]) if row["event_type"] == "LOITERING" else 1.0),
-    axis=1
-)
-
+df_filtered["risk_score"] = df_filtered.apply(compute_risk_score, axis=1).round(1)
 total_risk = df_filtered["risk_score"].sum()
 
 # ========================= COLOR SCHEME =========================
@@ -926,20 +1000,31 @@ with tab11:
 # ========================= METHODOLOGY (sidebar) =========================
 with st.sidebar.expander("Methodology & About"):
     st.markdown("""
-**Risk Score Formula**
-`risk = (duration_h ^ 0.75) x event_weight x flag_multiplier x offshore_bonus`
+**GFW-Aligned Risk Scoring**
 
-- **Encounters** weighted highest (transshipment risk)
-- **Gaps** (AIS disabling) next (intentional dark activity)
-- **Loitering** weighted for staging + offshore bonus
+Risk model replicates Global Fishing Watch transshipment detection
+methodology (Miller et al. 2018).
 
-**Data Source**
-Global Fishing Watch Events API (GAP, ENCOUNTER, LOITERING).
-Static fallback uses a realistic synthetic Med dataset.
+`risk = duration^0.75 x event_weight x flag_mult x shore_factor x event_factors`
 
-**Caveats**
-Not all dark activity is illegal. AIS coverage has gaps.
-This tool is for educational/portfolio use only.
+**Encounter factors** (GFW criteria):
+- Proximity: <500m = 1.8x (GFW threshold)
+- Speed: <2kn = 1.5x (likely transfer)
+- Vessel type: reefer/carrier = 1.4x
+
+**Loitering factors** (potential transshipment):
+- Reefer/carrier loitering = 1.6x
+- Avg speed <2kn = 1.4x
+
+**Gap factors** (evasion):
+- Speed change >5kn across gap = 1.5x
+
+**Shore distance** (all events):
+- >20nm = 1.5x | >10km = 1.2x | <10km = 0.8x
+
+**Data:** GFW Events API (GAP, ENCOUNTER, LOITERING)
+
+*Not all dark activity is illegal. For educational use only.*
     """)
 
 # ========================= DOWNLOAD =========================
