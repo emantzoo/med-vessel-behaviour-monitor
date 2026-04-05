@@ -4,3 +4,4 @@ __pycache__/
 .env
 specs/
 data/raw/
+CLAUDE.md
