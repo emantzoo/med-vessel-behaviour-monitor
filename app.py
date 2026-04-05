@@ -157,8 +157,16 @@ with col1:
         m = folium.Map(location=[37.0, 18.0], zoom_start=5, tiles="CartoDB positron")
         color_map = {"GAP": "red", "LOITERING": "orange", "ENCOUNTER": "purple"}
 
-        # FDI fishing effort choropleth layer
-        if show_fdi_layer and not fdi_effort.empty:
+        # Create toggleable layer groups
+        fg_gap = folium.FeatureGroup(name="AIS Gap", show=True)
+        fg_loiter = folium.FeatureGroup(name="Loitering", show=True)
+        fg_encounter = folium.FeatureGroup(name="Encounter", show=True)
+        fg_iuu = folium.FeatureGroup(name="IUU-Listed", show=True)
+        fg_iccat = folium.FeatureGroup(name="ICCAT Authorized", show=True)
+        fg_fdi = folium.FeatureGroup(name="FDI Fishing Effort", show=show_fdi_layer)
+
+        # FDI fishing effort choropleth layer (only near events)
+        if not fdi_effort.empty and "csq_lon" in df_filtered.columns:
             latest_year = fdi_effort["year"].max()
             fdi_agg = (
                 fdi_effort[fdi_effort["year"] == latest_year]
@@ -166,9 +174,15 @@ with col1:
                 .sum()
                 .reset_index()
             )
+            event_lons = df_filtered["lon"].values
+            event_lats = df_filtered["lat"].values
             for _, cell in fdi_agg.iterrows():
                 sw_lon = cell["rectangle_lon"]
                 sw_lat = cell["rectangle_lat"]
+                centre_lon = sw_lon + 0.25
+                centre_lat = sw_lat + 0.25
+                if not ((abs(event_lons - centre_lon) < 1.0) & (abs(event_lats - centre_lat) < 1.0)).any():
+                    continue
                 days = cell["totfishdays"]
                 if days >= 2000:
                     color = "#e31a1c"
@@ -183,10 +197,10 @@ with col1:
                     color=color,
                     fill=True,
                     fill_color=color,
-                    fill_opacity=0.25,
-                    weight=0.5,
+                    fill_opacity=0.2,
+                    weight=0,
                     popup=f"Fishing days ({latest_year}): {days:,.0f}",
-                ).add_to(m)
+                ).add_to(fg_fdi)
 
         # Pre-compute FDI context per unique c-square (avoid repeated 83K-row scans)
         fdi_cache = {}
@@ -266,46 +280,52 @@ with col1:
                 marker_color = color_map.get(row["event_type"], "blue")
                 marker_radius = 8
 
-            folium.CircleMarker(
+            marker = folium.CircleMarker(
                 location=[row["lat"], row["lon"]],
                 radius=marker_radius,
                 color=marker_color,
                 popup=popup_text,
                 fill=True,
-            ).add_to(m)
+            )
 
-        fdi_legend = ""
-        if show_fdi_layer and not fdi_effort.empty:
-            fdi_legend = """
-            <hr style="margin:6px 0 4px 0">
-            <b style="font-size:12px">FDI Effort</b><br>
-            <span style="display:inline-block;width:12px;height:12px;background:#ffffb2;border:1px solid #ccc;margin-right:6px;vertical-align:middle"></span> Low (&lt;50d)<br>
-            <span style="display:inline-block;width:12px;height:12px;background:#fecc5c;border:1px solid #ccc;margin-right:6px;vertical-align:middle"></span> Moderate (50-500d)<br>
-            <span style="display:inline-block;width:12px;height:12px;background:#fd8d3c;border:1px solid #ccc;margin-right:6px;vertical-align:middle"></span> High (500-2000d)<br>
-            <span style="display:inline-block;width:12px;height:12px;background:#e31a1c;border:1px solid #ccc;margin-right:6px;vertical-align:middle"></span> Very High (&gt;2000d)
-            """
-        legend_html = f"""
-        {{% macro html(this, kwargs) %}}
-        <div style="
-            position: fixed; bottom: 30px; left: 30px; z-index: 1000;
-            background: white; padding: 10px 14px; border-radius: 6px;
-            box-shadow: 0 1px 5px rgba(0,0,0,0.3); font-size: 13px;
-            line-height: 1.8; font-family: Arial, sans-serif;">
-            <b style="font-size:13px">Legend</b><br>
-            <span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:red;margin-right:6px;vertical-align:middle"></span> AIS Gap<br>
-            <span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:orange;margin-right:6px;vertical-align:middle"></span> Loitering<br>
-            <span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:purple;margin-right:6px;vertical-align:middle"></span> Encounter<br>
-            <span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:blue;margin-right:6px;vertical-align:middle"></span> ICCAT Authorized<br>
-            <span style="display:inline-block;width:16px;height:16px;border-radius:50%;background:black;margin-right:6px;vertical-align:middle"></span> IUU-Listed
-            {fdi_legend}
-        </div>
-        {{% endmacro %}}
-        """
-        legend = MacroElement()
-        legend._template = Template(legend_html)
-        m.get_root().add_child(legend)
+            # Add marker to appropriate layer group
+            if is_iuu:
+                marker.add_to(fg_iuu)
+            elif is_iccat:
+                marker.add_to(fg_iccat)
+            elif row["event_type"] == "GAP":
+                marker.add_to(fg_gap)
+            elif row["event_type"] == "LOITERING":
+                marker.add_to(fg_loiter)
+            else:
+                marker.add_to(fg_encounter)
+
+        # Add all layer groups to map (FDI first so it renders behind markers)
+        fg_fdi.add_to(m)
+        fg_gap.add_to(m)
+        fg_loiter.add_to(m)
+        fg_encounter.add_to(m)
+        fg_iccat.add_to(m)
+        fg_iuu.add_to(m)
+        folium.LayerControl(collapsed=True).add_to(m)
 
         st_folium(m, width=700, height=500)
+
+        # Color legend below map
+        dot = '<span style="display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:4px;vertical-align:middle;background:{c}"></span>'
+        sq = '<span style="display:inline-block;width:11px;height:11px;margin-right:4px;vertical-align:middle;background:{c};border:1px solid #ccc"></span>'
+        legend_md = (
+            f'{dot.format(c="red")} AIS Gap&ensp;'
+            f'{dot.format(c="orange")} Loitering&ensp;'
+            f'{dot.format(c="purple")} Encounter&ensp;'
+            f'{dot.format(c="blue")} ICCAT&ensp;'
+            f'{dot.format(c="black")} IUU&ensp;&ensp;'
+            f'{sq.format(c="#ffffb2")} <small>&lt;50d</small>&ensp;'
+            f'{sq.format(c="#fecc5c")} <small>50-500d</small>&ensp;'
+            f'{sq.format(c="#fd8d3c")} <small>500-2kd</small>&ensp;'
+            f'{sq.format(c="#e31a1c")} <small>&gt;2kd</small>'
+        )
+        st.markdown(f'<div style="font-size:13px;line-height:1.8">{legend_md}</div>', unsafe_allow_html=True)
     else:
         st.info("No events match the selected filters.")
 
