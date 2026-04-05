@@ -17,7 +17,7 @@ The risk scoring replicates the criteria from Global Fishing Watch's transshipme
 | GFW Criterion | How We Apply It |
 |---------------|-----------------|
 | Encounter: two vessels < 500m | Proximity factor: < 500m = 1.8x risk weight |
-| Duration >= 2 hours | Configurable minimum duration filter (sidebar) |
+| Duration >= 2 hours | Default filter at 2h (configurable via sidebar slider) |
 | Median speed < 2 knots | Speed factor: < 2kn = 1.5x (encounters), 1.4x (loitering) |
 | >= 10km from anchorage | Shore distance factor: > 10km = 1.2x, > 20nm = 1.5x |
 | Likely transshipment = reefer + fishing vessel | Vessel type factor: carrier/tanker = 1.4x in encounters |
@@ -65,7 +65,7 @@ The AI tab uses Google Gemini 2.5 Flash with a RAG (Retrieval-Augmented Generati
 ## Data
 
 - **Live**: GFW Events API (gaps, encounters, loitering) filtered to Mediterranean via GeoJSON polygon
-- **Static fallback**: 80-event synthetic dataset with 23 columns, seeded for reproducibility
+- **Static fallback**: 80-event synthetic dataset with 23 columns, seeded for reproducibility (encounters 2-24h, loitering 4-48h, gaps 6-72h)
 - Rich fields: vessel name/type, distances, gap speed profiles, encounter proximity, EEZ, nearest port
 
 ## Stack
@@ -84,6 +84,15 @@ Add API keys in `.streamlit/secrets.toml`:
 gfw_token = "your_gfw_jwt_token"
 gemini_key = "your_gemini_api_key"
 ```
+
+## Live API Field Extraction
+
+When connected to the GFW Events API, the app extracts nested fields from the JSON response for full risk model support:
+
+- `event_info` → encounter median distance/speed, gap distances/speeds, loitering distance/speed
+- `distances` → shore distance (km), port distance (km), nearest port name
+- `regions` → EEZ and Mediterranean zone classification
+- `vessel` → vessel name, type, flag state
 
 ## References
 
