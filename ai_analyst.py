@@ -297,10 +297,10 @@ def render_ai_analyst(df_filtered, fdi_effort, fdi_landings, knowledge_base, gem
                                 "np": np,
                                 "px": px,
                                 "go": go,
-                                "fdi_effort": fdi_effort,
-                                "fdi_landings": fdi_landings,
-                                "iuu_vessels": iuu_vessels,
-                                "iccat_vessels": iccat_vessels,
+                                "fdi_effort": fdi_effort.copy() if fdi_effort is not None and not fdi_effort.empty else pd.DataFrame(),
+                                "fdi_landings": fdi_landings.copy() if fdi_landings is not None and not fdi_landings.empty else pd.DataFrame(),
+                                "iuu_vessels": iuu_vessels.copy() if iuu_vessels is not None and not iuu_vessels.empty else pd.DataFrame(),
+                                "iccat_vessels": iccat_vessels.copy() if iccat_vessels is not None and not iccat_vessels.empty else pd.DataFrame(),
                             }
                             exec(code, exec_ns)
 

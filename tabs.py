@@ -442,6 +442,11 @@ def render_fisheries_context(df, fdi_effort, fdi_landings):
         }),
         use_container_width=True,
     )
+    st.info(
+        "FDI spatial data covers EU Member State fleets only. C-squares in non-EU waters "
+        "(Libya, North Africa, eastern Mediterranean) have no coverage -- this is expected, "
+        "not a data error."
+    )
     st.markdown(
         "**Interpretation:** Events *outside* known fishing grounds or in cells "
         "with *no FDI data* are potentially more suspicious -- they may indicate "

@@ -108,7 +108,14 @@ if use_live and token and not df_filtered.empty:
     unique_mmsis = df_filtered["mmsi"].dropna().unique().tolist()
     imo_map = lookup_vessel_imos(unique_mmsis, token)
     if imo_map:
-        df_filtered["imo"] = df_filtered["mmsi"].astype(str).map(imo_map)
+        df_filtered["imo"] = df_filtered["mmsi"].astype(str).map(imo_map).fillna("")
+
+# Ensure IMO column exists (static CSV may lack it)
+if "imo" not in df_filtered.columns:
+    df_filtered["imo"] = ""
+
+# Preserve base risk score before IUU/ICCAT multipliers
+df_filtered["base_risk_score"] = df_filtered["risk_score"].copy()
 
 # IUU cross-reference (after risk scoring)
 if not df_filtered.empty and not iuu_vessels.empty:
@@ -128,6 +135,12 @@ with col1:
     if not df_filtered.empty:
         m = folium.Map(location=[37.0, 18.0], zoom_start=5, tiles="CartoDB positron")
         color_map = {"GAP": "red", "LOITERING": "orange", "ENCOUNTER": "purple"}
+
+        # Pre-compute FDI context per unique c-square (avoid repeated 83K-row scans)
+        fdi_cache = {}
+        if not fdi_effort.empty and "csq_lon" in df_filtered.columns:
+            for csq_lon, csq_lat in df_filtered[["csq_lon", "csq_lat"]].drop_duplicates().values:
+                fdi_cache[(csq_lon, csq_lat)] = get_fdi_context(csq_lon, csq_lat, fdi_effort, fdi_landings)
 
         for _, row in df_filtered.iterrows():
             popup_text = f"""
@@ -153,7 +166,7 @@ with col1:
                 <b>Multiplier:</b> {row.get('iuu_multiplier', 1.0):.1f}x
                 """
                 reason = row.get("iuu_listing_reason", "")
-                if reason:
+                if reason and pd.notna(reason) and str(reason).strip().lower() != "nan":
                     popup_text += f"<br><b>Reason:</b> {str(reason)[:200]}"
 
             # ICCAT authorization enrichment
@@ -169,19 +182,26 @@ with col1:
                 if is_iuu:
                     popup_text += "<br><b style='color:darkred'>DUAL FLAG: IUU-listed + ICCAT-authorized</b>"
 
-            if not fdi_effort.empty and "csq_lon" in row.index:
-                ctx = get_fdi_context(row["csq_lon"], row["csq_lat"], fdi_effort, fdi_landings)
+            if "csq_lon" in row.index:
+                ctx = fdi_cache.get((row["csq_lon"], row["csq_lat"]))
                 if ctx and ctx["total_fishing_days"] > 0:
                     top_sp_str = ", ".join(
                         SPECIES_NAMES.get(s[0], s[0]) for s in ctx["top_species"][:3]
                     )
+                    tonnes = ctx['total_landings_tonnes']
+                    if tonnes > 1000:
+                        level = "High"
+                    elif tonnes > 10:
+                        level = "Moderate"
+                    else:
+                        level = "Low"
                     popup_text += f"""
                     <hr style='margin:4px 0'>
                     <b>FDI Baseline</b><br>
                     <b>Fishing ground:</b> {'Yes' if ctx['is_known_fishing_ground'] else 'No'}<br>
                     <b>Fishing days:</b> {ctx['total_fishing_days']:,.0f}<br>
                     <b>Top species:</b> {top_sp_str}<br>
-                    <b>Landings:</b> {ctx['total_landings_tonnes']:,.0f} t
+                    <b>Landings:</b> {tonnes:,.0f} t ({level})
                     """
 
             if is_iuu:

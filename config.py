@@ -47,6 +47,8 @@ FORBIDDEN_CODE = [
 
 def classify_med_zone(lon, lat):
     """Classify a point into a Mediterranean sub-region."""
+    if lat < 30 or lat > 46:
+        return "Outside Mediterranean"
     if lon < 0:
         return "Strait of Gibraltar"
     elif lon < 5:

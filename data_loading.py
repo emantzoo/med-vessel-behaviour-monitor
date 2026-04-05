@@ -323,7 +323,10 @@ def lookup_vessel_imos(mmsi_list, token):
 def load_fdi_effort():
     path = os.path.join(os.path.dirname(__file__), "data", "fdi_effort_med.csv")
     if os.path.exists(path):
-        return pd.read_csv(path)
+        try:
+            return pd.read_csv(path)
+        except Exception as e:
+            st.warning(f"Error loading FDI effort data: {e}")
     return pd.DataFrame()
 
 
@@ -331,7 +334,10 @@ def load_fdi_effort():
 def load_fdi_landings():
     path = os.path.join(os.path.dirname(__file__), "data", "fdi_landings_med.csv")
     if os.path.exists(path):
-        return pd.read_csv(path)
+        try:
+            return pd.read_csv(path)
+        except Exception as e:
+            st.warning(f"Error loading FDI landings data: {e}")
     return pd.DataFrame()
 
 
@@ -342,11 +348,14 @@ def load_iuu_vessels():
     """Load preprocessed IUU vessel list."""
     path = os.path.join(os.path.dirname(__file__), "data", "iuu_vessels.csv")
     if os.path.exists(path):
-        df = pd.read_csv(path, dtype={"mmsi": str, "imo": str})
-        df["mmsi"] = df["mmsi"].fillna("")
-        df["imo"] = df["imo"].fillna("")
-        df["all_names"] = df["all_names"].fillna("").astype(str)
-        return df
+        try:
+            df = pd.read_csv(path, dtype={"mmsi": str, "imo": str})
+            df["mmsi"] = df["mmsi"].fillna("")
+            df["imo"] = df["imo"].fillna("")
+            df["all_names"] = df["all_names"].fillna("").astype(str)
+            return df
+        except Exception as e:
+            st.warning(f"Error loading IUU vessel list: {e}")
     return pd.DataFrame()
 
 
@@ -357,5 +366,8 @@ def load_iccat_vessels():
     """Load preprocessed ICCAT Med-authorized vessel list."""
     path = os.path.join(os.path.dirname(__file__), "data", "iccat_med_vessels.csv")
     if os.path.exists(path):
-        return pd.read_csv(path, dtype=str).fillna("")
+        try:
+            return pd.read_csv(path, dtype=str).fillna("")
+        except Exception as e:
+            st.warning(f"Error loading ICCAT vessel list: {e}")
     return pd.DataFrame()

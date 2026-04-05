@@ -180,11 +180,13 @@ def check_iuu_match(mmsi, vessel_name, iuu_df, include_delisted=False, imo=None)
         if not name_upper:
             return dict(_NO_MATCH)
 
-        # Exact match: name is one of the pipe-delimited known names
-        for idx, row in working.iterrows():
-            known = [n.strip() for n in str(row["all_names"]).upper().split("|")]
-            if name_upper in known:
-                return _build_match_result(row, "name_exact", "medium")
+        # Exact match: name is one of the pipe-delimited known names (vectorised)
+        name_mask = working["all_names"].str.upper().str.split("|").apply(
+            lambda names: name_upper in [n.strip() for n in names]
+        )
+        exact_matches = working[name_mask]
+        if not exact_matches.empty:
+            return _build_match_result(exact_matches.iloc[0], "name_exact", "medium")
 
         # Fuzzy match: name appears as substring in all_names
         fuzzy = working[
@@ -264,7 +266,7 @@ def check_iccat_match(vessel_name, iccat_df, imo=None):
         if "IntRegNo" in iccat_df.columns and "IRNoTypeCode" in iccat_df.columns:
             imo_matches = iccat_df[
                 (iccat_df["IRNoTypeCode"] == "IMO") &
-                (iccat_df["IntRegNo"].str.replace(".0", "", regex=False) == imo_str)
+                (iccat_df["IntRegNo"].str.split(".").str[0] == imo_str)
             ]
             if not imo_matches.empty:
                 return _build_iccat_result(imo_matches.iloc[0])
