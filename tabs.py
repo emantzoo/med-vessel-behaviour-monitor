@@ -5,7 +5,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 
-from config import EVENT_COLORS, SPECIES_NAMES
+from config import EVENT_COLORS, SPECIES_NAMES, FLAG_RISKS
 from risk_model import get_fdi_context
 
 
@@ -17,7 +17,22 @@ def render_daily_trend(df):
     daily = df.groupby("date")["risk_score"].sum().reset_index()
     fig = px.line(daily, x="date", y="risk_score", markers=True,
                   title="Total risk score by day")
+
+    # Mark IUU event dates
+    if "iuu_matched" in df.columns:
+        iuu_dates = df[df["iuu_matched"] == True]["date"].unique()
+        for d in iuu_dates:
+            fig.add_vline(x=d, line_dash="dash", line_color="black",
+                          annotation_text="IUU", annotation_position="top")
+
     st.plotly_chart(fig)
+
+    # Stacked area by event type
+    daily_by_type = df.groupby(["date", "event_type"])["risk_score"].sum().reset_index()
+    fig2 = px.area(daily_by_type, x="date", y="risk_score", color="event_type",
+                   color_discrete_map=EVENT_COLORS,
+                   title="Daily Risk by Event Type")
+    st.plotly_chart(fig2)
 
 
 def render_flag_breakdown(df):
@@ -31,6 +46,31 @@ def render_flag_breakdown(df):
                  title="Total risk by flag (sorted)")
     st.plotly_chart(fig)
 
+    # Stacked bar by event type
+    flag_type = (df.groupby(["flag", "event_type"])["risk_score"].sum()
+                 .reset_index().sort_values("risk_score", ascending=False))
+    fig2 = px.bar(flag_type, x="risk_score", y="flag", color="event_type",
+                  orientation="h", color_discrete_map=EVENT_COLORS,
+                  title="Risk by Flag State and Event Type")
+    st.plotly_chart(fig2)
+
+    # IUU/ICCAT summary by flag
+    cols = st.columns(2)
+    if "iuu_matched" in df.columns:
+        iuu_by_flag = df[df["iuu_matched"] == True].groupby("flag")["mmsi"].nunique()
+        if not iuu_by_flag.empty:
+            with cols[0]:
+                st.markdown("**IUU-listed vessels by flag:**")
+                st.dataframe(iuu_by_flag.reset_index().rename(
+                    columns={"mmsi": "IUU Vessels", "flag": "Flag"}))
+    if "iccat_authorized" in df.columns:
+        iccat_by_flag = df[df["iccat_authorized"] == True].groupby("flag")["mmsi"].nunique()
+        if not iccat_by_flag.empty:
+            with cols[1]:
+                st.markdown("**ICCAT-authorized vessels by flag:**")
+                st.dataframe(iccat_by_flag.reset_index().rename(
+                    columns={"mmsi": "ICCAT Vessels", "flag": "Flag"}))
+
 
 def render_event_types(df):
     st.subheader("Breakdown by Event Type")
@@ -42,6 +82,23 @@ def render_event_types(df):
                  color="event_type", color_discrete_map=EVENT_COLORS,
                  title="Risk contribution by event type")
     st.plotly_chart(fig)
+
+    # Summary table
+    summary = df.groupby("event_type").agg(
+        events=("mmsi", "count"),
+        avg_duration=("duration_h", "mean"),
+        avg_risk=("risk_score", "mean"),
+        total_risk=("risk_score", "sum"),
+    ).reset_index()
+    if "iuu_matched" in df.columns:
+        iuu_counts = df[df["iuu_matched"] == True].groupby("event_type")["mmsi"].count()
+        summary["iuu_matches"] = summary["event_type"].map(iuu_counts).fillna(0).astype(int)
+    if "iccat_authorized" in df.columns:
+        iccat_counts = df[df["iccat_authorized"] == True].groupby("event_type")["mmsi"].count()
+        summary["iccat_authorized"] = summary["event_type"].map(iccat_counts).fillna(0).astype(int)
+    st.dataframe(summary.style.format({
+        "avg_duration": "{:.1f}h", "avg_risk": "{:.1f}", "total_risk": "{:.0f}"
+    }))
 
 
 def render_duration_analysis(df):
@@ -61,6 +118,14 @@ def render_duration_analysis(df):
     st.markdown("**Why it matters:** Long gaps (>24h) suggest deliberate AIS disabling. "
                 "Encounters over 8h point to transshipment. Short loitering may be staging.")
 
+    # Duration vs risk scatter by flag
+    hover_cols = ["vessel_name", "event_type", "mmsi"] if "vessel_name" in df.columns else ["event_type", "mmsi"]
+    fig2 = px.scatter(df, x="duration_h", y="risk_score", color="flag",
+                      hover_data=hover_cols,
+                      title="Duration vs Risk Score by Flag",
+                      labels={"duration_h": "Duration (hours)", "risk_score": "Risk Score"})
+    st.plotly_chart(fig2)
+
 
 def render_geographic_risk(df):
     st.subheader("Geographic Risk Analysis")
@@ -68,13 +133,25 @@ def render_geographic_risk(df):
         st.info("No data.")
         return
 
+    df_geo = df.copy()
+    df_geo["marker"] = "Regular"
+    if "iuu_matched" in df_geo.columns:
+        df_geo.loc[df_geo["iuu_matched"] == True, "marker"] = "IUU-Listed"
+    if "iccat_authorized" in df_geo.columns:
+        df_geo.loc[(df_geo["iccat_authorized"] == True) & (df_geo["marker"] == "Regular"), "marker"] = "ICCAT-Authorized"
+
+    hover_cols = ["mmsi", "flag", "duration_h", "risk_score"]
+    if "vessel_name" in df_geo.columns:
+        hover_cols.append("vessel_name")
+
     fig = px.scatter(
-        df, x="lon", y="lat", size="risk_score", color="event_type",
+        df_geo, x="lon", y="lat", size="risk_score", color="event_type",
+        symbol="marker",
+        symbol_map={"Regular": "circle", "IUU-Listed": "diamond", "ICCAT-Authorized": "square"},
         color_discrete_map=EVENT_COLORS,
-        hover_data=["mmsi", "flag", "duration_h", "risk_score",
-                    "vessel_name"] if "vessel_name" in df.columns else ["mmsi", "flag"],
+        hover_data=hover_cols,
         size_max=25,
-        title="Risk-Weighted Event Map (bubble size = risk score)",
+        title="Risk-Weighted Event Map (shape: circle=regular, diamond=IUU, square=ICCAT)",
         labels={"lon": "Longitude", "lat": "Latitude"},
     )
     st.plotly_chart(fig)
@@ -150,6 +227,13 @@ def render_risk_heatmap(df):
         xaxis_title="Event Type", yaxis_title="Flag State", height=500,
     )
     st.plotly_chart(fig)
+    # Highest risk combination insight
+    if not pivot.empty:
+        max_flag = pivot.max(axis=1).idxmax()
+        max_type = pivot.loc[max_flag].idxmax()
+        max_val = pivot.loc[max_flag, max_type]
+        st.markdown(f"**Highest risk combination:** {max_flag} + {max_type} = {max_val:.1f} risk score")
+
     st.markdown("**Interpretation:** bright cells = high risk combinations. "
                 "Look for Russian/Iranian flags with high GAP or ENCOUNTER scores.")
 
@@ -208,6 +292,25 @@ def render_repeat_offenders(df):
     else:
         st.info("No vessels with multiple events in filtered data.")
 
+    # Event timeline for top 3 repeat offenders
+    if not repeat_vessels.empty:
+        top3 = repeat_vessels.head(3)["mmsi"].tolist()
+        timeline_df = df[df["mmsi"].isin(top3)].copy()
+        if not timeline_df.empty:
+            st.subheader("Event Timeline for Top Repeat Offenders")
+            hover_cols = ["flag", "duration_h"]
+            if "vessel_name" in timeline_df.columns:
+                hover_cols.append("vessel_name")
+            fig_tl = px.scatter(
+                timeline_df, x="date", y="mmsi", color="event_type",
+                size="risk_score", color_discrete_map=EVENT_COLORS,
+                hover_data=hover_cols,
+                title="When did the top repeat offenders act?",
+                labels={"mmsi": "Vessel MMSI", "date": "Date"},
+            )
+            fig_tl.update_yaxes(type="category")
+            st.plotly_chart(fig_tl)
+
     st.markdown("**Why it matters:** A vessel with 5 events is far more interesting "
                 "than 5 vessels with 1 event each. Repeat offenders warrant deeper investigation.")
 
@@ -216,10 +319,25 @@ def render_gap_behaviour(df):
     st.subheader("Gap Behaviour Analysis")
     gap_df = df[df["event_type"] == "GAP"].copy()
 
+    # IUU gap warning
+    if not gap_df.empty and "iuu_matched" in gap_df.columns:
+        iuu_gaps = gap_df[gap_df["iuu_matched"] == True]
+        if not iuu_gaps.empty:
+            st.warning(f"**{len(iuu_gaps)} AIS gap(s) involve IUU-listed vessels** -- "
+                       "highest-priority evasion signals.")
+
     if not gap_df.empty and "speed_before_gap" in gap_df.columns and gap_df["speed_before_gap"].notna().any():
+        # Add IUU status for marker symbols
+        if "iuu_matched" in gap_df.columns:
+            gap_df["status"] = gap_df["iuu_matched"].map({True: "IUU-Listed", False: "Regular"})
+            symbol_col = "status"
+        else:
+            symbol_col = None
+
         fig = px.scatter(
             gap_df, x="speed_before_gap", y="speed_after_gap",
             size="duration_h", color="flag",
+            symbol=symbol_col,
             hover_data=["mmsi", "duration_h",
                         "gap_distance_km"] + (["vessel_name"] if "vessel_name" in gap_df.columns else []),
             title="Gap Behaviour: Speed Before vs After AIS Disabling",
@@ -297,6 +415,20 @@ def render_encounter_analysis(df):
                 carrier_cols = [c for c in carrier_cols if c in iccat_carriers.columns]
                 st.dataframe(iccat_carriers[carrier_cols].sort_values("risk_score", ascending=False))
 
+        # Flag pairing analysis
+        if "encounter_vessel_flag" in enc_df.columns and enc_df["encounter_vessel_flag"].notna().any():
+            pair_df = enc_df.groupby(["flag", "encounter_vessel_flag"]).agg(
+                count=("mmsi", "count"),
+                total_risk=("risk_score", "sum")
+            ).reset_index().sort_values("total_risk", ascending=False).head(10)
+            if not pair_df.empty:
+                pair_df["pairing"] = pair_df["flag"] + " <> " + pair_df["encounter_vessel_flag"]
+                fig_pair = px.bar(pair_df, x="total_risk", y="pairing", orientation="h",
+                                  color="count", color_continuous_scale="Reds",
+                                  title="Top Flag Pairings in Encounters (by risk)",
+                                  labels={"total_risk": "Total Risk", "pairing": "Flag Pairing"})
+                st.plotly_chart(fig_pair)
+
         st.markdown("**Why it matters:** Two vessels within 100m for 8 hours is almost certainly "
                     "a transshipment. Look for high-risk flag combinations (e.g. RUS + PAN).")
     elif not enc_df.empty:
@@ -339,6 +471,20 @@ def render_top_vessels(df):
             vessel_risk["ICCAT Authorized"] = vessel_risk["mmsi"].map(iccat_map).fillna("")
 
     st.dataframe(vessel_risk.style.format({"risk": "{:.1f}"}))
+
+    # Risk decomposition for #1 vessel
+    if not vessel_risk.empty:
+        top = vessel_risk.iloc[0]
+        top_mmsi = top["mmsi"]
+        top_events = df[df["mmsi"] == top_mmsi]
+        st.markdown(f"**#1 Riskiest Vessel Breakdown:**")
+        st.markdown(
+            f"- {top_events.shape[0]} events ({top_events['event_type'].value_counts().to_dict()})\n"
+            f"- Flag: {top.get('flag', 'N/A')} (multiplier: {FLAG_RISKS.get(top.get('flag', ''), 1.0)}x)\n"
+            f"- Avg duration: {top_events['duration_h'].mean():.1f}h\n"
+            f"- IUU listed: {'Yes' if top.get('IUU Listed', '') else 'No'}\n"
+            f"- ICCAT authorized: {'Yes' if top.get('ICCAT Authorized', '') else 'No'}"
+        )
 
     if "vessel_type" in df.columns and df["vessel_type"].notna().any():
         st.subheader("Risk by Vessel Type")
@@ -521,6 +667,13 @@ def render_fisheries_context(df, fdi_effort, fdi_landings):
             )
             fig_d.update_layout(coloraxis_colorbar_title="Tonnes")
             st.plotly_chart(fig_d)
+
+            # ICCAT-managed species note
+            iccat_species = {"SWO", "BFT", "ALB"}
+            top_species_codes = sp_agg.index.tolist()
+            if any(s in iccat_species for s in top_species_codes):
+                st.markdown("**Note:** ICCAT-managed species detected in these c-squares. "
+                            "Transshipment of BFT/SWO in these areas has elevated regulatory significance.")
         else:
             st.info("No FDI landings data matches GFW event c-squares.")
     else:

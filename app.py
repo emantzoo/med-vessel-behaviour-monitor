@@ -103,6 +103,13 @@ iccat_vessels = load_iccat_vessels()
 knowledge_base = load_knowledge_base()
 
 # ========================= FILTER & SCORE =========================
+# Clip events to selected date range (± 3 day buffer for long-running events)
+if "date" in df.columns and len(date_range) == 2:
+    df["date"] = pd.to_datetime(df["date"], errors="coerce", utc=True).dt.tz_localize(None)
+    buffer_start = pd.Timestamp(date_range[0]) - pd.Timedelta(days=3)
+    buffer_end = pd.Timestamp(date_range[1]) + pd.Timedelta(days=3)
+    df = df[df["date"].between(buffer_start, buffer_end) | df["date"].isna()]
+
 df_filtered = df[df["duration_h"] >= min_duration].copy()
 df_filtered["risk_score"] = df_filtered.apply(
     compute_risk_score, axis=1, event_weights=event_weights, flag_risks=FLAG_RISKS,
@@ -209,66 +216,10 @@ with col1:
                 fdi_cache[(csq_lon, csq_lat)] = get_fdi_context(csq_lon, csq_lat, fdi_effort, fdi_landings)
 
         for _, row in df_filtered.iterrows():
-            popup_text = f"""
-            <b>Event:</b> {row['event_type']}<br>
-            <b>Flag:</b> {row['flag']}<br>
-            <b>Duration:</b> {row['duration_h']} h<br>
-            <b>Risk Score:</b> {row['risk_score']:.1f}
-            """
-            if "vessel_name" in row and pd.notna(row.get("vessel_name")):
-                popup_text = f"<b>{row['vessel_name']}</b><br>" + popup_text
-
-            # IUU match enrichment
             is_iuu = row.get("iuu_matched", False)
-            if is_iuu:
-                tier = "GFCM (Med)" if row.get("iuu_is_gfcm") else "Other RFMO"
-                popup_text += f"""
-                <hr style='margin:4px 0'>
-                <b style='color:red'>IUU-LISTED VESSEL</b><br>
-                <b>IUU Name:</b> {row.get('iuu_vessel_name', 'N/A')}<br>
-                <b>Match:</b> {row.get('iuu_match_type', '')} ({row.get('iuu_match_confidence', '')} confidence)<br>
-                <b>Tier:</b> {tier}<br>
-                <b>Listed by:</b> {row.get('iuu_listing_rfmos', 'N/A')}<br>
-                <b>Multiplier:</b> {row.get('iuu_multiplier', 1.0):.1f}x
-                """
-                reason = row.get("iuu_listing_reason", "")
-                if reason and pd.notna(reason) and str(reason).strip().lower() != "nan":
-                    popup_text += f"<br><b>Reason:</b> {str(reason)[:200]}"
-
-            # ICCAT authorization enrichment
             is_iccat = row.get("iccat_authorized", False)
-            if is_iccat:
-                popup_text += f"""
-                <hr style='margin:4px 0'>
-                <b style='color:blue'>ICCAT AUTHORIZED</b><br>
-                <b>Authorizations:</b> {row.get('iccat_authorizations', 'N/A')}<br>
-                <b>Risk tier:</b> {row.get('iccat_risk_tier', 'N/A')}<br>
-                <b>Multiplier:</b> {row.get('iccat_multiplier', 1.0):.1f}x
-                """
-                if is_iuu:
-                    popup_text += "<br><b style='color:darkred'>DUAL FLAG: IUU-listed + ICCAT-authorized</b>"
-
-            if "csq_lon" in row.index:
-                ctx = fdi_cache.get((row["csq_lon"], row["csq_lat"]))
-                if ctx and ctx["total_fishing_days"] > 0:
-                    top_sp_str = ", ".join(
-                        SPECIES_NAMES.get(s[0], s[0]) for s in ctx["top_species"][:3]
-                    )
-                    tonnes = ctx['total_landings_tonnes']
-                    if tonnes > 1000:
-                        level = "High"
-                    elif tonnes > 10:
-                        level = "Moderate"
-                    else:
-                        level = "Low"
-                    popup_text += f"""
-                    <hr style='margin:4px 0'>
-                    <b>FDI Baseline</b><br>
-                    <b>Fishing ground:</b> {'Yes' if ctx['is_known_fishing_ground'] else 'No'}<br>
-                    <b>Fishing days:</b> {ctx['total_fishing_days']:,.0f}<br>
-                    <b>Top species:</b> {top_sp_str}<br>
-                    <b>Landings:</b> {tonnes:,.0f} t ({level})
-                    """
+            vname = row.get("vessel_name", "")
+            tooltip = f"{vname} | {row['event_type']} | {row['flag']}" if pd.notna(vname) else f"{row['event_type']} | {row['flag']}"
 
             if is_iuu:
                 marker_color = "black"
@@ -284,7 +235,7 @@ with col1:
                 location=[row["lat"], row["lon"]],
                 radius=marker_radius,
                 color=marker_color,
-                popup=popup_text,
+                tooltip=tooltip,
                 fill=True,
             )
 
@@ -309,7 +260,7 @@ with col1:
         fg_iuu.add_to(m)
         folium.LayerControl(collapsed=True).add_to(m)
 
-        st_folium(m, width=700, height=500)
+        map_data = st_folium(m, width=700, height=500)
 
         # Color legend below map
         dot = '<span style="display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:4px;vertical-align:middle;background:{c}"></span>'
@@ -326,6 +277,65 @@ with col1:
             f'{sq.format(c="#e31a1c")} <small>&gt;2kd</small>'
         )
         st.markdown(f'<div style="font-size:13px;line-height:1.8">{legend_md}</div>', unsafe_allow_html=True)
+
+        # Event detail card on click
+        clicked = map_data.get("last_object_clicked") if map_data else None
+        if clicked:
+            clat, clng = clicked.get("lat"), clicked.get("lng")
+            if clat is not None and clng is not None:
+                dist = ((df_filtered["lat"] - clat)**2 + (df_filtered["lon"] - clng)**2)
+                nearest_idx = dist.idxmin()
+                if dist[nearest_idx] < 0.01:
+                    ev = df_filtered.loc[nearest_idx]
+                    is_iuu_ev = ev.get("iuu_matched", False)
+                    is_iccat_ev = ev.get("iccat_authorized", False)
+
+                    st.markdown("---")
+                    c1, c2, c3 = st.columns(3)
+                    c1.metric("Vessel", ev.get("vessel_name", "Unknown"))
+                    c2.metric("Event", ev["event_type"])
+                    c3.metric("Risk Score", f"{ev['risk_score']:.1f}")
+
+                    c4, c5, c6 = st.columns(3)
+                    c4.metric("Flag", ev["flag"])
+                    c5.metric("Duration", f"{ev['duration_h']} h")
+                    c6.metric("Date", str(ev.get("date", ""))[:10])
+
+                    if is_iuu_ev:
+                        tier = "GFCM (Med)" if ev.get("iuu_is_gfcm") else "Other RFMO"
+                        st.error(
+                            f"**IUU-LISTED VESSEL** | Name: {ev.get('iuu_vessel_name', 'N/A')} | "
+                            f"Match: {ev.get('iuu_match_type', '')} ({ev.get('iuu_match_confidence', '')}) | "
+                            f"Tier: {tier} | Listed by: {ev.get('iuu_listing_rfmos', 'N/A')} | "
+                            f"Multiplier: {ev.get('iuu_multiplier', 1.0):.1f}x"
+                        )
+                        reason = ev.get("iuu_listing_reason", "")
+                        if reason and pd.notna(reason) and str(reason).strip().lower() != "nan":
+                            st.caption(f"Reason: {str(reason)[:300]}")
+
+                    if is_iccat_ev:
+                        st.info(
+                            f"**ICCAT AUTHORIZED** | Authorizations: {ev.get('iccat_authorizations', 'N/A')} | "
+                            f"Risk tier: {ev.get('iccat_risk_tier', 'N/A')} | "
+                            f"Multiplier: {ev.get('iccat_multiplier', 1.0):.1f}x"
+                        )
+                        if is_iuu_ev:
+                            st.warning("**DUAL FLAG: IUU-listed + ICCAT-authorized**")
+
+                    if "csq_lon" in ev.index:
+                        ctx = fdi_cache.get((ev["csq_lon"], ev["csq_lat"]))
+                        if ctx and ctx["total_fishing_days"] > 0:
+                            top_sp_str = ", ".join(
+                                SPECIES_NAMES.get(s[0], s[0]) for s in ctx["top_species"][:3]
+                            )
+                            tonnes = ctx["total_landings_tonnes"]
+                            level = "High" if tonnes > 1000 else ("Moderate" if tonnes > 10 else "Low")
+                            st.caption(
+                                f"FDI Baseline: {'Known fishing ground' if ctx['is_known_fishing_ground'] else 'Not a known fishing ground'} | "
+                                f"Fishing days: {ctx['total_fishing_days']:,.0f} | "
+                                f"Top species: {top_sp_str} | "
+                                f"Landings: {tonnes:,.0f} t ({level})"
+                            )
     else:
         st.info("No events match the selected filters.")
 
