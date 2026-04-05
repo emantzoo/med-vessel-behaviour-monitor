@@ -1,5 +1,8 @@
 # Med Vessel Behaviour Monitor
 
+![Med Vessel Behaviour Monitor](https://raw.githubusercontent.com/emantzoo/emantzoo.github.io/master/images/med-vessel.jpg)
+
+
 **Behavioral risk intelligence dashboard for the Mediterranean Sea.**
 
 Live app: [med-vessel-behaviour-monitor.streamlit.app](https://med-vessel-behaviour-monitor-ysq4ipavn5jwnuragca3by.streamlit.app/)
