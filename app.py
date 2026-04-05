@@ -3,7 +3,9 @@
 import streamlit as st
 import pandas as pd
 import folium
+from folium.utilities import normalize
 from streamlit_folium import st_folium
+from branca.element import MacroElement, Template
 from datetime import datetime
 
 from config import (
@@ -78,6 +80,16 @@ include_delisted = st.sidebar.toggle(
     help="Also match against vessels removed from IUU registries.",
 )
 
+resolve_imos = st.sidebar.toggle(
+    "Resolve vessel IMOs (live)", value=True,
+    help="Query GFW Vessels API for IMO numbers. Slower but enables stronger IUU/ICCAT matching.",
+)
+
+show_fdi_layer = st.sidebar.toggle(
+    "Show FDI fishing effort layer", value=False,
+    help="Overlay officially reported fishing effort (days) per c-square grid cell.",
+)
+
 # ========================= DATA LOADING =========================
 if use_live and token:
     df = load_live_data(token, date_range[0], date_range[1], min_duration)
@@ -104,9 +116,18 @@ if not df_filtered.empty:
     df_filtered["csq_lat"] = csq.apply(lambda x: x[1])
 
 # IMO enrichment via GFW Vessels API (live mode only)
-if use_live and token and not df_filtered.empty:
+if use_live and token and resolve_imos and not df_filtered.empty:
     unique_mmsis = df_filtered["mmsi"].dropna().unique().tolist()
-    imo_map = lookup_vessel_imos(unique_mmsis, token)
+    cache_key = f"imo_map_{hash(tuple(sorted(str(m) for m in unique_mmsis)))}"
+    if cache_key in st.session_state:
+        imo_map = st.session_state[cache_key]
+    else:
+        progress_bar = st.progress(0, text="Resolving vessel IMOs via GFW API...")
+        def _update_progress(current, total):
+            progress_bar.progress(current / total, text=f"Resolving vessel IMOs... {current}/{total}")
+        imo_map = lookup_vessel_imos(unique_mmsis, token, progress_callback=_update_progress)
+        st.session_state[cache_key] = imo_map
+        progress_bar.empty()
     if imo_map:
         df_filtered["imo"] = df_filtered["mmsi"].astype(str).map(imo_map).fillna("")
 
@@ -135,6 +156,37 @@ with col1:
     if not df_filtered.empty:
         m = folium.Map(location=[37.0, 18.0], zoom_start=5, tiles="CartoDB positron")
         color_map = {"GAP": "red", "LOITERING": "orange", "ENCOUNTER": "purple"}
+
+        # FDI fishing effort choropleth layer
+        if show_fdi_layer and not fdi_effort.empty:
+            latest_year = fdi_effort["year"].max()
+            fdi_agg = (
+                fdi_effort[fdi_effort["year"] == latest_year]
+                .groupby(["rectangle_lon", "rectangle_lat"])["totfishdays"]
+                .sum()
+                .reset_index()
+            )
+            for _, cell in fdi_agg.iterrows():
+                sw_lon = cell["rectangle_lon"]
+                sw_lat = cell["rectangle_lat"]
+                days = cell["totfishdays"]
+                if days >= 2000:
+                    color = "#e31a1c"
+                elif days >= 500:
+                    color = "#fd8d3c"
+                elif days >= 50:
+                    color = "#fecc5c"
+                else:
+                    color = "#ffffb2"
+                folium.Rectangle(
+                    bounds=[[sw_lat, sw_lon], [sw_lat + 0.5, sw_lon + 0.5]],
+                    color=color,
+                    fill=True,
+                    fill_color=color,
+                    fill_opacity=0.25,
+                    weight=0.5,
+                    popup=f"Fishing days ({latest_year}): {days:,.0f}",
+                ).add_to(m)
 
         # Pre-compute FDI context per unique c-square (avoid repeated 83K-row scans)
         fdi_cache = {}
@@ -222,8 +274,38 @@ with col1:
                 fill=True,
             ).add_to(m)
 
+        fdi_legend = ""
+        if show_fdi_layer and not fdi_effort.empty:
+            fdi_legend = """
+            <hr style="margin:6px 0 4px 0">
+            <b style="font-size:12px">FDI Effort</b><br>
+            <span style="display:inline-block;width:12px;height:12px;background:#ffffb2;border:1px solid #ccc;margin-right:6px;vertical-align:middle"></span> Low (&lt;50d)<br>
+            <span style="display:inline-block;width:12px;height:12px;background:#fecc5c;border:1px solid #ccc;margin-right:6px;vertical-align:middle"></span> Moderate (50-500d)<br>
+            <span style="display:inline-block;width:12px;height:12px;background:#fd8d3c;border:1px solid #ccc;margin-right:6px;vertical-align:middle"></span> High (500-2000d)<br>
+            <span style="display:inline-block;width:12px;height:12px;background:#e31a1c;border:1px solid #ccc;margin-right:6px;vertical-align:middle"></span> Very High (&gt;2000d)
+            """
+        legend_html = f"""
+        {{% macro html(this, kwargs) %}}
+        <div style="
+            position: fixed; bottom: 30px; left: 30px; z-index: 1000;
+            background: white; padding: 10px 14px; border-radius: 6px;
+            box-shadow: 0 1px 5px rgba(0,0,0,0.3); font-size: 13px;
+            line-height: 1.8; font-family: Arial, sans-serif;">
+            <b style="font-size:13px">Legend</b><br>
+            <span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:red;margin-right:6px;vertical-align:middle"></span> AIS Gap<br>
+            <span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:orange;margin-right:6px;vertical-align:middle"></span> Loitering<br>
+            <span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:purple;margin-right:6px;vertical-align:middle"></span> Encounter<br>
+            <span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:blue;margin-right:6px;vertical-align:middle"></span> ICCAT Authorized<br>
+            <span style="display:inline-block;width:16px;height:16px;border-radius:50%;background:black;margin-right:6px;vertical-align:middle"></span> IUU-Listed
+            {fdi_legend}
+        </div>
+        {{% endmacro %}}
+        """
+        legend = MacroElement()
+        legend._template = Template(legend_html)
+        m.get_root().add_child(legend)
+
         st_folium(m, width=700, height=500)
-        st.caption("Markers: red=GAP, orange=LOITERING, purple=ENCOUNTER, **blue=ICCAT-authorized**, **black=IUU-listed vessel**")
     else:
         st.info("No events match the selected filters.")
 

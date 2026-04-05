@@ -25,6 +25,13 @@ ICCAT_MULTIPLIERS = {
     "alb_med": 1.2,
 }
 
+FDI_EFFORT_COLORS = {
+    "Very High": "#e31a1c",
+    "High": "#fd8d3c",
+    "Moderate": "#fecc5c",
+    "Low": "#ffffb2",
+}
+
 # FAO 3-letter species code lookup (common Med species)
 SPECIES_NAMES = {
     "HKE": "Hake", "MUT": "Red mullet", "SWO": "Swordfish",

@@ -238,15 +238,13 @@ def load_live_data(token, start_date, end_date, _min_dur):
 
 # ========================= VESSEL IMO LOOKUP =========================
 
-@st.cache_data
-def lookup_vessel_imos(mmsi_list, token):
+def lookup_vessel_imos(mmsi_list, token, progress_callback=None):
     """Query GFW Vessels API to retrieve IMO numbers for unique MMSIs.
 
     Returns dict of {mmsi_str: imo_str} where IMO is available.
     Skips invalid MMSIs and handles errors per vessel gracefully.
+    progress_callback(current, total) is called after each MMSI lookup.
     """
-    import time
-
     try:
         import gfwapiclient as gfw
     except ImportError:
@@ -261,15 +259,18 @@ def lookup_vessel_imos(mmsi_list, token):
 
     client = gfw.Client(access_token=token)
     result = {}
+    total = len(unique_mmsis)
 
     async def _lookup_all():
-        for mmsi in unique_mmsis:
+        for i, mmsi in enumerate(unique_mmsis):
             try:
                 resp = await client.vessels.search_vessels(
                     where=f"ssvid = '{mmsi}'"
                 )
                 vessels = resp.df() if hasattr(resp, 'df') else pd.DataFrame()
                 if vessels.empty:
+                    if progress_callback:
+                        progress_callback(i + 1, total)
                     continue
 
                 imo = None
@@ -303,6 +304,9 @@ def lookup_vessel_imos(mmsi_list, token):
 
             except Exception:
                 continue  # Skip vessel, don't fail batch
+            finally:
+                if progress_callback:
+                    progress_callback(i + 1, total)
 
     try:
         asyncio.run(_lookup_all())
