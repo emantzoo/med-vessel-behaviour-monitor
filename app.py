@@ -312,9 +312,19 @@ def load_static_data():
 
     return df
 
+def _safe_get(d, *keys, default=None):
+    """Safely navigate nested dicts."""
+    for k in keys:
+        if isinstance(d, dict):
+            d = d.get(k)
+        else:
+            return default
+    return d if d is not None else default
+
+
 @st.cache_data
 def load_live_data(token, start_date, end_date, _min_dur):
-    """Fetch events from GFW Events API (async client, April 2025 package)."""
+    """Fetch events from GFW Events API with full nested field extraction."""
     try:
         import gfwapiclient as gfw
 
@@ -341,36 +351,88 @@ def load_live_data(token, start_date, end_date, _min_dur):
             )
             return result.df()
 
-        df = asyncio.run(_fetch())
+        raw_df = asyncio.run(_fetch())
 
-        if df.empty:
+        if raw_df.empty:
             st.warning("No events returned from API for this period.")
             return load_static_data()
 
-        df = df.rename(columns={"type": "event_type", "start": "date"})
+        # Build rich dataframe by extracting nested fields
+        rows = []
+        for _, r in raw_df.iterrows():
+            row_dict = {}
 
-        if "position" in df.columns:
-            df["lat"] = df["position"].apply(lambda p: p.get("lat") if isinstance(p, dict) else None)
-            df["lon"] = df["position"].apply(lambda p: p.get("lon") if isinstance(p, dict) else None)
+            # Core fields
+            row_dict["event_type"] = str(r.get("type", "")).upper()
+            row_dict["date"] = r.get("start")
 
-        if "vessel" in df.columns:
-            df["flag"] = df["vessel"].apply(lambda v: v.get("flag", "UNK") if isinstance(v, dict) else "UNK")
-            df["mmsi"] = df["vessel"].apply(lambda v: v.get("ssvid", "0") if isinstance(v, dict) else "0")
-            df["vessel_name"] = df["vessel"].apply(lambda v: v.get("name", "") if isinstance(v, dict) else "")
-            df["vessel_type"] = df["vessel"].apply(lambda v: v.get("type", "") if isinstance(v, dict) else "")
+            # Position
+            pos = r.get("position") if isinstance(r.get("position"), dict) else {}
+            row_dict["lat"] = pos.get("lat")
+            row_dict["lon"] = pos.get("lon")
 
-        if "duration_h" not in df.columns and "end" in df.columns and "date" in df.columns:
-            df["duration_h"] = (
-                (pd.to_datetime(df["end"]) - pd.to_datetime(df["date"]))
-                .dt.total_seconds() / 3600
-            ).round(1)
+            # Vessel identity
+            vessel = r.get("vessel") if isinstance(r.get("vessel"), dict) else {}
+            row_dict["mmsi"] = vessel.get("ssvid", "0")
+            row_dict["flag"] = vessel.get("flag", "UNK")
+            row_dict["vessel_name"] = vessel.get("name", "")
+            row_dict["vessel_type"] = vessel.get("type", "")
 
-        type_map = {"gap": "GAP", "encounter": "ENCOUNTER", "loitering": "LOITERING"}
-        df["event_type"] = df["event_type"].str.lower().map(type_map).fillna(df["event_type"])
+            # Duration
+            if r.get("start") and r.get("end"):
+                try:
+                    start_dt = pd.to_datetime(r["start"])
+                    end_dt = pd.to_datetime(r["end"])
+                    row_dict["duration_h"] = round((end_dt - start_dt).total_seconds() / 3600, 1)
+                except Exception:
+                    row_dict["duration_h"] = 0
+
+            # Distances (from nested distances dict)
+            distances = r.get("distances") if isinstance(r.get("distances"), dict) else {}
+            row_dict["distance_from_shore_km"] = distances.get("shoreDistanceKm")
+            row_dict["distance_from_port_km"] = distances.get("portDistanceKm")
+            port = distances.get("port") if isinstance(distances.get("port"), dict) else {}
+            row_dict["nearest_port"] = port.get("name")
+
+            # Regions (EEZ, RFMO)
+            for region in (r.get("regions") or []):
+                if isinstance(region, dict):
+                    ds = region.get("dataset", "")
+                    if "eez" in ds:
+                        row_dict["eez"] = region.get("name")
+
+            # Event-specific nested data
+            event_info = r.get("event_info") if isinstance(r.get("event_info"), dict) else {}
+
+            if row_dict["event_type"] == "GAP":
+                row_dict["gap_distance_km"] = event_info.get("distanceKm")
+                row_dict["speed_before_gap"] = event_info.get("speedBeforeKnots")
+                row_dict["speed_after_gap"] = event_info.get("speedAfterKnots")
+
+            elif row_dict["event_type"] == "ENCOUNTER":
+                enc_vessel = event_info.get("vessel") if isinstance(event_info.get("vessel"), dict) else {}
+                row_dict["encounter_vessel_name"] = enc_vessel.get("name")
+                row_dict["encounter_vessel_flag"] = enc_vessel.get("flag")
+                row_dict["encounter_median_distance_km"] = event_info.get("medianDistanceKm")
+                row_dict["encounter_median_speed_knots"] = event_info.get("medianSpeedKnots")
+
+            elif row_dict["event_type"] == "LOITERING":
+                row_dict["loitering_total_distance_km"] = event_info.get("totalDistanceKm")
+                row_dict["loitering_avg_speed_knots"] = event_info.get("averageSpeedKnots")
+
+            rows.append(row_dict)
+
+        df = pd.DataFrame(rows)
+
+        # Normalise event type
+        type_map = {"GAP": "GAP", "ENCOUNTER": "ENCOUNTER", "LOITERING": "LOITERING"}
+        df["event_type"] = df["event_type"].map(type_map).fillna(df["event_type"])
 
         # Add med_zone
         if "lat" in df.columns and "lon" in df.columns:
-            df["med_zone"] = df.apply(lambda r: classify_med_zone(r["lon"], r["lat"]), axis=1)
+            df["med_zone"] = df.apply(
+                lambda r: classify_med_zone(r["lon"], r["lat"])
+                if pd.notna(r.get("lon")) and pd.notna(r.get("lat")) else "", axis=1)
 
         return df
 
