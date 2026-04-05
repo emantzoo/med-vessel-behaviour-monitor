@@ -164,6 +164,85 @@ def classify_med_zone(lon, lat):
         return "Eastern Med / Near East"
 
 
+def assign_csquare(lat, lon):
+    """Map a point to its 0.5x0.5 dd c-square cell (FDI rectangle corner).
+    FDI cells are centred at multiples of 0.5 (0.0, 0.5, 1.0, ...),
+    rectangle_lon/lat is the SW corner = centre - 0.25.
+    """
+    centre_lon = round(round(lon * 2) / 2, 1)  # snap to nearest 0.5
+    centre_lat = round(round(lat * 2) / 2, 1)
+    return centre_lon - 0.25, centre_lat - 0.25
+
+
+# FAO 3-letter species code lookup (common Med species)
+SPECIES_NAMES = {
+    "HKE": "Hake", "MUT": "Red mullet", "SWO": "Swordfish",
+    "BFT": "Bluefin tuna", "PIL": "Sardine", "ANE": "Anchovy",
+    "DPS": "Deep-water rose shrimp", "OCC": "Common octopus",
+    "ARS": "Red shrimp", "SAA": "Round sardinella", "ALB": "Albacore",
+    "BOG": "Bogue", "SBG": "Gilthead seabream", "MZZ": "Marine fishes nei",
+    "HOM": "Horse mackerel", "BSH": "Blue shark", "ARA": "Blue & red shrimp",
+    "SQM": "European squid", "VMA": "Violet squid", "RPW": "Red pandora",
+}
+
+
+@st.cache_data
+def load_fdi_effort():
+    path = os.path.join(os.path.dirname(__file__), "data", "fdi_effort_med.csv")
+    if os.path.exists(path):
+        return pd.read_csv(path)
+    return pd.DataFrame()
+
+
+@st.cache_data
+def load_fdi_landings():
+    path = os.path.join(os.path.dirname(__file__), "data", "fdi_landings_med.csv")
+    if os.path.exists(path):
+        return pd.read_csv(path)
+    return pd.DataFrame()
+
+
+def get_fdi_context(csq_lon, csq_lat, fdi_effort, fdi_landings, year=None):
+    """Return FDI baseline summary for a c-square cell."""
+    if fdi_effort.empty:
+        return None
+
+    eff = fdi_effort[(fdi_effort["rectangle_lon"] == csq_lon) &
+                     (fdi_effort["rectangle_lat"] == csq_lat)]
+    land = fdi_landings[(fdi_landings["rectangle_lon"] == csq_lon) &
+                        (fdi_landings["rectangle_lat"] == csq_lat)] if not fdi_landings.empty else pd.DataFrame()
+
+    if year:
+        eff = eff[eff["year"] == year]
+        land = land[land["year"] == year] if not land.empty else land
+
+    if eff.empty and land.empty:
+        return None
+
+    total_fd = eff["totfishdays"].sum() if not eff.empty else 0
+    gear_bk = eff.groupby("gear_type")["totfishdays"].sum().sort_values(ascending=False).head(5).to_dict() if not eff.empty else {}
+    quarterly = eff.groupby("quarter")["totfishdays"].sum().to_dict() if not eff.empty else {}
+
+    total_wt = land["totwghtlandg"].sum() if not land.empty else 0
+    total_val = land["totvallandg"].sum() if not land.empty else 0
+    top_sp = []
+    if not land.empty:
+        sp_agg = land.groupby("species").agg(
+            wt=("totwghtlandg", "sum"), val=("totvallandg", "sum")
+        ).sort_values("wt", ascending=False).head(5)
+        top_sp = [(idx, row["wt"], row["val"]) for idx, row in sp_agg.iterrows()]
+
+    return {
+        "total_fishing_days": total_fd,
+        "gear_breakdown": gear_bk,
+        "quarterly_effort": quarterly,
+        "top_species": top_sp,
+        "total_landings_tonnes": total_wt,
+        "total_landings_value": total_val,
+        "is_known_fishing_ground": total_fd > 10,
+    }
+
+
 # ========================= CONFIG & SETUP =========================
 st.set_page_config(
     page_title="Med Vessel Behaviour Monitor",
@@ -548,6 +627,16 @@ df_filtered = df[df["duration_h"] >= min_duration].copy()
 df_filtered["risk_score"] = df_filtered.apply(compute_risk_score, axis=1).round(1)
 total_risk = df_filtered["risk_score"].sum()
 
+# ========================= FDI DATA =========================
+fdi_effort = load_fdi_effort()
+fdi_landings = load_fdi_landings()
+
+# Assign c-square cells to GFW events for FDI joins
+if not df_filtered.empty:
+    csq = df_filtered.apply(lambda r: assign_csquare(r["lat"], r["lon"]), axis=1)
+    df_filtered["csq_lon"] = csq.apply(lambda x: x[0])
+    df_filtered["csq_lat"] = csq.apply(lambda x: x[1])
+
 # ========================= COLOR SCHEME =========================
 EVENT_COLORS = {"GAP": "#e74c3c", "LOITERING": "#f39c12", "ENCOUNTER": "#8e44ad"}
 
@@ -569,6 +658,22 @@ with col1:
             """
             if "vessel_name" in row and pd.notna(row.get("vessel_name")):
                 popup_text = f"<b>{row['vessel_name']}</b><br>" + popup_text
+
+            # FDI context enrichment
+            if not fdi_effort.empty and "csq_lon" in row.index:
+                ctx = get_fdi_context(row["csq_lon"], row["csq_lat"], fdi_effort, fdi_landings)
+                if ctx and ctx["total_fishing_days"] > 0:
+                    top_sp_str = ", ".join(
+                        SPECIES_NAMES.get(s[0], s[0]) for s in ctx["top_species"][:3]
+                    )
+                    popup_text += f"""
+                    <hr style='margin:4px 0'>
+                    <b>FDI Baseline</b><br>
+                    <b>Fishing ground:</b> {'Yes' if ctx['is_known_fishing_ground'] else 'No'}<br>
+                    <b>Fishing days:</b> {ctx['total_fishing_days']:,.0f}<br>
+                    <b>Top species:</b> {top_sp_str}<br>
+                    <b>Landings:</b> {ctx['total_landings_tonnes']:,.0f} t
+                    """
 
             folium.CircleMarker(
                 location=[row["lat"], row["lon"]],
@@ -593,19 +698,12 @@ with col2:
         st.metric("Flags", df_filtered["flag"].nunique())
 
 # ========================= TABS =========================
-tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11 = st.tabs([
-    "Daily Trend",
-    "Flag Breakdown",
-    "Event Types",
-    "Duration Analysis",
-    "Geographic Risk",
-    "Risk Heatmap",
-    "Repeat Offenders",
-    "Gap Behaviour",
-    "Encounter Analysis",
-    "Top Vessels",
-    "AI Analyst",
-])
+tab_names = [
+    "Daily Trend", "Flag Breakdown", "Event Types", "Duration Analysis",
+    "Geographic Risk", "Risk Heatmap", "Repeat Offenders", "Gap Behaviour",
+    "Encounter Analysis", "Top Vessels", "Fisheries Context", "AI Analyst",
+]
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11, tab12 = st.tabs(tab_names)
 
 # --- Tab 1: Daily Risk Trend ---
 with tab1:
@@ -932,8 +1030,200 @@ with tab10:
     else:
         st.info("No data.")
 
-# --- Tab 11: AI Analyst ---
+# --- Tab 11: Fisheries Context (FDI) ---
 with tab11:
+    st.subheader("Fisheries Context — EU FDI Baseline")
+    st.markdown(
+        "Overlaying GFW behavioural events with EU Fisheries Dependent Information (FDI) "
+        "spatial data to assess whether events occur in known fishing grounds."
+    )
+
+    if fdi_effort.empty:
+        st.warning("FDI data not available. Run `python data/prepare_fdi.py` to generate.")
+    elif df_filtered.empty:
+        st.info("No GFW events match the selected filters.")
+    else:
+        # --- Section A: C-Square Effort Comparison Map ---
+        st.subheader("A. Fishing Effort vs GFW Events")
+
+        # Aggregate FDI effort per c-square (latest year)
+        latest_year = fdi_effort["year"].max()
+        eff_agg = (fdi_effort[fdi_effort["year"] == latest_year]
+                   .groupby(["centre_lon", "centre_lat"])["totfishdays"]
+                   .sum().reset_index())
+
+        fig_a = go.Figure()
+
+        # FDI c-squares as background
+        fig_a.add_trace(go.Scatter(
+            x=eff_agg["centre_lon"], y=eff_agg["centre_lat"],
+            mode="markers",
+            marker=dict(
+                size=8, symbol="square",
+                color=eff_agg["totfishdays"],
+                colorscale="Blues", showscale=True,
+                colorbar=dict(title="Fishing Days", x=1.02),
+                opacity=0.6,
+            ),
+            name=f"FDI Effort ({latest_year})",
+            hovertemplate="Lon: %{x:.1f}<br>Lat: %{y:.1f}<br>Fishing days: %{marker.color:,.0f}<extra>FDI</extra>",
+        ))
+
+        # GFW events overlay
+        for etype, color in EVENT_COLORS.items():
+            sub = df_filtered[df_filtered["event_type"] == etype]
+            if not sub.empty:
+                fig_a.add_trace(go.Scatter(
+                    x=sub["lon"], y=sub["lat"],
+                    mode="markers",
+                    marker=dict(size=10, color=color, line=dict(width=1, color="white")),
+                    name=etype,
+                    hovertemplate="Lon: %{x:.2f}<br>Lat: %{y:.2f}<extra>" + etype + "</extra>",
+                ))
+
+        fig_a.update_layout(
+            title=f"FDI Fishing Effort ({latest_year}) vs GFW Events",
+            xaxis_title="Longitude", yaxis_title="Latitude",
+            height=550, legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
+        )
+        st.plotly_chart(fig_a)
+
+        # --- Section B: Event Context Table ---
+        st.subheader("B. Event Context — Known Fishing Ground?")
+
+        context_rows = []
+        for _, row in df_filtered.iterrows():
+            ctx = get_fdi_context(row["csq_lon"], row["csq_lat"], fdi_effort, fdi_landings)
+            if ctx is None:
+                flag_label = "No FDI data for cell"
+                fd = 0
+                sp = ""
+                val = 0
+            else:
+                fd = ctx["total_fishing_days"]
+                if ctx["is_known_fishing_ground"]:
+                    flag_label = "Known fishing ground"
+                else:
+                    flag_label = "Outside known fishing ground"
+                sp = ", ".join(SPECIES_NAMES.get(s[0], s[0]) for s in ctx["top_species"][:3])
+                val = ctx["total_landings_value"]
+
+            context_rows.append({
+                "event_type": row["event_type"],
+                "flag": row["flag"],
+                "vessel_name": row.get("vessel_name", ""),
+                "duration_h": row["duration_h"],
+                "risk_score": row["risk_score"],
+                "fishing_days": fd,
+                "top_species": sp,
+                "landings_value_eur": val,
+                "context": flag_label,
+            })
+
+        ctx_df = pd.DataFrame(context_rows)
+        # Summary counts
+        ctx_counts = ctx_df["context"].value_counts()
+        cols_b = st.columns(3)
+        for i, (label, count) in enumerate(ctx_counts.items()):
+            if i < 3:
+                cols_b[i].metric(label, count)
+
+        st.dataframe(
+            ctx_df.sort_values("risk_score", ascending=False).style.format({
+                "risk_score": "{:.1f}", "fishing_days": "{:,.0f}",
+                "landings_value_eur": "EUR {:,.0f}", "duration_h": "{:.1f}",
+            }),
+            use_container_width=True,
+        )
+
+        st.markdown(
+            "**Interpretation:** Events *outside* known fishing grounds or in cells "
+            "with *no FDI data* are potentially more suspicious — they may indicate "
+            "unreported activity or dark fleet operations."
+        )
+
+        # --- Section C: Seasonal Pattern Analysis ---
+        st.subheader("C. Seasonal Patterns — FDI Effort vs GFW Events")
+
+        if "quarter" in fdi_effort.columns:
+            # FDI quarterly effort by med zone
+            fdi_q = (fdi_effort[fdi_effort["year"] == latest_year]
+                     .groupby(["med_zone", "quarter", "gear_type"])["totfishdays"]
+                     .sum().reset_index())
+            fdi_q_zone = fdi_q.groupby(["med_zone", "quarter"])["totfishdays"].sum().reset_index()
+
+            # GFW events by quarter
+            df_q = df_filtered.copy()
+            df_q["quarter"] = pd.to_datetime(df_q["date"]).dt.quarter
+
+            zone_sel = st.selectbox(
+                "Select Mediterranean zone",
+                sorted(df_filtered["med_zone"].unique()),
+                key="fdi_zone_sel",
+            )
+
+            fdi_zone = fdi_q_zone[fdi_q_zone["med_zone"] == zone_sel]
+            gfw_zone = df_q[df_q["med_zone"] == zone_sel].groupby("quarter").size().reset_index(name="gfw_events")
+
+            fig_c = go.Figure()
+            fig_c.add_trace(go.Bar(
+                x=fdi_zone["quarter"], y=fdi_zone["totfishdays"],
+                name="FDI Fishing Days", marker_color="steelblue", opacity=0.7,
+            ))
+            fig_c.add_trace(go.Scatter(
+                x=gfw_zone["quarter"], y=gfw_zone["gfw_events"],
+                name="GFW Events", mode="lines+markers",
+                marker=dict(color="red", size=10), yaxis="y2",
+            ))
+            fig_c.update_layout(
+                title=f"Seasonal Pattern: {zone_sel}",
+                xaxis=dict(title="Quarter", dtick=1),
+                yaxis=dict(title="FDI Fishing Days", side="left"),
+                yaxis2=dict(title="GFW Events", side="right", overlaying="y"),
+                height=400,
+            )
+            st.plotly_chart(fig_c)
+
+        # --- Section D: Species Context ---
+        st.subheader("D. Species in Event Locations")
+        st.markdown(
+            "What species are reported in c-squares where GFW events occur? "
+            "High-value species (BFT, SWO, HKE) increase transshipment risk."
+        )
+
+        if not fdi_landings.empty and "csq_lon" in df_filtered.columns:
+            event_cells = df_filtered[["csq_lon", "csq_lat"]].drop_duplicates()
+            event_land = event_cells.merge(
+                fdi_landings, left_on=["csq_lon", "csq_lat"],
+                right_on=["rectangle_lon", "rectangle_lat"], how="inner",
+            )
+
+            if not event_land.empty:
+                sp_agg = (event_land.groupby("species")
+                          .agg(total_tonnes=("totwghtlandg", "sum"),
+                               total_value=("totvallandg", "sum"))
+                          .sort_values("total_value", ascending=True)
+                          .tail(15))
+                sp_agg["species_name"] = sp_agg.index.map(
+                    lambda x: f"{x} ({SPECIES_NAMES.get(x, '?')})"
+                )
+
+                fig_d = px.bar(
+                    sp_agg.reset_index(), x="total_value", y="species_name",
+                    orientation="h",
+                    title="Top Species by Landings Value in GFW Event Cells",
+                    labels={"total_value": "Total Landings Value (EUR)", "species_name": "Species"},
+                    color="total_tonnes", color_continuous_scale="YlOrRd",
+                )
+                fig_d.update_layout(coloraxis_colorbar_title="Tonnes")
+                st.plotly_chart(fig_d)
+            else:
+                st.info("No FDI landings data matches GFW event c-squares.")
+        else:
+            st.info("FDI landings data not available.")
+
+# --- Tab 12: AI Analyst ---
+with tab12:
     st.subheader("AI Maritime Analyst")
     st.markdown(
         "Ask questions about the vessel data in natural language. "
@@ -994,6 +1284,19 @@ with tab11:
 
                 client_ai = genai.Client(api_key=gemini_key)
                 system_ctx = build_system_prompt(df_filtered)
+                if not fdi_effort.empty:
+                    system_ctx += f"""
+
+FDI BASELINE DATA (variable names: fdi_effort, fdi_landings)
+FDI effort shape: {fdi_effort.shape}
+FDI landings shape: {fdi_landings.shape}
+FDI year range: {fdi_effort['year'].min()}-{fdi_effort['year'].max()}
+FDI unique c-squares: {fdi_effort[['rectangle_lon','rectangle_lat']].drop_duplicates().shape[0]}
+FDI gear types: {fdi_effort['gear_type'].value_counts().head(5).to_dict()}
+
+The fdi_effort and fdi_landings DataFrames are available for analysis.
+Join to GFW events using csq_lon/csq_lat (event columns) = rectangle_lon/rectangle_lat (FDI columns).
+"""
 
                 contents = []
                 for msg in st.session_state.ai_messages[-20:]:
@@ -1044,6 +1347,8 @@ with tab11:
                                 "np": np,
                                 "px": px,
                                 "go": go,
+                                "fdi_effort": fdi_effort,
+                                "fdi_landings": fdi_landings,
                             }
                             exec(code, exec_ns)
 
