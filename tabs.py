@@ -173,6 +173,18 @@ def render_repeat_offenders(df):
         name_map = df.dropna(subset=["vessel_name"]).drop_duplicates("mmsi").set_index("mmsi")["vessel_name"]
         vessel_counts["vessel_name"] = vessel_counts["mmsi"].map(name_map).fillna("")
 
+    # Add IUU info if available
+    if "iuu_matched" in df.columns:
+        iuu_map = (df[df["iuu_matched"] == True]
+                   .drop_duplicates("mmsi").set_index("mmsi")[["iuu_listing_rfmos", "iuu_match_confidence"]])
+        if not iuu_map.empty:
+            vessel_counts["IUU Listed"] = vessel_counts["mmsi"].map(
+                iuu_map["iuu_listing_rfmos"]).fillna("")
+            # Sort IUU-listed vessels to top
+            vessel_counts["_iuu_sort"] = vessel_counts["IUU Listed"].apply(lambda x: 0 if x else 1)
+            vessel_counts = vessel_counts.sort_values(
+                ["_iuu_sort", "event_count"], ascending=[True, False]).drop(columns="_iuu_sort")
+
     repeat_vessels = vessel_counts[vessel_counts["event_count"] >= 2]
     if not repeat_vessels.empty:
         fig = px.bar(
@@ -287,6 +299,14 @@ def render_top_vessels(df):
     vessel_risk = (df.groupby(group_cols)
                    .agg(risk=("risk_score", "sum"), events=("mmsi", "count"))
                    .reset_index().sort_values("risk", ascending=False).head(10))
+
+    # Add IUU info if available
+    if "iuu_matched" in df.columns:
+        iuu_map = (df[df["iuu_matched"] == True]
+                   .drop_duplicates("mmsi").set_index("mmsi")["iuu_listing_rfmos"])
+        if not iuu_map.empty:
+            vessel_risk["IUU Listed"] = vessel_risk["mmsi"].map(iuu_map).fillna("")
+
     st.dataframe(vessel_risk.style.format({"risk": "{:.1f}"}))
 
     if "vessel_type" in df.columns and df["vessel_type"].notna().any():

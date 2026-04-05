@@ -14,3 +14,43 @@ EU IUU Regulation 1005/2008: catch certification required for all fishery import
 CATCH digital system mandatory since January 2026.
 EU carding system: 28 countries yellow-carded since 2010. Cambodia, Comoros,
 St Vincent & Grenadines currently red-carded.
+
+## IUU Vessel List Cross-Reference
+
+The app cross-references GFW event vessels against the Combined IUU
+Vessel List (iuu-vessels.org), maintained by TMT (Trygg Mat Tracking).
+The list merges IUU fishing vessel lists from all 13 Regional Fisheries
+Management Organisations (RFMOs): GFCM, ICCAT, IOTC, CCAMLR, WCPFC,
+IATTC, NEAFC, NAFO, SEAFO, SPRFMO, CCSBT, NPFC, SIOFA.
+
+Matching is performed on MMSI (exact), vessel name (exact and fuzzy/substring).
+
+Two alert tiers:
+- Tier 1 — GFCM-listed: vessel confirmed to have carried out IUU
+  fishing in the Mediterranean/Black Sea (GFCM area). 3.0x risk multiplier.
+- Tier 2 — Other RFMO: vessel IUU-listed by another RFMO (ICCAT,
+  IOTC, etc.) detected operating in Mediterranean waters. 2.0x risk multiplier.
+
+Match confidence levels:
+- High: MMSI exact match (strongest identity link)
+- Medium: Vessel name exact or fuzzy match (name >= 5 characters)
+- Low: Vessel name fuzzy match on short names (< 5 characters)
+
+The IUU list contains 369 vessels (213 currently listed, 156 delisted).
+150 vessels have GFCM listings. 64 vessels have MMSI numbers for
+direct AIS matching.
+
+Key flags on the IUU list: Unknown (64), India (36), China (29),
+Belize (14), Sri Lanka (10), Indonesia (9), Malaysia (9), Russia (5),
+Panama (4).
+
+Common vessel types: Fishing Vessel, Reefer, Fish carrier — the same
+vessel types associated with transshipment in GFW encounter events.
+
+Delisted vessels can optionally be shown (sidebar toggle). A delisted
+vessel is worth flagging as it may indicate a vessel with a compliance
+history, though it no longer receives the risk multiplier.
+
+MMSI numbers can be spoofed or reassigned. An MMSI match is strong
+evidence but not proof. Matches are flagged as "potential match" not
+"confirmed IUU vessel."

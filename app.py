@@ -12,9 +12,9 @@ from config import (
 )
 from data_loading import (
     load_knowledge_base, load_static_data, load_live_data,
-    load_fdi_effort, load_fdi_landings,
+    load_fdi_effort, load_fdi_landings, load_iuu_vessels,
 )
-from risk_model import compute_risk_score, get_fdi_context
+from risk_model import compute_risk_score, get_fdi_context, match_iuu_vessels
 from tabs import (
     render_daily_trend, render_flag_breakdown, render_event_types,
     render_duration_analysis, render_geographic_risk, render_risk_heatmap,
@@ -72,6 +72,11 @@ with st.sidebar.expander("Advanced -- Risk Weights (optional)"):
 
 event_weights = {"GAP": gap_weight, "LOITERING": loitering_weight, "ENCOUNTER": encounter_weight}
 
+include_delisted = st.sidebar.toggle(
+    "Include delisted IUU vessels", value=False,
+    help="Also match against vessels removed from IUU registries.",
+)
+
 # ========================= DATA LOADING =========================
 if use_live and token:
     df = load_live_data(token, date_range[0], date_range[1], min_duration)
@@ -80,6 +85,7 @@ else:
 
 fdi_effort = load_fdi_effort()
 fdi_landings = load_fdi_landings()
+iuu_vessels = load_iuu_vessels()
 knowledge_base = load_knowledge_base()
 
 # ========================= FILTER & SCORE =========================
@@ -94,6 +100,11 @@ if not df_filtered.empty:
     csq = df_filtered.apply(lambda r: assign_csquare(r["lat"], r["lon"]), axis=1)
     df_filtered["csq_lon"] = csq.apply(lambda x: x[0])
     df_filtered["csq_lat"] = csq.apply(lambda x: x[1])
+
+# IUU cross-reference (after risk scoring)
+if not df_filtered.empty and not iuu_vessels.empty:
+    df_filtered = match_iuu_vessels(df_filtered, iuu_vessels, include_delisted)
+    total_risk = df_filtered["risk_score"].sum()
 
 # ========================= MAIN MAP & METRICS =========================
 col1, col2 = st.columns([3, 1])
@@ -114,6 +125,23 @@ with col1:
             if "vessel_name" in row and pd.notna(row.get("vessel_name")):
                 popup_text = f"<b>{row['vessel_name']}</b><br>" + popup_text
 
+            # IUU match enrichment
+            is_iuu = row.get("iuu_matched", False)
+            if is_iuu:
+                tier = "GFCM (Med)" if row.get("iuu_is_gfcm") else "Other RFMO"
+                popup_text += f"""
+                <hr style='margin:4px 0'>
+                <b style='color:red'>IUU-LISTED VESSEL</b><br>
+                <b>IUU Name:</b> {row.get('iuu_vessel_name', 'N/A')}<br>
+                <b>Match:</b> {row.get('iuu_match_type', '')} ({row.get('iuu_match_confidence', '')} confidence)<br>
+                <b>Tier:</b> {tier}<br>
+                <b>Listed by:</b> {row.get('iuu_listing_rfmos', 'N/A')}<br>
+                <b>Multiplier:</b> {row.get('iuu_multiplier', 1.0):.1f}x
+                """
+                reason = row.get("iuu_listing_reason", "")
+                if reason:
+                    popup_text += f"<br><b>Reason:</b> {str(reason)[:200]}"
+
             if not fdi_effort.empty and "csq_lon" in row.index:
                 ctx = get_fdi_context(row["csq_lon"], row["csq_lat"], fdi_effort, fdi_landings)
                 if ctx and ctx["total_fishing_days"] > 0:
@@ -129,15 +157,19 @@ with col1:
                     <b>Landings:</b> {ctx['total_landings_tonnes']:,.0f} t
                     """
 
+            marker_color = "black" if is_iuu else color_map.get(row["event_type"], "blue")
+            marker_radius = 12 if is_iuu else 8
+
             folium.CircleMarker(
                 location=[row["lat"], row["lon"]],
-                radius=8,
-                color=color_map.get(row["event_type"], "blue"),
+                radius=marker_radius,
+                color=marker_color,
                 popup=popup_text,
                 fill=True,
             ).add_to(m)
 
         st_folium(m, width=700, height=500)
+        st.caption("Markers: red=GAP, orange=LOITERING, purple=ENCOUNTER, **black=IUU-listed vessel**")
     else:
         st.info("No events match the selected filters.")
 
@@ -148,6 +180,27 @@ with col2:
         st.metric("Events", len(df_filtered))
         st.metric("Unique Vessels", df_filtered["mmsi"].nunique())
         st.metric("Flags", df_filtered["flag"].nunique())
+        if "iuu_matched" in df_filtered.columns:
+            iuu_count = int(df_filtered["iuu_matched"].sum())
+            if iuu_count > 0:
+                st.metric("IUU-Listed Vessels", iuu_count)
+
+# IUU Alert Box (full width, below map)
+if not df_filtered.empty and "iuu_matched" in df_filtered.columns:
+    iuu_events = df_filtered[df_filtered["iuu_matched"] == True]
+    if not iuu_events.empty:
+        st.error(f"**IUU ALERT:** {len(iuu_events)} event(s) involve IUU-listed vessels")
+        with st.expander("IUU Match Details", expanded=True):
+            display_cols = [
+                "vessel_name", "mmsi", "flag", "event_type", "duration_h",
+                "risk_score", "iuu_vessel_name", "iuu_listing_rfmos",
+                "iuu_match_type", "iuu_match_confidence", "iuu_multiplier",
+            ]
+            display_cols = [c for c in display_cols if c in iuu_events.columns]
+            st.dataframe(
+                iuu_events[display_cols].sort_values("risk_score", ascending=False),
+                use_container_width=True,
+            )
 
 # ========================= TABS =========================
 tab_names = [
@@ -173,7 +226,7 @@ try:
     gemini_key = st.secrets["gemini_key"]
 except (FileNotFoundError, KeyError):
     gemini_key = ""
-with tab12: render_ai_analyst(df_filtered, fdi_effort, fdi_landings, knowledge_base, gemini_key)
+with tab12: render_ai_analyst(df_filtered, fdi_effort, fdi_landings, knowledge_base, gemini_key, iuu_vessels)
 
 # ========================= SIDEBAR METHODOLOGY =========================
 with st.sidebar.expander("Methodology & About"):
@@ -199,6 +252,12 @@ methodology (Miller et al. 2018).
 
 **Shore distance** (all events):
 - >20nm = 1.5x | >10km = 1.2x | <10km = 0.8x
+
+**IUU Cross-Reference:**
+- Source: Combined IUU Vessel List (iuu-vessels.org / TMT)
+- GFCM-listed vessel in Med: 3.0x risk multiplier
+- Other RFMO-listed vessel in Med: 2.0x risk multiplier
+- Matching: MMSI (exact) > vessel name (exact) > name (substring)
 
 **Data:** GFW Events API (GAP, ENCOUNTER, LOITERING)
 

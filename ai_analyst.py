@@ -10,7 +10,7 @@ import plotly.graph_objects as go
 from config import FORBIDDEN_CODE
 
 
-def build_system_prompt(df, knowledge_base, fdi_effort=None, fdi_landings=None):
+def build_system_prompt(df, knowledge_base, fdi_effort=None, fdi_landings=None, iuu_vessels=None):
     """Build system prompt with dataframe context and domain knowledge."""
     schema = f"""DATAFRAME SCHEMA (variable name: df)
 Columns: {list(df.columns)}
@@ -125,6 +125,28 @@ The fdi_effort and fdi_landings DataFrames are available for analysis.
 Join to GFW events using csq_lon/csq_lat (event columns) = rectangle_lon/rectangle_lat (FDI columns).
 """
 
+    if iuu_vessels is not None and not iuu_vessels.empty:
+        iuu_matched_count = int(df["iuu_matched"].sum()) if "iuu_matched" in df.columns else 0
+        prompt += f"""
+
+IUU VESSEL CROSS-REFERENCE (variable name: iuu_vessels)
+IUU list size: {len(iuu_vessels)} vessels
+Currently listed: {iuu_vessels['is_currently_listed'].sum()}
+GFCM-listed (Med): {iuu_vessels['is_gfcm'].sum()}
+IUU matches in current data: {iuu_matched_count}
+
+IUU-related columns in df (when matches exist):
+- iuu_matched: bool
+- iuu_vessel_name: str (matched IUU list name)
+- iuu_listing_rfmos: str (comma-separated RFMOs)
+- iuu_match_type: "MMSI" | "name_exact" | "name_fuzzy"
+- iuu_match_confidence: "high" | "medium" | "low"
+- iuu_multiplier: float (3.0 for GFCM, 2.0 for other RFMO, 1.0 if no match)
+- iuu_is_gfcm: bool
+
+The iuu_vessels DataFrame is available for analysis.
+"""
+
     return prompt
 
 
@@ -137,7 +159,7 @@ def is_safe_code(code):
     return True
 
 
-def render_ai_analyst(df_filtered, fdi_effort, fdi_landings, knowledge_base, gemini_key):
+def render_ai_analyst(df_filtered, fdi_effort, fdi_landings, knowledge_base, gemini_key, iuu_vessels=None):
     """Render the AI Maritime Analyst tab."""
     st.subheader("AI Maritime Analyst")
     st.markdown(
@@ -200,7 +222,7 @@ def render_ai_analyst(df_filtered, fdi_effort, fdi_landings, knowledge_base, gem
 
                 client_ai = genai.Client(api_key=gemini_key)
                 system_ctx = build_system_prompt(
-                    df_filtered, knowledge_base, fdi_effort, fdi_landings
+                    df_filtered, knowledge_base, fdi_effort, fdi_landings, iuu_vessels
                 )
 
                 contents = []
@@ -255,6 +277,7 @@ def render_ai_analyst(df_filtered, fdi_effort, fdi_landings, knowledge_base, gem
                                 "go": go,
                                 "fdi_effort": fdi_effort,
                                 "fdi_landings": fdi_landings,
+                                "iuu_vessels": iuu_vessels,
                             }
                             exec(code, exec_ns)
 

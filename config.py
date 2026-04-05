@@ -15,6 +15,8 @@ FLAG_RISKS = {
 
 TRANSSHIPMENT_VESSEL_TYPES = {"CARRIER", "TANKER"}
 
+IUU_MULTIPLIERS = {"GFCM": 3.0, "OTHER_RFMO": 2.0}
+
 # FAO 3-letter species code lookup (common Med species)
 SPECIES_NAMES = {
     "HKE": "Hake", "MUT": "Red mullet", "SWO": "Swordfish",

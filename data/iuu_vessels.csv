@@ -1,0 +1,370 @@
+is_currently_listed,vessel_name,all_names,rfmo_name,imo,mmsi,ircs,flag,vessel_type,gear_type,owner,operator,is_gfcm,listing_rfmos,listing_reason
+True,LU RONG YUAN YU 197,LU RONG YUAN YU 197|鲁荣远 渔 197,Unknown,,,,,Fishing Vessel,,,,False,"NAFO, NPFC, SIOFA",Cross-listing
+True,ABDI BABA 1,ABDI BABA 1,Sharon 1,8692299,,,Unknown,Fishing Vessel,Purse seine,Rptd Sold Undisclosed Interest,Rptd Sold Undisclosed Interest,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,ABISHAK PUTHA 3,ABISHAK PUTHA 3,,,417000878,4SFXXXX,,,,,,False,"IOTC, ICCAT, SEAFO, NEAFC, NAFO, CCSBT, SIOFA",Cross-listing
+True,ABUNDANT 1,ABUNDANT 1,ABUNDANT 1 (YI HONG 06),,,CPA 226,,,,Huang Jia Yi,Hatto Daroi,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,ABUNDANT 12,ABUNDANT 12,ABUNDANT 12 (YI HONG 106),,,CPA202,,,,Huang Jia Yi,Mendez Francisco Delos Reyes,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,ABUNDANT 3,ABUNDANT 3,ABUNDANT 3 (YI HONG 16),,,CPA201,,,,Huang Jia Yi,Huang Wen Hsin,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,ABUNDANT 6,ABUNDANT 6,ABUNDANT 6 (YI HONG 86),,,CPA221,,Fishing Vessel,Longline,Huang Jia Yi,Huang Wen Hsin,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,ABUNDANT 9,ABUNDANT 9,ABUNDANT 9 (YI HONG 116),,,CPA222,,,,Huang Jia Yi,Pan Chao Mao,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,ACROS NO. 2,ACROS NO. 2,Acros No. 2,7379345,,,Honduras,Fishing Vessel,,"Infitco SA, Infitco Ltd","Infitco SA, Infitco Ltd",True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,AKASH,AKASH,,,,,India,Fishing Vessel,,WILLIAM S/O MANUVELPILLAI,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,AL'AMIR MUHAMMAD,AL'AMIR MUHAMMAD,AL'AMIR MUHAMMAD,,,,Egypt,Fishing Vessel,,,,True,"IOTC, NEAFC, NAFO, GFCM, SIOFA",IUU fishing in the Strait of Sicily
+True,ALBORAN II,ALBORAN II,Alboran II,7306570,,,,Fishing Vessel,Trawl unspecified,Redfin Investments SA,Redfin Investments SA,True,"IOTC, ICCAT, SEAFO, NEAFC, NAFO, GFCM, SIOFA",Cross-listing
+False,ALFA,ALFA,Alfa,7436533,,4LPN,Georgia,Reefer,,Stratford Vale Corp,JSC Fishery Group,False,"SEAFO, NEAFC, NAFO",OBS by NOR TRA in RA SCH 07/37
+True,AMORINN,AMORINN,Amorinn,7036345,,,Unknown,Fishing Vessel,,Rptd Sold Undisclosed Interest,Rptd Sold Undisclosed Interest,True,"IOTC, ICCAT, CCAMLR, SEAFO, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,AN TON,AN TON,,8907888,620999583,D6A3582,Comoros,"Cargo vessel, Fish carrier, Unknown",Unknown,Aries Navigation Ltd,Seatrade Groningen B.V.; Aries Navigation Ltd,False,"IOTC, NAFO, NPFC, SIOFA",Cross-listing
+True,ANEKA 228,ANEKA 228,Aneka 228,,,,,,,,,False,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, SIOFA",Operating in the IOTC area without authorisation
+True,ANNAI VELAMKANNI,ANNAI VELAMKANNI,,,,,India,Fishing Vessel,,D.WILSON,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,ANTONY,ANTONY,Antony,7236634,,,Unknown,Fishing Vessel,,World Ocean Fishing SL; World Oceans Fishing SL,,True,"IOTC, ICCAT, CCAMLR, SEAFO, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+False,AQUARUS,AQUARUS,Aquarus,,,,St. Vincent and the Grenadines,,,,,False,ICCAT,
+True,ARARAT/RESHMITHA,ARARAT/RESHMITHA,IND-TN-15- MM8297/ARARAT/RESH MITHA,,,,India,Fishing Vessel,,,,True,"IOTC, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+False,AROGYA ANNAI,AROGYA ANNAI,BEO HINGIS,,,,India,Fishing Vessel,"Lines unspecified, Gillnets",Siraj,,False,"IOTC, ICCAT",Fishing without a license in the waters of the UK (OT)
+True,ARPUTHA MATHA,ARPUTHA MATHA,,,,,India,Fishing Vessel,,SALBIN S/O CLEETUS,PRABHU ALBY,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,ASIAN WARRIOR,ASIAN WARRIOR,ASIAN WARRIOR,7322897,,,,Fishing Vessel,,High Mountain Overseas S.A.,Rptd Sold Undisclosed Interest,True,"IOTC, ICCAT, CCAMLR, SEAFO, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Following IOTC
+False,ATLANTIC GLORY,ATLANTIC GLORY|ATLANTICGLORY,TS Elegance,8919403,312864000,V3PB8,Belize,"Fishing Vessel, Unknown","Purse seine, Unknown","AFRICA STARS FISHERIES LTD, AFRICA STARS FISHERIES, AFRICA STARS FISHERIES LIMITED","Africa Star Fisheries Ltd, AFRICA STAR FISHERIES. LTD, AFRICA STAR FISHERIES LIMITED, Africa Star Fisheries Limited",False,IOTC,Contravention of IOTC Resolution 02/04
+False,ATLANTIC PRINCE,ATLANTIC PRINCE,TS Emerald,8919415,312867000,V3PG8,Belize,"Fishing Vessel, Unknown","Purse seine, Seine other, Unknown","Zhong Gha Foods Co Ltd, ZHONG GHA FOODS COMPANY LIMITED, Zhong Gha Foods Company Limited; AFRICA STARS FISHERIES LTD, AFRICA STARS FISHERIES, AFRICA STARS FISHERIES LIMITED","Africa Star Fisheries Ltd, AFRICA STAR FISHERIES. LTD, AFRICA STAR FISHERIES LIMITED, Africa Star Fisheries Limited",False,IOTC,Contravention of IOTC Resolution 02/04
+False,ATLANTIC QUEEN,ATLANTIC QUEEN,TS Prosperity,9223227,627179000,9GHE,Ghana,"Fishing Vessel, Unknown","Purse seine, Unknown","AFRICA STARS FISHERIES LTD, AFRICA STARS FISHERIES, AFRICA STARS FISHERIES LIMITED; Africa Star Fisheries Ltd, AFRICA STAR FISHERIES. LTD, AFRICA STAR FISHERIES LIMITED, Africa Star Fisheries Limited; ZHONG  GHA FOODS COMPAN","Africa Star Fisheries Ltd, AFRICA STAR FISHERIES. LTD, AFRICA STAR FISHERIES LIMITED, Africa Star Fisheries Limited",False,IOTC,Contravention of IOTC Resolution 02/04
+True,ATLANTIC WIND,ATLANTIC WIND,ATLANTIC WIND,9042001,,,Unknown,Fishing Vessel,Gillnets,High Mountain Overseas S.A.; Bright Future Invest NV,Bright Future Invest NV,True,"IOTC, ICCAT, CCAMLR, SEAFO, NEAFC, NAFO, CCSBT, GFCM, SIOFA","Fishing inside Division 58.4.3b; Inside Division 58.4.3a; Fishing inside Division 58.4.3a; Undocumented landing, Malaysia"
+True,AVE MARIA,AVE MARIA,,,,,India,Fishing Vessel,"Gillnets, Longline",Xaviour S/O Theouns,,False,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, SIOFA",Not on Record of Authorised Vessels (RAV). Fishing in closed area. Fishing  in coastal State's waters without authorization. Contravention of IOTC CMMs (e.g. VMS).
+True,AVE MARIYA,AVE MARIYA|AVEMARIYA,,,,,India,Fishing Vessel,"Gillnets, Longline",Jerin Charles S/O Bosco,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+False,AVIOR,AVIOR,Avior,7612321,,4LIJ,Georgia,Reefer,,ArdiStelo Ltd (OOO 'ArdiStella'),ArdiStelo Ltd (OOO 'ArdiStella'),False,"SEAFO, NEAFC, NAFO",1st OBS by NOR TRA in RA
+False,BALENA,BALENA,Balena,,,,Unknown,,,Long Bow Fishing Co Ltd,,False,IOTC,Contravention of IOTC Resolution 07/02 and 09/03
+True,BAROON,BAROON,Baroon,9037537,,,Unknown,Fishing Vessel,Longline,"Vero Shipping Corp, Vero Shipping Corporation",Etterna Ship Management; Etterna Shipmanagement SA,True,"IOTC, ICCAT, CCAMLR, SEAFO, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+False,BELLATOR,BELLATOR,BELLATOR,9179359,603100323,D3P5442,Angola,"Fishing Vessel, Stern Trawler","Trawl unspecified, Purse seine","Cat-Congelacao Atlantica Do Tombwa, S.A.; CAT Congelacao Atlantica Do Tombwa SA",CAT Congelacao Atlantica Do Tombwa SA,False,"IOTC, SPRFMO, SIOFA",Cross-listing
+False,BENAIAH,BENAIAH,BENAIAH,,,,India,Fishing Vessel,"Longline, Gillnets",Raju,Chris Lukaj,False,"IOTC, ICCAT",Fishing without a license in the waters of the UK (OT)
+True,BENEDICTA,BENEDICTA,,,,,India,Fishing Vessel,,PAUL SURGEN J ,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,BHASKARA NO. 10,BHASKARA NO. 10,Bhaskara No. 10,,,,Unknown,,,,,True,"IOTC, ICCAT, IATTC, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,BHASKARA NO. 9,BHASKARA NO. 9,Bhaskara No. 9,,,,Unknown,,,,,True,"IOTC, ICCAT, IATTC, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+False,BHINEKA,BHINEKA,Bhineka,,,YGJY,Indonesia,,,,,False,"ICCAT, IATTC",ref E11-5762
+True,BIGEYE,BIGEYE|BIG EYE,Bigeye,,,FN003883,Sierra Leone,,,MARIA FISHERY CO.LTD,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+False,BINH MINH 02,BINH MINH 02,Pavlovsk,8326319,574756000,3WYN,,"Seismic Survey Vessel, Research Survey Vessel",,Rptd Sold Undisclosed Interest,Rptd Sold Undisclosed Interest,False,"SEAFO, NEAFC, NAFO",
+False,BLAGODATNY,BLAGODATNY,NEFELIN,7645237,272545000,,Ukraine,Fishing Vessel,Trawl unspecified,Batisi Cooperative ('Kooperativ Batisi'); MAM MUSUKOI,Batisi Cooperative ('Kooperativ Batisi'),True,"IOTC, ICCAT, GFCM, SIOFA",Cross-listing
+False,BLUE OCEAN MARINE,BLUE OCEAN MARINE,Blue Ocean Marine,7826271,,V3AF3,Belize,Fishing Vessel,,Blue Ocean Marine Line SA,TS Marine Pte Ltd,False,IOTC,"Contravention of IOTC Resolution 02/04, 02/05, 03/05"
+True,BRAVO,BRAVO,Bravo,,,T8AN3,Palau,,,,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,CAMELOT,CAMELOT,Camelot,,,,Unknown,,,,,True,"IOTC, ICCAT, IATTC, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+False,CAPTAIN NAS 2,CAPTAIN NAS 2,DIEGO STAR 2,8318570,620026000,D6A2026,Comoros,Fishing Vessel,,Lingont SA; Captain Nas Marine Sarlu,Lingont SA; Captain Nas Marine Sarlu,False,SIOFA,Fishing in the Agreement Area and not on the SIOFA Record of Authorised Vessels
+False,CARIBBEAN STAR NO. 31,CARIBBEAN STAR NO. 31,Caribbean Star No. 31,,,,Colombia,,,Crystal Ocean Inc.,,False,IATTC,Not authorized to fish
+False,CARIBE,CARIBE,Caribe,7351161,,,,"Fishing Vessel, Stern Trawler",Trawl unspecified,Rptd Sold Undisclosed Interest,Rptd Sold Undisclosed Interest,False,"SEAFO, NEAFC, NAFO",
+True,CARLOS,CARLOS,Daniaa,7234014,,,,Fishing Vessel,Longline,Pesqueira Sao Tome Lda; SIPEM GUINEE SARL-PESQ.SAO TOME (ALPHA CAMARA),Pesqueira Sao Tome Lda,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+False,CARMAL MATHA,CARMAL MATHA,CARMAL MATHA,,,,India,Fishing Vessel,Lines unspecified,"Anthony J, s/o Joseph",Mr Antony,False,"IOTC, ICCAT",Fishing without a license in the waters of the UK (OT)
+False,CARMEN,CARMEN,Carmen,8522030,,4LSK,,"Fishing Vessel, Stern Trawler",Trawl unspecified,A B Bocyp Fishing Ltd,Northern Fishers Co (OOO 'Severnaya Rybolovetskaya Kompaniya'),False,"SEAFO, NEAFC, NAFO",NAFO Div. 1F
+False,CEFEY,CEFEY,Cefey,7700104,,UGAU,Russia,Reefer,,Rybprom-3 JSC (ZAO 'Rybprom-3'),Rybprom-3 JSC (ZAO 'Rybprom-3'),False,"SEAFO, NEAFC, NAFO","OBS with Panamanian Flag call sign: HP8520, OBS by NOR transhipping the in NEAFC Regulatory Area"
+True,CEVAHIR,CEVAHIR,GALA I,8133839,,,Unknown,"Research vessel, Fishing Vessel, Research Survey Vessel",Purse seine,Rptd Sold Undisclosed Interest,Rptd Sold Undisclosed Interest,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,CHALLENGE,CHALLENGE,Challenge,6622642,,HO5381,,Fishing Vessel,,Advantage Company SA,Advantage Company SA,True,"IOTC, ICCAT, CCAMLR, SEAFO, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,CHI TONG,CHI TONG,Chi Tong,,,,,,,,,False,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, SIOFA",Operating in the IOTC area without authorisation
+False,CHIA YU 3,CHIA YU 3,Yu Long 33,,,,Unknown,,,,Pesca Tuna SA; Pescatuna Sociedad Anonima,False,IATTC,
+True,CHOTCHAINAVEE 35,CHOTCHAINAVEE 35,CHOTCHAINAVEE 35,,567000035,,,"Fishing Vessel, Trawler",Trawls,Green Laurel International SARL,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,COBIJA,COBIJA,COBIJA,7330399,,,,"Fishing Vessel, Stern Trawler","Trawl unspecified, Gillnets",Precision Shipping Services; Precision Shipping & Logistics Ltd,Precision Shipping & Logistics Ltd,True,"IOTC, ICCAT, CCAMLR, SEAFO, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+False,COMET,COMET,Comet,8324139,,,Unknown,Fishing Vessel,,Credraf Associates SA,Jose Manuel Salgueiro,False,"CCAMLR, SEAFO",Fishing inside Division 58.4.3b
+False,CONCHITA VI,CONCHITA VI,Conchita VI,,,V3TB7,Belize,,,Primero Fishery Co. Ltd,,False,IATTC,
+False,CRYSTAL CROWN,CRYSTAL CROWN,Ocean Explorer,7826245,,,,Fishing Vessel,Purse seine,"THAI TUNA FISHING Co., Ltd.",International Fishing Corp Pte Ltd,False,IOTC,Contravention of IOTC Resolution 02/04
+False,DAE YANG NO. 606,DAE YANG NO. 606|NO.606 DAE YANG,Chang Yow No. 212,8013883,441527000,DTBV3,,Fishing Vessel,Longline,,Dae Yang Fisheries Co Ltd,False,ICCAT,
+True,DEWLI FISHING KUDAWELLA,DEWLI FISHING KUDAWELLA,IMUL-A-1028-TLE/DEWLI FISHING KUDAWELLA,,,,Sri Lanka,Fishing Vessel,,,,True,"IOTC, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+False,DIEGO STAR 3,DIEGO STAR 3,DIEGO STAR 3,8001608,,D6A2132,Comoros,Fishing Vessel,Longline,Rodia Processing Plant Co Ltd,Rodia Processing Plant Co Ltd,False,SIOFA,Fishing in the Agreement Area and not on the SIOFA Record of Authorised Vessels
+False,DIGNAMOL 1,DIGNAMOL 1,DIGNAMOL 1,,,,India,Fishing Vessel,Lines unspecified,"Jelvis s/o Dicostan; SD. Jelvish, s/o Dikostan",James Robert,False,"IOTC, ICCAT",Fishing without a license in the waters of the UK (OT)
+False,DIVO,DIVO,Damanzaihao,7913622,273455520,D6A3596,Comoros,"Fish factory ship, Fishing Vessel",,Resurgence Ship Management Pvt Ltd,,False,"SPRFMO, SIOFA",Prolonged presence in the SPRFMO Area without authorisation and providing support to five authorised Peruvian trawlers
+False,DOLFIN,DOLFIN,Dolphin,8422852,,,Unknown,"Fishing Vessel, Stern Trawler",Trawl unspecified,Selskokhoz Proizvodst Kooperativ Rybokolkhoz 'Kuzema',,False,"SEAFO, NEAFC, NAFO",OBS by EU and ISL fishing in the NEAFC Regulatory Area
+True,DONG WON NO. 629,DONG WON NO. 629,Melilla No. 103,7809986,,DTAQ8,South Korea,Fishing Vessel,Longline,Dongwon Industries Co. Ltd.,Dongwon Industries Co. Ltd.,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+False,DRAGON 18,DRAGON 18,Dragon 18,,,V3NS5,Belize,,,,"Shung Ye Fishery Co., Ltd",False,IATTC,
+False,DRAGON 28,DRAGON 28,Dragon 28,,,V3HT2,Costa Rica,Fishing Vessel,Longline,"3-102-749775 Sociedad De Responsabilidad, Ltd.",,False,IATTC,
+True,DRAGON III,DRAGON III,Dragon III,,,,Unknown,,,,,True,"IOTC, ICCAT, IATTC, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+False,DRAGON VI,DRAGON VI,Dragon VI,,,,Costa Rica,,,Hung Chuan Wang Shih / Astillero Mariscos del Pacífico SA,Pesca Tuna SA; Pescatuna Sociedad Anonima,False,IATTC,
+False,DRAGON XIII,DRAGON XIII,Dragon XIII,,,,Belize,,,,,False,IATTC,
+False,DUBREKA,DUBREKA,Cliff,8028424,325110000,J7AW4,Dominica,"Fish carrier, Reefer",,Sonit Sarl (Societe Sonit Guinee-Sarl),"Sonit S/L Ltd,",False,"SEAFO, NEAFC, NAFO",OBS by NOR transhipping in the NEAFC Regulatory Area
+True,EASRON,EASRON,,,,,India,Fishing Vessel,,MR JELASTIN,,True,"IOTC, ICCAT, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,EL SHADAI,EL SHADAI,,,,,India,Fishing Vessel,,REJIKUMAR S/O SILUVAIYAN,,True,"IOTC, ICCAT, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+False,EL SHADDAI,EL SHADDAI,,8025082,601126800,ZR6358,South Africa,Fishing Vessel,Demersal longline,Braxton Security Services CC,Braxton Security Services CC,True,"IOTC, ICCAT, CCAMLR, SEAFO, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,EMMANUEL,EMMANUEL,,,,,India,Fishing Vessel,Gillnets,SASIKUMAR,VINUU ARULAPPA,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+False,EPHRAEEM,EPHRAEEM,EPHRAEEM,,,,India,Fishing Vessel,"Gillnets, Longline",,,False,"IOTC, ICCAT","Fishing without a license, use of prohibited gear and no logbook in the waters of the UK (OT)"
+False,EROS DOS,EROS DOS,Eros Dos,8604668,,,Unknown,"Fishing Vessel, Fishery support vessel",Longline,Rptd Sold Undisclosed Interest,Rptd Sold Undisclosed Interest,True,"IOTC, ICCAT, SEAFO, NEAFC, NAFO, GFCM, SIOFA",Cross-listing
+False,EVA,EVA,Eva,8522119,,4LPH,Georgia,"Fishing Vessel, Stern Trawler",Trawl unspecified,A B Bocyp Fishing Ltd,Northern Fishers Co (OOO 'Severnaya Rybolovetskaya Kompaniya'),False,"SEAFO, NEAFC, NAFO",NAFO Div. 1F
+False,F/V EMILY,F/V EMILY,F/V Emily,,,,St. Vincent and the Grenadines,,,Continental Ltd.,,False,ICCAT,
+True,FB KUDA LAUT 03,FB KUDA LAUT 03,,,,DUM-4015,Philippines,"Support vessel, Fishing Vessel",,Tuna Explorers Inc,,False,"IOTC, ICCAT, WCPFC, NAFO, CCSBT, SIOFA",Cross-listing
+False,FLORENTINO,FLORENTINO,Daniela F,9130793,,HC5240,Ecuador,Fishing Vessel,Purse seine,Importadora Y Exportadora De Maquinas Y Equipos Industriales Importeq SA,Importadora Y Exportadora De Maquinas Y Equipos Industriales Importeq SA,False,WCPFC,
+False,FONG KUO NO. 819,FONG KUO NO. 819|FONG KUO 819,Seed Leaf,8913992,370070000,3FCY3,Panama,"Reefer, Fish carrier, Cargo vessel",,"FK Overseas Corp, F.K. OVERSEAS CORP.",FK Overseas Co Ltd,False,"CCAMLR, SEAFO",Undocumented transhipment
+True,FREEDOM 7,FREEDOM 7,FREEDOM 7,7302548,,,,"Reefer, Fishing Vessel, Cargo vessel",Longline,Long-Teng Int'l Trading Co Ltd,Long-Teng Int'l Trading Co Ltd,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,FU HSIANG FA 18,FU HSIANG FA 18,Fu Hsiang Fa 18,,,,,Fishing Vessel,Longline,,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,FU HSIANG FA NO. 01,FU HSIANG FA NO. 01,Fu Hsiang Fa No. 01,,,,,,,,,False,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, SIOFA",Operating in the IOTC area without authorisation
+True,FU HSIANG FA NO. 02,FU HSIANG FA NO. 02,Fu Hsiang Fa No. 02,,,,,,,,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,FU HSIANG FA NO. 06,FU HSIANG FA NO. 06,Fu Hsiang Fa No. 06,,,,,,,,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,FU HSIANG FA NO. 08,FU HSIANG FA NO. 08,Fu Hsiang Fa No. 08,,,,,,,,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,FU HSIANG FA NO. 09,FU HSIANG FA NO. 09,Fu Hsiang Fa No. 09,,,,,,,,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,FU HSIANG FA NO. 11,FU HSIANG FA NO. 11,Fu Hsiang Fa No. 11,,,,,,,,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,FU HSIANG FA NO. 13,FU HSIANG FA NO. 13,Fu Hsiang Fa No. 13,,,,,,,,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,FU HSIANG FA NO. 17,FU HSIANG FA NO. 17,Fu Hsiang Fa No. 17,,,,,,,,,False,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, SIOFA",Operating in the IOTC area without authorisation
+True,FU HSIANG FA NO. 20,FU HSIANG FA NO. 20,Fu Hsiang Fa No. 20,,,,,,,,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,FU HSIANG FA NO. 21,FU HSIANG FA NO. 21,Fu Hsiang Fa No. 21,,,,,,,,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,FU HSIANG FA NO. 23,FU HSIANG FA NO. 23,Fu Hsiang Fa No. 23,,,,,,,,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,FU HSIANG FA NO. 26,FU HSIANG FA NO. 26,Fu Hsiang Fa No. 26,,,,,,,,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,FU HSIANG FA NO. 30,FU HSIANG FA NO. 30,Fu Hsiang Fa No. 30,,,,,,,,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,FU LIEN NO. 1,FU LIEN NO. 1,Fu Lien No 1,7355662,,,Unknown,Fishing Vessel,,Fu Lien Fishery Co Ltd,Fu Lien Fishery Co Ltd,True,"IOTC, ICCAT, WCPFC, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,FULL RICH,FULL RICH,Full Rich,,,HMEK3,Unknown,Fishing Vessel,Longline,Noel International Ltd.,Noel International Ltd.,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Operating in the IOTC area without authorisation
+True,GIFT OF GOD,GIFT OF GOD,,,,,India,Fishing Vessel,,ANTHONY ROBERT T,TOM S/O CHRISTOPHER,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+False,GILONTAS NO.382,GILONTAS NO.382|JAYA 25,Maya 11,1740877,,9M3857,Malaysia,Fishing Vessel,"Longline, Unknown",Rptd Sold Malaysia; ASTANA CONGLOMERATE SDN. BHD.,Rptd Sold Malaysia; ASTANA CONGLOMERATE SDN. BHD.,False,IATTC,
+False,GLORIOUS HARMONY,GLORIOUS HARMONY,Ocean Liberty,7806702,,,Equatorial Guinea,Fishing Vessel,Purse seine,Interocean TSM Holdings Pte Ltd; Marine Ocean Shipping SA,International Fishing Corp Pte Ltd,False,IOTC,Contravention of IOTC Resolution 02/04
+True,GOD BLESS,GOD BLESS,IMULA 0846 KLT/GOD BLESS ,,,,Sri Lanka,Fishing Vessel,,,,True,"IOTC, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,GODS GIFT,GODS GIFT,,,,,India,Fishing Vessel,"Gillnets, Longline",Darvin S/O Deniston,,False,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, SIOFA",Not on Record of Authorised Vessels (RAV). Fishing in a Coastal State's waters without authorization. Contravention of IOTC CMMs (e.g. VMS & logbook).
+True,GOIDAU RUEY NO.1,GOIDAU RUEY NO.1,Goidau Ruey No.1,,,HO2508,Unknown,,,"Goidau Ruey Industrial, S.A.",,True,"IOTC, ICCAT, IATTC, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,GOOD HOPE,GOOD HOPE,Good Hope,7020126,657379000,5NMU,Nigeria,"Supply Vessel, Platform Supply Ship",,Port Plus Ltd,Port Plus Ltd,True,"IOTC, ICCAT, CCAMLR, SEAFO, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,GORILERO,GORILERO,Gorilero,6719419,,,Unknown,"Fishing Vessel, Trawler",Trawl unspecified,Trianon Business SA,Trianon Business SA,True,"IOTC, ICCAT, SEAFO, NEAFC, NAFO, GFCM, SIOFA",Cross-listing
+True,GUNUAR MELYAN 21,GUNUAR MELYAN 21,Gunuar Melyan 21,,,,,,,,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",IOTC Contravention of IOTC Resolution 07/02
+True,HAI DA 705,HAI DA 705|HAIDA 705|海达705,HAI DA 705,,,,,Fishing Vessel,Driftnets,,,False,"IOTC, NEAFC, NAFO, NPFC, SIOFA",Cross-listing
+False,HALELUYA,HALELUYA,,,,HJLX,Colombia,Fishing Vessel,Longline,Imanely SAS,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+False,HALIFAX,HALIFAX,,8529533,659363000,V5IW,Namibia,Fishing Vessel,"Longline, Handline, Pole and line",,"Southern Wolf Holdings (PTY) Ltd, Southern Wolf Holdings (PTY) LTD; SOUTH WOLF HOLDINGS (PTY) LTD, South Wolf Holdings (Pty) Ltd, South Wolf Holdings (PTY) LTD",True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,HAMBAN TOTA EXPRESS,HAMBAN TOTA EXPRESS,,8450835,417105347,4SF5385,Sri Lanka,Fishing Vessel,"Gillnets, Unknown, Longline, Driftnets","M MILHAN, m.milhan","M MILHAN, m.milhan; Rptd Sold Sri Lanka",False,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, SIOFA",Not on Record of Authorised Vessels (RAV). Fishing in a coastal State's waters without authorization.
+True,HAN,HAN,,8214645,,V4BK5,St. Kitts and Nevis,"Reefer, Fish carrier, Cargo vessel",Unknown,Trade Shipping Inc,"SHUNHANG INTERNATIONAL SHIPPING CO., LIMITED; Machtrans Ship Management Pvt Ltd",False,"IOTC, NEAFC, NAFO, NPFC, SIOFA",Cross-listing
+True,HE LI 1 HAO,HE LI 1 HAO,,8524492,677051100,,,"Fishing Vessel, Unknown",,"Ginsil Holding Singapore Pte Ltd, Ginsil Holding (Singapore) Pte Ltd","Ginsil Holding Singapore Pte Ltd, Ginsil Holding (Singapore) Pte Ltd",True,"IOTC, ICCAT, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,HEAVY SEA,HEAVY SEA,Heavy Sea,7322926,,,,Fishing Vessel,,Rptd Sold Undisclosed Interest,Rptd Sold Undisclosed Interest,True,"IOTC, ICCAT, CCAMLR, SEAFO, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+False,HIROYOSHI - 17,HIROYOSHI - 17,Hiroyoshi 17,8565836,525500291,YB5548,Indonesia,"Fishing Vessel, Reefer, Fish carrier","Longline, Unknown","INTIMAS SURYA, PT, INTIMAS SURYA, PT.","INTIMAS SURYA, PT, INTIMAS SURYA, PT.",False,"ICCAT, IATTC",
+True,HOOM XIANG 101,HOOM XIANG 101,Hoom Xiang 101,,,,Unknown,Fishing Vessel,Longline,Unknown,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,HOOM XIANG 103,HOOM XIANG 103,Hoom Xiang 103,,,,Unknown,Fishing Vessel,Longline,Unknown,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,HOOM XIANG 105,HOOM XIANG 105,Hoom Xiang 105,,,,Unknown,Fishing Vessel,Longline,Unknown,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,HOOM XIANG 11,HOOM XIANG 11,Hoom Xiang 11,,,,Unknown,Fishing Vessel,Longline,,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Contravention of IOTC Resolution 09/03
+False,HSIN CHI WANG NO. 8,HSIN CHI WANG NO. 8,Hsin Chi Wang No. 8,8994300,,,Unknown,Fishing Vessel,,Rptd Sold Undisclosed Interest,Rptd Sold Undisclosed Interest,False,IATTC,
+False,HSIN TSAN NO. 2,HSIN TSAN NO. 2,Hsin Tsan No. 2,,,V3VK8,Belize,,,,,False,IATTC,
+False,HUNG CHI FU,HUNG CHI FU,Talamanca,2597590,,,,Fishing Vessel,Longline,"Transportes El Pescador, S.A.","Transportes El Pescador, S.A.",False,IATTC,
+False,HUNG CHI FU 12,HUNG CHI FU 12,Yuh Shan,,,,Unknown,,,,"Yuh Shan Fishery Co., Ltd",False,IATTC,
+False,HUNG CHI FU 3,HUNG CHI FU 3,Yu Long 27,,,,Unknown,,,,Pesca Tuna SA; Pescatuna Sociedad Anonima,False,IATTC,
+False,HUNG CHI FU 33,HUNG CHI FU 33|HUNG CHI FU NO. 33,Yu Long 68,2699843,,,,Fishing Vessel,Longline,Pesca Tuna SA; Pescatuna Sociedad Anonima,Pesca Tuna SA; Pescatuna Sociedad Anonima,False,IATTC,
+False,HUNG CHI FU 35,HUNG CHI FU 35,Reymar No. 1,,,,Costa Rica,Fishing Vessel,Longline,Hung Chuan Wang Shih / Astilleros Mariscos del Pacifico SA,,False,IATTC,
+False,HUNG CHI FU 68,HUNG CHI FU 68,Reymar No. 2,,567000445,HSN5658,Thailand,Fishing Vessel,Longline,Shealth Services (Thailand) Co Ltd,Shealth Services (Thailand) Co Ltd,False,IATTC,
+False,HUNG CHI FU NO. 16,HUNG CHI FU NO. 16,Yu Long No. 21,,,V3WC7,Belize,,,,Pesca Tuna SA; Pescatuna Sociedad Anonima,False,IATTC,
+False,HUNG CHI FU NO. 27,HUNG CHI FU NO. 27,Yu Long 37,2700642,,,,Fishing Vessel,Longline,Pesca Tuna SA; Pescatuna Sociedad Anonima,Pesca Tuna SA; Pescatuna Sociedad Anonima,False,IATTC,
+False,HUNG JIE WEI NO. 2,HUNG JIE WEI NO. 2,Conchita VIII,,,,Unknown,,,,,False,IATTC,
+True,IANNIS I,IANNIS I,Iannis I,7332218,,HO3374,Unknown,"Fishing Vessel, Trawler",Trawl unspecified,Iannis Corp,Iannis Corp,True,"IOTC, ICCAT, SEAFO, NEAFC, NAFO, GFCM, SIOFA",Cross-listing
+False,IN SUNG NO. 7,IN SUNG NO. 7,East Ocean,9230660,,DTBX4,South Korea,Fishing Vessel,,"Insung Corp, Insung Corporation, INSUNG CORPORATION","Insung Corp, Insung Corporation, INSUNG CORPORATION",False,"CCAMLR, SEAFO",Fishing inside Division 58.4.3; 58.4.1; 58.4.3b; 58.4.3b; Inside division 58.4.3b
+False,ISABELLA,ISABELLA,Isabella,8422838,,,,"Fishing Vessel, Stern Trawler",Trawl unspecified,A B Bocyp Fishing Ltd,Northern Fishers Co (OOO 'Severnaya Rybolovetskaya Kompaniya'),False,"SEAFO, NEAFC, NAFO","NAFO Div. 1F, 31.07.2006"
+True,ISRAR 1,ISRAR 1,,8004076,,,Unknown,Fishing Vessel,Longline,ALMURAN INTERNATIONAL LLC; Starlight LLC,ALMURAN INTERNATIONAL LLC; Starlight LLC,True,"IOTC, ICCAT, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,ISRAR 2,ISRAR 2,,8568694,,,Unknown,Fishing Vessel,Longline,ALMURAN INTERNATIONAL LLC; Starlight LLC,ALMURAN INTERNATIONAL LLC; Starlight LLC,True,"IOTC, ICCAT, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,ISRAR 3,ISRAR 3,,8568682,,,Unknown,Fishing Vessel,Longline,ALMURAN INTERNATIONAL LLC; Starlight LLC,ALMURAN INTERNATIONAL LLC; Starlight LLC,True,"IOTC, ICCAT, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+False,ITZIAR II,ITZIAR II,Itziar II,6803961,,5NTV3,,"Fishing Vessel, Trawler",Trawl unspecified,Monteco Shipping Corp,Monteco Shipping Corp,True,"CCAMLR, SEAFO, GFCM",Inside Division 58.5.1; Fishing inside Division 58.5.1; Inside Division 58.4.3b; 58.4.3b; 58.4.3b; 58.4.3b; Fishing inside Division 58.4.3
+False,JAYA 21,JAYA 21,Maya 31,8977601,,9M3853,Malaysia,"Fishing Vessel, Trawler","Longline, Trawl unspecified",Rptd Sold Malaysia; ASTANA CONGLOMERATE SDN. BHD.,Rptd Sold Malaysia; ASTANA CONGLOMERATE SDN. BHD.,False,IATTC,
+False,JAYA 22,JAYA 22,Maya 32,8977613,,"4SF5344, 9M3854",Malaysia,"Fishing Vessel, Trawler","Longline, Trawl unspecified, Unknown",Rptd Sold Malaysia; ASTANA CONGLOMERATE SDN. BHD.,Rptd Sold Malaysia; ASTANA CONGLOMERATE SDN. BHD.,False,IATTC,
+False,JAYA 23,JAYA 23,Maya 1,8525226,,9M3855,Malaysia,Fishing Vessel,Longline,Rptd Sold Malaysia; ASTANA CONGLOMERATE SDN. BHD.,Rptd Sold Malaysia; ASTANA CONGLOMERATE SDN. BHD.,False,IATTC,
+False,JAYA 24,JAYA 24,Maya 2,1740865,,"4SF3277, 9M3856",Malaysia,Fishing Vessel,"Longline, Unknown",Rptd Sold Malaysia; ASTANA CONGLOMERATE SDN. BHD.,Rptd Sold Malaysia; ASTANA CONGLOMERATE SDN. BHD.,False,IATTC,
+False,JAYA 26,JAYA 26,Maya 12,1740889,,"4SF4703, 9M3858",Malaysia,Fishing Vessel,"Longline, Unknown, Gillnets",Rptd Sold Malaysia; ASTANA CONGLOMERATE SDN. BHD.,Rptd Sold Malaysia; ASTANA CONGLOMERATE SDN. BHD.,False,IATTC,
+False,JAYA 27,JAYA 27,Maya 22,1740891,,9M3859,Malaysia,Fishing Vessel,Longline,Rptd Sold Malaysia; ASTANA CONGLOMERATE SDN. BHD.,Rptd Sold Malaysia; ASTANA CONGLOMERATE SDN. BHD.,False,IATTC,
+False,JAYA 28,JAYA 28,Maya 61,1740906,,9M3860,Malaysia,Fishing Vessel,Longline,Rptd Sold Malaysia; ASTANA CONGLOMERATE SDN. BHD.,Rptd Sold Malaysia; ASTANA CONGLOMERATE SDN. BHD.,False,IATTC,
+False,JAYA 29,JAYA 29,Maya 62,1740918,,9M3861,Malaysia,Fishing Vessel,"Longline, Unknown",Rptd Sold Malaysia; ASTANA CONGLOMERATE SDN. BHD.,Rptd Sold Malaysia; ASTANA CONGLOMERATE SDN. BHD.,False,IATTC,
+False,JIMMY WIJAYA XXXV,JIMMY WIJAYA XXXV,Jimmy Wijaya XXXV,,,YE4683,Indonesia,Fishing Vessel,Longline,"Farida, FARIDA","Farida, FARIDA",False,"ICCAT, IATTC",
+False,JIN SHYANG YIH 668,JIN SHYANG YIH 668,Jin Shyang Yih 666,,,HSN6022,,Fishing Vessel,Longline,Shealth Services (Thailand) Co Ltd,"JIN SHYANG YIH FISHERY CO.,LTD.",False,IATTC,
+False,JINN FENG TSAIR NO. 1,JINN FENG TSAIR NO. 1,Jinn Feng Tsair No. 1,,,BJ4444,Taiwan,Fishing Vessel,Longline,"JHENG, ZONG-SIN",,False,WCPFC,"Fishing in the Exclusive Economic Zone of the Federated States of Micronesia without permission and in contravention of Federated States of Micronesia’s laws and regulations. (CMM 2007-03, para 3b)"
+True,JINZHANG,JINZHANG,JINZHANG,6607666,,,,Fishing Vessel,,,Rptd Sold Undisclosed Interest,True,"IOTC, ICCAT, CCAMLR, SEAFO, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+False,JOSELITO,JOSELITO,Mar Cantabrico,8212415,735059351,HC5759,Ecuador,Fishing Vessel,Purse seine,"Grupo Degfer Cia Ltda, Grupo Degfer CIA LTDA, Grupo Degfer CIA Ltda.","Grupo Degfer Cia Ltda, Grupo Degfer CIA LTDA, Grupo Degfer CIA Ltda.",False,"ICCAT, IATTC",Fished during a closure in 2010
+False,JUANITA,JUANITA,Juanita,8522042,,4LSM,Cyprus,"Fishing Vessel, Stern Trawler",Trawl unspecified,A B Bocyp Fishing Ltd,Northern Fishers Co (OOO 'Severnaya Rybolovetskaya Kompaniya'),False,"SEAFO, NEAFC, NAFO",NAFO Div. 1F
+True,JYI LIH 88,JYI LIH 88,Jyi Lih 88,,,,,,,,,True,"IOTC, ICCAT, IATTC, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+False,KABOU,KABOU,Red,6706084,,,Unknown,"Fishing Vessel, Stern Trawler",Trawl unspecified,Star Maritime Corp,"Empresa de Pesca Joao Maria Vilarinho, Sucessores, Sarl",False,"SEAFO, NEAFC, NAFO",Surveillance flight. First observation by NOR FIS in RA SCH 06/34
+False,KALAN-2,KALAN-2,MYS MARII,9009918,273338570,UIBA,Russia,Fishing Vessel,Longline,"Tranzit-DV Group OOO; Transit-DV Co Ltd, LLC Transit DV","Tranzit-DV Group OOO; Transit-DV Co Ltd, LLC Transit DV",False,"SPRFMO, SIOFA",Fishing in the Convention Area without authorisation
+True,KIKI,KIKI,,7929176,,C5J130,,Fishing Vessel,Longline,Rptd Sold Undisclosed Interest; BAY ROUTE SHIPPING COMPANY LIMITED,"Sun Warm Tuna Corporation, SUN WARM TUNA CORPORATION; HSIN FEI TRADING AND INVESTMENT CO. LTD (NATIC SARL); Rptd Sold Undisclosed Interest",False,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, SIOFA",Cross-listing
+True,KIM SENG DENG 3,KIM SENG DENG 3,Kim Seng Deng 3,,,,,,,,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+False,KING JESUS,KING JESUS,KING JESUS,,,,India,Fishing Vessel,Lines unspecified,,Bibi S. R. Paul Miranda S.,False,"IOTC, ICCAT",Fishing without a license in the waters of the UK (OT)
+True,KM. ANEKA 228,KM. ANEKA 228|ANEKA 228; KM,KM. Aneka 228,,,,,,,,,False,"IOTC, ICCAT, NEAFC, NAFO, CCSBT",Operating in the IOTC area without authorisation
+True,KOOSHA 4,KOOSHA 4,Koosha 4,7905443,422734000,9BQK,Iran,Reefer,,Pars Paya Seyd Industrial Fishing Co,Pars Paya Seyd Industrial Fishing Co,True,"IOTC, ICCAT, CCAMLR, SEAFO, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,KUANG HSING 127,KUANG HSING 127,Kuang Hsing 127,,,,,,,,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,KUANG HSING 196,KUANG HSING 196,Kuang Hsing 196,,,,,,,,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,LABIKO 2,LABIKO 2|MV LABIKO 2|M/V LABIKO II|LABIKO II,LABIKO,7325746,,3XGU,Liberia,"Fishing Vessel, Stern Trawler","Gillnets, Bottom trawl unspecified, Trawl unspecified",Diakhate Djibnil; Diakhate Djibril,Rptd Sold Undisclosed Interest,True,"IOTC, ICCAT, SEAFO, NEAFC, NAFO, GFCM, SIOFA",Cross-listing
+False,LAKPRIYA 14,LAKPRIYA 14|IMULA0730KLT,IMULA 0730 KLT/LAKPRIYA 14,,,4SF4482,Sri Lanka,Fishing Vessel,,,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+False,LE MALIN,LE MALIN,Apache I,9142693,,,France,Diving Support Vessel,,Marine Nationale - Direction des Travaux Maritimes,Marine Nationale - Direction des Travaux Maritimes,False,"CCAMLR, SEAFO",Fishing Division 58.5.1 Apprehended
+True,LIAO YUAN YU 071,LIAO YUAN YU 071,LIAO YUAN YU 071,,,,,Fishing Vessel,Lift nets,,,False,"IOTC, NEAFC, NAFO, NPFC, SIOFA",Cross-listing
+True,LIAO YUAN YU 072,LIAO YUAN YU 072,LIAO YUAN YU 072,,,,,Fishing Vessel,Lift nets,,,False,"IOTC, NEAFC, NAFO, NPFC, SIOFA",Cross-listing
+True,LIAO YUAN YU 9,LIAO YUAN YU 9,LIAO YUAN YU 9,,,,,Fishing Vessel,Lift nets,,,False,"IOTC, NEAFC, NAFO, NPFC, SIOFA",Cross-listing
+True,LILA NO. 10,LILA NO. 10,Lila No. 10,,,,,,,,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,LIMPOPO,LIMPOPO,Limpopo,7388267,,,Unknown,"Fishing Vessel, Trawler",Trawl unspecified,Alos Company Ghana Ltd,,True,"IOTC, ICCAT, CCAMLR, SEAFO, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+False,LINGSAR 08,LINGSAR 08,Lingsar 08,,,,Indonesia,Fishing Vessel,Longline,Mr Nurwahid,,False,IOTC,Contravention of IOTC Resolution 09/03
+True,LITTLESHA,LITTLESHA,,,,,India,,,,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+False,LIVADIA,LIVADIA,Thorgull,8209078,,,Slovakia,Reefer,,Red Ruby Trading Ltd,Seatraffic Ltd,False,"SEAFO, NEAFC, NAFO",
+False,LONG YU SHENG,LONG YU SHENG,Long Yu Sheng,,,V3ZW2,Costa Rica,,,,Pesca Tuna SA; Pescatuna Sociedad Anonima,False,IATTC,
+True,LU RONG SHUI 158,LU RONG SHUI 158|鲁荣水158,LU RONG SHUI 158 (鲁荣水158),9025663,412688540,BBFB8,China,"Live fish carrier, Reefer",,Rptd Sold Undisclosed Interest,Rptd Sold Undisclosed Interest,False,"IOTC, NEAFC, NAFO, NPFC, SIOFA",Cross-listing
+True,LU RONG YU 612,LU RONG YU 612,LU RONG●YU 612,,412328746,,China,,,,,False,"IOTC, NEAFC, NAFO, NPFC, SIOFA",Cross-listing
+True,LU RONG YU SHUI 189,LU RONG YU SHUI 189,LU RONG YU 1189,9027104,,BBKC,China,"Fish carrier, Live fish carrier, Reefer",,Shandong Homey Group Co Ltd,Shandong Homey Group Co Ltd,False,"IOTC, NEAFC, NAFO, NPFC, SIOFA",Cross-listing
+True,LU RONG YUAN YU 101,LU RONG YUAN YU 101,LU RONG YUAN YU 101,,,,China,Fishing Vessel,Lift nets,,,False,"IOTC, NEAFC, NAFO, NPFC, SIOFA",Cross-listing
+True,LU RONG YUAN YU 102,LU RONG YUAN YU 102,LU RONG YUAN YU 102,,,,China,Fishing Vessel,Lift nets,,,False,"IOTC, NEAFC, NAFO, NPFC, SIOFA",Cross-listing
+True,LU RONG YUAN YU 103,LU RONG YUAN YU 103,LU RONG YUAN YU 103,,,,China,Fishing Vessel,Lift nets,,,False,"IOTC, NPFC, SIOFA",Cross-listing
+True,LU RONG YUAN YU 103,LU RONG YUAN YU 103|LURONGYUANYU103,LU RONG YUAN YU 103,,412328751,,China,"Unknown, Fishing Vessel",Trawl unspecified,,,False,"IOTC, NEAFC, NPFC, SIOFA",Cross-listing
+True,LU RONG YUAN YU 105,LU RONG YUAN YU 105,LU RONG YUAN YU 105,,,,China,Fishing Vessel,Lift nets,,,False,"IOTC, NAFO, NPFC, SIOFA",Cross-listing
+True,LU RONG YUAN YU 106,LU RONG YUAN YU 106,LU RONG YUAN YU 106,,,,China,Fishing Vessel,Lift nets,,,False,"IOTC, NAFO, NPFC, SIOFA",Cross-listing
+True,LU RONG YUAN YU 108,LU RONG YUAN YU 108,LU RONG YUAN YU 108,,,,China,Fishing Vessel,Lift nets,,,False,"IOTC, NAFO, NPFC, SIOFA",Cross-listing
+True,LU RONG YUAN YU 108,LU RONG YUAN YU 108,LU RONG YUAN YU 108,,,,China,Fishing Vessel,Trawl unspecified,,,False,"IOTC, NEAFC, NAFO, NPFC, SIOFA",Cross-listing
+True,LU RONG YUAN YU 109,LU RONG YUAN YU 109,LU RONG YUAN YU 109,,,,China,Fishing Vessel,Lift nets,,,False,"IOTC, NAFO, NPFC, SIOFA",Cross-listing
+True,LU RONG YUAN YU 581,LU RONG YUAN YU 581|鲁荣远渔 581,Unknown,,,,,Fishing Vessel,,,,False,"NPFC, SIOFA","A Japanese patrol vessel sighted this fishing vessel displaying the name LU RONG YUAN YU 581 in the Convention area at 41°11.6’N, 174°17.7’W on July 15, 2020. This vessel was fishing under the name of a legally authorized vessels which was not in the Convention Area, consequently this vessel was conducting IUU fishing and did not display an IRCS."
+True,LU RONG YUAN YU 582,LU RONG YUAN YU 582|鲁荣远渔 582,Unknown,,,,,Fishing Vessel,,,,False,"NPFC, SIOFA","A Japanese patrol vessel sighted this fishing vessel displaying the name LU RONG YUAN YU 582 in the Convention area at 41°11.4’N, 174°22.9’W on July 15, 2020. This vessel was fishing under the name of a legally authorized vessels which was not in the Convention Area, consequently this vessel was conducting IUU fishing and did not display an IRCS."
+True,LU RONG YUAN YU 787,LU RONG YUAN YU 787,LU RONG YUAN YU 787,,413800814,,China,Fishing Vessel,,Shidao Group,,False,"IOTC, NEAFC, NAFO, NPFC, SIOFA",Cross-listing
+True,LU RONG YUAN YU 797,LU RONG YUAN YU 797,LU RONG YUAN YU 797,,,,China,Fishing Vessel,,Shidao Group,,False,"IOTC, NEAFC, NAFO, NPFC, SIOFA",Cross-listing
+True,LU RONG YUAN YU 810,LU RONG YUAN YU 810|LURONGYUANYU810,,8798093,412333743,BBCI1,China,"Fishing Vessel, Unknown","Trawl unspecified, Purse seine",Shandong Lanyue Ocean Fishery Co Ltd,Shandong Lanyue Ocean Fishery Co Ltd,False,"IOTC, NPFC, SIOFA",Cross-listing
+True,LU RONG YUAN YU 811,LU RONG YUAN YU 811,LU RONG YUAN YU 102,8524973,412328752,BBDP2,China,Fishing Vessel,"Trawl unspecified, Purse seine",Shandong Lanyue Ocean Fishery Co Ltd,Shandong Lanyue Ocean Fishery Co Ltd,False,"IOTC, NAFO, NPFC, SIOFA",Cross-listing
+True,LU RONG YUAN YU 813,LU RONG YUAN YU 813,LU RONG YUAN YU 105,8798134,412328749,BBDK5,China,"Unknown, Fishing Vessel","Trawl unspecified, Purse seine",Shandong Lanyue Ocean Fishery Co Ltd,Shandong Lanyue Ocean Fishery Co Ltd,False,"IOTC, NEAFC, NAFO, NPFC, SIOFA",Cross-listing
+True,LU RONG YUAN YU 815,LU RONG YUAN YU 815,LU RONG YUAN YU 106,8799932,412328748,BBFB6,China,"Fishing Vessel, Unknown","Purse seine, Trawl unspecified",Shandong Lanyue Ocean Fishery Co Ltd,Shandong Lanyue Ocean Fishery Co Ltd,False,"IOTC, NEAFC, NAFO, NPFC, SIOFA",Cross-listing
+True,LU RONG YUAN YU 817,LU RONG YUAN YU 817,LU RONG YUAN YU 109,8798304,412333749,BBGB3,China,Fishing Vessel,"Trawl unspecified, Purse seine",Shandong Lanyue Ocean Fishery Co Ltd,Shandong Lanyue Ocean Fishery Co Ltd,False,"IOTC, NEAFC, NAFO, NPFC, SIOFA",Cross-listing
+True,LU RONG YUAN YU YUN 958,LU RONG YUAN YU YUN 958,LU RONG YUAN YU YUN 958,,412452812,,China,Fish carrier,,,,False,"IOTC, NEAFC, NAFO, NPFC, SIOFA",Cross-listing
+True,LUCAS,LUCAS,,9038402,629009114,C5J128,,"Fishing Vessel, Reefer","Longline, Troll line",Rptd Sold Undisclosed Interest; BAY ROUTE SHIPPING COMPANY LIMITED,Rptd Sold Undisclosed Interest,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,MAAN YIH HSING,MAAN YIH HSING,Maan Yih Hsing,,,,,,,,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,MADURA 2,MADURA 2,Madura 2,,,,,,,P.T. Provisit,P.T. Provisit,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,MADURA 3,MADURA 3,Madura 3,,,,,,,P.T. Provisit,P.T. Provisit,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+False,MANARA 1,MANARA 1,Cevahir,,,,,,,"AJD Tuna Limited, AJD TUNA LIMITED; Hannibal Shipping / ADJ Tuna",J.L. Jalabert,False,ICCAT,Use of fraudulent documentation
+False,MANARA II,MANARA II,Abdi Baba 1,,,,Libya,Fishing Vessel,Purse seine,Hannibal Shipping / ADJ Tuna,J.L. Jalabert,False,ICCAT,Use of fraudulent documentation
+True,MANGALA,MANGALA,,,,,Sri Lanka,Fishing Vessel,,,,True,"IOTC, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,MANJU MATHA,MANJU MATHA,,,,,India,Fishing Vessel,"Gillnets, Longline",Simon BASTIN,,False,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, SIOFA",Not on Record of Authorised Vessels (RAV). Fishing in a Coastal State's waters without authorization. Contravention of IOTC CMMs (e.g. no logbook).
+True,MANJUMATHA,MANJUMATHA,,,,,India,Fishing Vessel,"Gillnets, Longline",Simon BASTIN,,False,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, SIOFA",Not on Record of Authorised Vessels (RAV). Fishing in a Coastal State's waters without authorization. Contravention of IOTC CMMs (e.g. VMS & logbook).
+True,MARIA,MARIA,Maria,,,FN003882,,,,MARIA FISHERY CO.LTD,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,MARIYAL,MARIYAL,,,,,India,Fishing Vessel,"Gillnets, Longline",B. Varghese Raj S/O Babians,,False,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, SIOFA",Not on Record of Authorised Vessels (RAV). Fishing in closed area. Fishing in Coastal State's waters without authorization. Contravention of IOTC CMMs (e.g. VMS).
+False,MARTA LUCIA R,MARTA LUCIA R,Marta Lucia R.,9330214,730014000,HJCY,Colombia,"Fishing Vessel, Cargo vessel",Purse seine,Clingham Incorporated,Atunamar Ltda,False,"ICCAT, IATTC",
+True,MARWAN 1,MARWAN 1,AL WESAM 4,,,,,Fishing Vessel,Trawls,Marine Renown SARL,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+False,MARY LYNN,MARY LYNN|MARY-LYNN,Mary Lynn,8949044,735058984,HC5290,Ecuador,Fishing Vessel,Purse seine,"Industrias de Productos del Mar S.A. (IDELMAR), Industrias De Productos Del Mar S.A. (IDELMAR), Industrias de Productos del Mar, S.A. (IDELMAR)",Rodrigo Agudo Valle,False,IATTC,
+False,MAYA V,MAYA V,Maya V,8882818,,HP8357,Unknown,Fishing Vessel,,Rptd Sold Undisclosed Interest,Rptd Sold Undisclosed Interest,False,"CCAMLR, SEAFO",Fishing inside Division 58.5.2 Apprehended
+False,MING TSAIR FA NO. 60,MING TSAIR FA NO. 60,Feng Jung Chin 1,8787276,416002232,BG4018,Taiwan,Fishing Vessel,Longline,"TSENG, SHU FEN; Shu-Fen Tseng","TSENG, SHU FEN; Shu-Fen Tseng",False,IOTC,Contravention of IOTC Resolution 02/04
+True,MOTHER OF JESUS,MOTHER OF JESUS,,,,,India,Fishing Vessel,"Gillnets, Longline",Robert Bruce S/O Benjamin,,False,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, SIOFA",Not on Record of Authorised Vessels (RAV). Fishing in closed area. Fishing in Coastal State's waters without authorization. Contravention of IOTC CMMs (e.g. VMS).
+False,MURAVYEV-AMURSKIY,MURAVYEV-AMURSKIY,Muravyev Amurskiy,9146352,273319630,UESA,Russia,Fishing Vessel,,OOO 'Tymlatskiy Rybokombinat',OOO 'Tymlatskiy Rybokombinat',False,CCAMLR,
+True,MURTOSA,MURTOSA,Murtosa,7385174,,,Unknown,"Fishing Vessel, Stern Trawler",Trawl unspecified,Murtosa Fishing Co,Murtosa Fishing Co,True,"IOTC, ICCAT, SEAFO, NEAFC, NAFO, GFCM, SIOFA",Cross-listing
+False,MUTIARA NO. 28,MUTIARA NO. 28,Mutiara 28,8669723,,,Unknown,Fishing Vessel,Longline,"INTIMAS SURYA, PT, INTIMAS SURYA, PT.",,False,IATTC,
+True,NAJEM AL SHAMAL,NAJEM AL SHAMAL,Oriente No. 7,8430586,642137027,5AWC,Libya,Fishing Vessel,Longline,Taisay Kosho Co Ltd,Taisay Kosho Co Ltd; AL FAJR AL MUNIR MARINE FISHING CO,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+False,NATIONAL NO. 101,NATIONAL NO. 101,National No. 101,,,,St. Vincent and the Grenadines,,,Kuo Jeng Marine Services Limited; Kwo-Jeng Marine Services Limited,,False,ICCAT,
+False,NEMANSKIY,NEMANSKIY,Nemanskiy,8721595,,UBKQ,Unknown,"Fishing Vessel, Stern Trawler",Trawl unspecified,OOO 'Yuzhnyy Rybopromyslovyy Flot',Pionerskiy Ocean Fishing Marine Center (Pionerskaya Baza Okeanicheskogo Rybolovnogo Flota (BORF)),False,"SEAFO, NEAFC, NAFO",
+True,NEPTUNE,NEPTUNE,Neptune,8977596,,,Unknown,"Fishing Vessel, Trawler",Trawl unspecified,Space Energy Enterprises Co Ltd,Space Energy Enterprises Co Ltd,True,"IOTC, ICCAT, IATTC, WCPFC, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,NEW BAI I NO. 168,NEW BAI I NO. 168,NEW BAI I NO. 168,,,YGMY,,Fish carrier,,,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+False,NICOLAY CHUDOTVORETS,NICOLAY CHUDOTVORETS,Nicolay Chudotvorets,8421937,,UDIB,Russia,"Fishing Vessel, Stern Trawler",Trawl unspecified,Okkervil LLC,Okkervil LLC,False,"SEAFO, NEAFC, NAFO",OBS by FRO FIS in RA
+True,NIKA,NIKA,,8808654,,,,"Fishing Vessel, Reefer",,Marine Fisheries Corporation Co Ltd,Marine Fisheries Corporation Co Ltd,True,"IOTC, ICCAT, CCAMLR, SEAFO, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,NINKI 1,NINKI 1,IMUL-A-0833-KLT,,,,Sri Lanka,Fishing Vessel,"Gillnets, Longline",MN UBEWARDHANA,MN UBEWARDHANA )OWNER OF THE VESSEL); E. Mohan,False,"IOTC, ICCAT, CCSBT, SIOFA",Fishing in a coastal State without authorisation. Contravention of IOTC CMMs (e.g. Marker buoys/floats not correctly marked and VMS not fully operational).
+False,NORTH OCEAN,NORTH OCEAN,North Ocean,9230658,,BZZW5,China,Fishing Vessel,,"China National Fisheries Corporation, CHINA NATIONAL FISHERIES CORPORATION; CNFC International Fisheries Corporation","China National Fisheries Corporation, CHINA NATIONAL FISHERIES CORPORATION; CNFC International Fisheries Corporation",False,"CCAMLR, SEAFO","Fishing inside Division 58.4.3b 2524 Jan 07 Feb 05, 22 Nov 06, Fishing inside Division 58.4.1 10 Dec 05"
+True,NORTHERN WARRIOR,NORTHERN WARRIOR,Northern Warrior,8808903,,,Angola,"Fishing Vessel, Stern Trawler",Trawl unspecified,"Orkiz Agro-Pecuaria, Pescas, Transportes E Comercio Geral, Limitada","Orkiz Agro-Pecuaria, Pescas, Transportes E Comercio Geral, Limitada",True,"IOTC, ICCAT, CCAMLR, SEAFO, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,NOVA,NOVA,,,,,India,Fishing Vessel,,,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,OCEAN DIAMOND,OCEAN DIAMOND,Ocean Diamond,,,,,,,,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+False,OCEAN STAR MARINE,OCEAN STAR MARINE,Ocean Star Marine,7817440,,V3AG3,Belize,Fishing Vessel,,Ocean Star Marine Lines SA,Ocean Star Marine Lines SA,False,IOTC,"Contravention of IOTC Resolution 02/04, 02/05, 03/05"
+True,OCEAN STAR NO. 2,OCEAN STAR NO. 2,,8665193,,,Unknown,Fishing Vessel,Longline,"Ming Shun Fishery SA, Ming Shun Fishery Co Ltd; Tuna Fishing (Vanuatu) Ltd, Tuna Fishing Vanuatu Co. Ltd","Ming Shun Fishery SA, Ming Shun Fishery Co Ltd; Tuna Fishing (Vanuatu) Ltd, Tuna Fishing Vanuatu Co. Ltd",True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,ORCA,ORCA,Orca,,,,Unknown,Fishing Vessel,Longline,,,True,"IOTC, ICCAT, IATTC, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+False,OZHERELYE,OZHERELYE,Ozherelye,8422876,273240900,UEZQ,Russia,"Fishing Vessel, Stern Trawler",Trawl unspecified,Zapmorflot Co Ltd (OOO 'Zapmorflot'),Pionerskiy Ocean Fishing Marine Center (Pionerskaya Baza Okeanicheskogo Rybolovnogo Flota (BORF)),False,NEAFC,
+False,PARSIAN SHILA,PARSIAN SHILA,Parsian Shila,9404285,422573000,9BKI,Iran,Fishing Vessel,Purse seine,Salem Chabahar Products Food Co,Salem Chabahar Products Food Co,False,IOTC,Contravention of IOTC Resolution 07/02 and 09/03
+True,PERLON,PERLON,Perlon,5062479,,5NTV21,,Fishing Vessel,,Americagalaica S.A.,Rptd Sold Undisclosed Interest,True,"IOTC, ICCAT, CCAMLR, SEAFO, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+False,PERMATA,PERMATA,Permata,,,,Unknown,,,,,False,IATTC,
+False,PERMATA - 08,PERMATA - 08,Permata 8,,,YEA5088,Indonesia,Fishing Vessel,Longline,"INTIMAS SURYA, PT, INTIMAS SURYA, PT.","INTIMAS SURYA, PT, INTIMAS SURYA, PT.",False,"ICCAT, IATTC",
+False,PERMATA 01,PERMATA 01,Permata 1,,,YEA5032,Indonesia,"Fishing Vessel, Reefer",Longline,"INTIMAS SURYA, PT, INTIMAS SURYA, PT.",AGUS CIK,False,"ICCAT, IATTC",
+False,PERMATA 102,PERMATA 102,Permata 102,,,,Unknown,,,,,False,IATTC,
+False,PERMATA 138,PERMATA 138,Permata 138,,,,Unknown,,,,,False,IATTC,
+False,PERMATA 6,PERMATA 6,Permata 6,,,YEA5035,Indonesia,Fishing Vessel,Longline,"INTIMAS SURYA, PT, INTIMAS SURYA, PT.","Lamijan, LAMIJAN",False,"ICCAT, IATTC",
+False,PERMATA 99,PERMATA 99,Permata 2,8592487,525401139,YEA5033,Indonesia,"Fishing Vessel, Unknown",Longline,"INTIMAS SURYA, PT, INTIMAS SURYA, PT.","INTIMAS SURYA, PT, INTIMAS SURYA, PT.",False,"ICCAT, IATTC",
+True,PESCACISNE 1,PESCACISNE 1|PESCACISNE 2,"PESCACISNE 1, PESCACISNE 2",9319856,514144000,9LU2119,,Fishing Vessel,,Eastern Holdings Ltd,Eastern Holdings Ltd,True,"IOTC, ICCAT, CCAMLR, SEAFO, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Following IOTC
+True,PHOENIX,PHOENIX,No. 2 Choyu,8429991,664246000,S7SK,,Fishing Vessel,Longline,"HARVEST FISHERY LTD (COMPANY NO. 195466); Harvest Fishery Ltd, HARVEST FISHERY LTD","HARVEST FISHERY LTD (COMPANY NO. 195466); Harvest Fishery Ltd, HARVEST FISHERY LTD",True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+False,PRIMERO VI,PRIMERO VI,Primero VI,,,V3HC3,Belize,,,Primero Fishery Co. Ltd,,False,IATTC,
+False,PRIMERO VIII,PRIMERO VIII,Primero VIII,,,V3TE6,Belize,,,Primero Fishery Co. Ltd,,False,IATTC,
+True,PROGRESO,PROGRESO,AL WESAM 5,,,TJMC30,,"Fishing Vessel, Stern Trawler","Unknown, Trawl unspecified",Marine Renown SARL,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+False,PS REEFER,PS REEFER,Senta,8221947,,3FRQ5,Panama,"Reefer, Fish carrier",,Pacsun Shipping SA,Pacsun Shipping SA,False,WCPFC,Transhipping on the high seas of the WCPFC Convention Area without being on the WCPFC Record of Fishing
+True,QIAN YUAN,QIAN YUAN,,8819691,371031000,H3YK,,"Reefer, Fishing Vessel, Fish carrier","Longline, Unknown","Ginsil Holding Group Ltd, GINSIL HOLDING GROUP LIMITED","Ginsil Holding Group Ltd, GINSIL HOLDING GROUP LIMITED",False,"IOTC, NEAFC, NAFO, NPFC, SIOFA",Cross-listing
+True,REYMAR 6,REYMAR 6,Reymar 6,,,,Unknown,,,,,True,"IOTC, ICCAT, IATTC, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,RIWA,RIWA,,9017666,671384100,5VIR8,,"Products Tanker, Chemical Tanker",,Stukita Shipping Co Ltd,JSC Fortune Tanker (ZAO Fortuna Tanker),False,"IOTC, NEAFC, NAFO, NPFC, SIOFA",Cross-listing
+False,ROBERTO,ROBERTO,Eternal,8608470,,CXYZ,Madagascar,Reefer,,"Societe de Transport Maritime de L'est (STME), Societe de Transport Maritime de L'Est (STME)","Societe de Transport Maritime de L'est (STME), Societe de Transport Maritime de L'Est (STME)",False,CCAMLR,Reported 58.4.2; Apprehended 58.5.1
+False,ROSITA,ROSITA,Rosita,8522169,,4LSL,Georgia,"Fishing Vessel, Stern Trawler",Trawl unspecified,A B Bocyp Fishing Ltd,Northern Fishers Co (OOO 'Severnaya Rybolovetskaya Kompaniya'),False,"SEAFO, NEAFC, NAFO",
+False,RWAD 1,RWAD 1,Rwad 1,8655409,,,,Fishing Vessel,Longline,Rwad Al Ibtkar Co LLC,Eastward Exim & Fishing Pte. Ltd; Rwad Al Ibtkar Co LLC,False,IOTC,Contravention of IOTC Resolution 07/02 and 09/03
+False,SACRED HEART,SACRED HEART,SACRED HEART,,,,India,Fishing Vessel,Lines unspecified,Metlan s/o Paniyadimai,,False,"IOTC, ICCAT",Fishing without a license in the waters of the UK (OT)
+False,SAE IN VICTOR,SAE IN VICTOR,South Ocean,9230646,441667000,DTBX5,South Korea,"Fishing Vessel, Cargo vessel, Unknown","Longline, Otter trawl, Demersal longline","Jeongil Corp, Jeong Il Corporation, Jeongil Corporation","Jeongil Corp, Jeong Il Corporation, Jeongil Corporation",False,"CCAMLR, SEAFO",Fishing inside Division 58.4.3; 58.4.3b; 58.4.3b; Inside Division 58.4.3b; Fishing inside Division 58.4.3b
+True,SAGE,SAGE,Chia Hao No. 66,7825215,,C5J96,,"Fishing Vessel, Fishery support vessel",Longline,Rptd Sold Undisclosed Interest,Rptd Sold Undisclosed Interest,True,"IOTC, ICCAT, IATTC, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,SAMPATH,SAMPATH,,,,,Sri Lanka,Fishing Vessel,,M.S.S.F. JAYASOORIYA,T. MADAN,False,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, SIOFA",Not on Record of Authorised Vessels (RAV). Fishing in a Coastal State's waters without authorization. Contravention of IOTC CMMs (e.g. logbook).
+True,SAMUDERA PASIFIC NO.18,SAMUDERA PASIFIC NO.18,Samudera Pasifik No. 18,,,YGGY,Indonesia,Fishing Vessel,Longline,,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,SAMUDERA PERKASA 11,SAMUDERA PERKASA 11,Samudera Perkasa 11,,,,,,,,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,SAMUDERA PERKASA 12,SAMUDERA PERKASA 12,Samudera Perkasa 12,,,,,,,,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,SANJANA PUTHA,SANJANA PUTHA,,,,,Sri Lanka,Fishing Vessel,Longline,"WPS JANSA, WPS. JANSA",W.R.R. FERNANDO; WPS JANSA(OWNER OF THE VESSEL),False,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, SIOFA",Fishing in a Coastal State's waters without authorization. Contravention of IOTC CMMs (e.g. VMS).
+False,SANT YAGO TRES,SANT YAGO TRES|SANT  YAGO TRES,TS Excellence,8919427,332001000,TGSY3,Guatemala,Fishing Vessel,"Purse seine, Unknown","PIONEER FOOD CANNARY, Pioneer Food Cannery Ltd (PFC); PFC; PIONEER FOOD CANNERY; Atunera Nacional, SA; ATUNERA NACIONAL, SOCIEDAD ANÓNIMA; Atunera Sant Yago SA; SMNCS; Grupo Formosa, SARL; ANNSENKAL F. CO, Annsenkal F.Co.; Alamari","Atunera Nacional, SA; ATUNERA NACIONAL, SOCIEDAD ANÓNIMA; Jealsa Rianxeira SA; CMNP CI; Atunera Sant Yago SA",False,IOTC,Contravention of IOTC Resolution 02/04
+True,SEA ANGEL 2,SEA ANGEL 2,,,,,India,Fishing Vessel,Gillnets,Anthony Raj S/O Micheal Nayagam,,False,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, SIOFA",Not on Record of Authorised Vessels (RAV). Fishing in closed area. Fishing in Coastal State's waters without authorization. Contravention of IOTC CMMs (e.g. VMS).
+False,SEA STAR V,SEA STAR V,Polestar,8914221,372210000,3EYI5,Panama,"Fish carrier, Reefer",,,"Shandong Zhonglu Fishery Shipping Co Ltd; HABITAT INTERNATIONAL CORP, HABITAT INTERNATIONAL CORP., Habitat International Corporation, HABITAT INTERNATIONAL CORPORATION",False,"SEAFO, NEAFC, NAFO",090606 Sighted by ISL Transhipping 190706 OBS by ICG surveillance aircraft in RA. Transhipping with IUU vessels.
+True,SEA URCHIN,SEA URCHIN,SEA URCHIN,7424891,,,,Fishing Vessel,,Rptd Sold Undisclosed Interest; Kiase Peche Co Ltd,Rptd Sold Undisclosed Interest,True,"IOTC, ICCAT, CCAMLR, SEAFO, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,SEA VIEW,SEA VIEW,AL WESAM 2,8692342,,,,Fishing Vessel,Unknown,Marine Renown SARL; Vichai Sangsukiam,Vichai Sangsukiam,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,SEA WIND,SEA WIND,AL WESAM 1,8692354,,,,"Unknown, Fishing Vessel","Unknown, Trawls",Marine Renown SARL; Vichai Sangsukiam,Vichai Sangsukiam,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,SEYARA,SEYARA,IMUL-A-0168-PTM,,,,Sri Lanka,Fishing Vessel,"Gillnets, Longline",HSM FERNANDO,HSM FERNANDO; WAM FERNANDO,False,"IOTC, ICCAT, CCSBT, SIOFA","Fishing in a coastal States waters without authorisation. Contravention of IOTC CMMs (e.g. Vessel registration and valid authorisation to fish/tranship and licence not resented, vessel not carrying documents detailing International callsign, marker buoys/floats not correctly marked and VMS not fully operational)."
+False,SHALOM,SHALOM,SHALOM,,,,India,Fishing Vessel,"Gillnets, Longline",,,False,"IOTC, ICCAT","Fishing without a license, use of prohibited gear and no logbook in the waters of the UK (OT)"
+True,SHARJI AMMA,SHARJI AMMA,,,,,India,Fishing Vessel,,LISTON S/O STEPHEN,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+False,SHENG I TSAI 313,SHENG I TSAI 313,Sheng I Tsai 313,,,V3VZ7,Unknown,,,,,False,IATTC,
+True,SHENG JI QUN 3,SHENG JI QUN 3,SHENG JI QUN 3,,,CPA311,,Fishing Vessel,Longline,Chang Lin Pao-Chun,Chen Chen Tsai,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+False,SHIN YEOU NO. 16,SHIN YEOU NO. 16,Shin Yeou No. 16,8431372,416612000,BI2157,Taiwan,Fishing Vessel,Longline,Unifishery Enterprise Co Ltd,Unifishery Enterprise Co Ltd,False,ICCAT,
+True,SHUEN SIANG,SHUEN SIANG,Shuen Siang,,,,,,,,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,SHUN CHANG NO. 3,SHUN CHANG NO. 3|SHUN CHANG 3|顺昌3号,No. 3 Choyu,8430550,,BZTX3,China,Fishing Vessel,Longline,"中渔环球海洋食品有限责任公司; Zhongyu Global Seafood Corporation; 中水集团远洋股份有限公司; CNFC Overseas Fisheries Co. LTD, CNFC OverseasFisheries Co. LTD, CNFC Overseas Fisheries Company, Ltd.","中渔环球海洋食品有限责任公司; Zhongyu Global Seafood Corporation; 中水集团远洋股份有限公司; CNFC Overseas Fisheries Co. LTD, CNFC OverseasFisheries Co. LTD, CNFC Overseas Fisheries Company, Ltd.",True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,SHUN LAI,SHUN LAI,SHUN LAI (HSIN JYI WANG NO. 6),,,CPA514,,,Unknown,Lee Cheng Chung,Sun Han Min,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+False,SHUN SING NO. 1,SHUN SING NO. 1,Chin Jui Yng No. 11,8977558,,,Unknown,"Fishing Vessel, Trawler","Longline, Trawl unspecified",Macalluns SA,Macalluns SA,False,IATTC,
+False,SIBLEY,SIBLEY,Sibley,7930034,,HO2894,Panama,Fishing Vessel,Longline,Baypamar Fishing SA,Baypamar Fishing SA,False,"CCAMLR, SEAFO, SIOFA",Cross-listing
+True,SIN SHUN FA 6,SIN SHUN FA 6,Sin Shun Fa 6,,,,,,,,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,SIN SHUN FA 67,SIN SHUN FA 67,Sin Shun Fa 67,,,,,,,,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,SIN SHUN FA 8,SIN SHUN FA 8,Sin Shun Fa 8,,,,,,,,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,SIN SHUN FA 9,SIN SHUN FA 9,Sin Shun Fa 9,,,,,,,,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,SOUTHERN STAR 136,SOUTHERN STAR 136,Southern Star 136,7378119,375905000,,,Fishing Vessel,,Yu-Ri Marine Ltd,Yu-Ri Marine Ltd,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,SRI FU FA 168,SRI FU FA 168,Sri Fu Fa 168,,,,,Fishing Vessel,Longline,,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,SRI FU FA 18,SRI FU FA 18,Sri Fu Fa 18,,,,,Fishing Vessel,Longline,,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,SRI FU FA 188,SRI FU FA 188,Sri Fu Fa 188,,,,,,,,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,SRI FU FA 189,SRI FU FA 189,Sri Fu Fa 189,,,,,Fishing Vessel,Longline,,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,SRI FU FA 286,SRI FU FA 286,Sri Fu Fa 286,,,,,Fishing Vessel,Longline,,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,SRI FU FA 67,SRI FU FA 67,Sri Fu Fa 67,,,,,,,,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,SRI FU FA 888,SRI FU FA 888,Sri Fu Fa 888,,,,,,,,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,ST ANNES,ST ANNES,,,,,India,Fishing Vessel,"Longline, Gillnets",Maria Manoj S/O Swamynathan,,False,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, SIOFA",Not on Record of Authorised Vessels (RAV). Fishing in closed area. Fishing in Coastal State's waters without authorization. Contravention of IOTC CMMs (e.g. VMS).
+True,ST ANTONY,ST ANTONY,,,,,India,Fishing Vessel,Longline,Seema W/O Marbin,,False,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, SIOFA",Not on Record of Authorised Vessels (RAV). Fishing in closed area. Fishing in Coastal State's waters without authorization. Contravention of IOTC CMMs (e.g. VMS).
+True,ST MARYS,ST MARYS,,,,,India,Fishing Vessel,"Gillnets, Longline",REJIN,,False,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, SIOFA",Not on Record of Authorised Vessels (RAV). Fishing in closed area. Fishing in Coastal State's waters without authorization. Contravention of IOTC CMMs (e.g. VMS).
+True,STAR OF THE SEA,STAR OF THE SEA,,,,,India,Fishing Vessel,,SHIBU S/O SILUVAIYAN,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,STS-50,STS-50,STS-50,8514772,,,Unknown,"Fishing Vessel, Reefer",Longline,Marine Fisheries Corporation Co Ltd,,True,"IOTC, ICCAT, CCAMLR, SEAFO, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,SUBA PATHUM 03,SUBA PATHUM 03,IMUL-A-0892-KLT,8444264,417089234,4SF5790,Sri Lanka,Fishing Vessel,"Gillnets, Longline","BTPP .JAYASOORIYA, BTPP JAYASOORIYA; Rptd Sold Sri Lanka","BTPP .JAYASOORIYA, BTPP JAYASOORIYA; Rptd Sold Sri Lanka; MAHALINGAM MANOHARAN",False,"IOTC, ICCAT, CCSBT, SIOFA","Fishing in coastal state waters without authorization. Contravention of IOTC CMMs (e.g. Documents detailing vessel horsepower, vessel  registration and valid authorisation to fish/tranship and licence not presented, permit or authorisation to fish with terms and conditions attached not presented)."
+True,SUMMER REFER,SUMMER REFER,OKAPI MARTA,7816472,,,,"Fish carrier, Reefer",,Rptd Sold Undisclosed Interest,Rptd Sold Undisclosed Interest,True,"IOTC, ICCAT, NEAFC, NAFO, GFCM, SIOFA",Cross-listing
+False,SUNNY JANE,SUNNY JANE,Sunny Jane,7347407,,V3KG2,Unknown,Reefer,,Rptd Sold Undisclosed Interest,Rptd Sold Undisclosed Interest,False,"SEAFO, NEAFC, NAFO",010704 OBS by ISL transhipping in the NEAFC Regulatory Area 270505 OBS by ISL Transhipping with and IUU Vessel
+True,TA FU NO. 1,TA FU NO. 1,Ta Fu 1,9259070,,,Unknown,Fishing Vessel,,Ching Tsuen Tsay Kuo,Ching Tsuen Tsay Kuo,True,"IOTC, ICCAT, IATTC, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+False,TARUMAN,TARUMAN,Taruman,7235733,,,North Korea,"Fishing Vessel, Stern Trawler",Trawl unspecified,Rulfend Corp SA,Manuel Barros Rivadulla,False,"CCAMLR, SEAFO",Fishing inside Subarea 88.1
+False,TARZAN 28,TARZAN 28,Tarzan 28,,,,Nicaragua,,,,Bluefin Todo De Belize Co. Ltd.,False,IATTC,
+False,TARZAN III,TARZAN III|TARZAN NO. 3,Tarzan III,8994362,,,,Fishing Vessel,Longline,Wang Ming-Fa,Wang Ming-Fa,False,IATTC,
+False,TARZAN VIII,TARZAN VIII,Tarzan VIII,8994374,,,Nicaragua,Fishing Vessel,,Tankan Marine SA (TAMASA),Wang Ming-Fa,False,IATTC,
+False,TARZAN XII,TARZAN XII,Tarzan XII,8994386,,V3NU9,Nicaragua,Fishing Vessel,,Tankan Marine SA (TAMASA); Hung Chuan Wang Shih / Astillero Mariscos del Pacífico SA; Wang Ming-Fa,Wang Ming-Fa,False,IATTC,
+False,TCHAW,TCHAW,Tchaw,6818930,,,,"Fishing Vessel, Trawler",,His-To Co Ltd,Jose Manuel Salgueiro,True,"CCAMLR, SEAFO, GFCM",Inside Division 58.4.3b; Fishing inside Division 58.4.2; Inside Division 58.4.3b; 58.4.4a; Fishing inside Division 58.4.3b
+True,TCHING YE NO. 6,TCHING YE NO. 6,Tching Ye No. 6,,,V3GN,Unknown,,,,,True,"IOTC, ICCAT, IATTC, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+False,THUNDER,THUNDER,Thunder,6905408,,5NTV,Nigeria,"Reefer, Factory Stern Trawler, Fishing Vessel",Trawl unspecified,Rptd Sold Undisclosed Interest; Royal Marine and Spares Nigeria Ltd,Rptd Sold Undisclosed Interest,False,"CCAMLR, SEAFO",
+True,TIAN LUNG NO. 12,TIAN LUNG NO. 12,Tian Lung No. 12,,,,,,,,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+False,TIANTAI,TIANTAI,Tiantai,7905039,,,Unknown,Reefer,,Rptd Sold Undisclosed Interest,Rptd Sold Undisclosed Interest,False,"CCAMLR, SEAFO",Inside Division 58.4.1
+False,TONINA NO. 5,TONINA NO. 5|NO.5 TONINA,Tonina V,9001423,440645000,6NKA,South Korea,"Fishing Vessel, Unknown",Longline,Dongwon Industries Co. Ltd.,Dongwon Industries Co. Ltd.,False,ICCAT,Vessels greater than 24m not included in ICCAT Record of Vessels. Seen fishing in the MED during closed season
+True,TRINITY,TRINITY,Trinity,7321374,,,Unknown,"Fishing Vessel, Trawler",Trawl unspecified,Fairmat GH - Holiday Fishing Ghana,,True,"IOTC, ICCAT, SEAFO, NEAFC, NAFO, GFCM, SIOFA",Cross-listing
+False,ULLA,ULLA,Ulla,8606836,,4LLA,Georgia,"Fishing Vessel, Stern Trawler",Trawl unspecified,Global Invest Ltd SA,Global Invest Ltd SA,False,"SEAFO, NEAFC, NAFO",NAFO Div. 1F
+False,UTHAIWAN,UTHAIWAN,WISDOM SEA REEFER,7637527,613003596,JVJT7,Mongolia,Reefer,,PK Shipping & Agency Co Ltd,PK Shipping & Agency Co Ltd,False,"IOTC, ICCAT, SIOFA",Contravention of IOTC Resolution 17/03
+False,VACHANAM,VACHANAM,VACHANAM,,,,India,Fishing Vessel,"Gillnets, Longline",Satrin T,,False,"IOTC, ICCAT",Fishing without a license and use of prohibited gear in the waters of the UK (OT)
+True,VEDRA,VEDRA,Acros No. 3,7717913,,HQTK9,Honduras,Fishing Vessel,,Pesqueras Inversiones  SA,Pesqueras Inversiones  SA,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+False,VIARSA I,VIARSA I,Viarsa I,8001335,,,,Fishing Vessel,,Viarsa Fishing Co Inc,Navalmar SA,False,"CCAMLR, SEAFO",Apprehended 58.5.2; Sighted inside Division 58.5.1
+False,VICENTE,VICENTE,Athena F,9130781,735059596,HC6037,,Fishing Vessel,Purse seine,"Productora Nacional Atunera Ecuatoriana ProatunaSA; Productora Nacional Atunera Ecuatoriana Proatuna SA, Productora Nacional Atunera Ecuatoriana Proatuna,","Productora Nacional Atunera Ecuatoriana ProatunaSA; Productora Nacional Atunera Ecuatoriana Proatuna SA, Productora Nacional Atunera Ecuatoriana Proatuna,",False,WCPFC,
+False,VIKING,VIKING,Viking,8713392,,,Unknown,Fishing Vessel,,Betex Limited,Rptd Sold Undisclosed Interest,True,"CCAMLR, SEAFO, GFCM",Assisting IUU operations of Thule
+True,VIRILE,VIRILE,Melilla No. 101,7920182,,,,Fishing Vessel,Longline,North Cargo Service SA,North Cargo Service SA,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+False,WAN FENG,WAN FENG,Wan Feng,,,,Papua New Guinea,,,Coco Enterprises,Sunrise International,False,IOTC,Contravention of IOTC Resolution 02/04
+False,WANG JIA MEN 89,WANG JIA MEN 89,Dragon 16,,,,Unknown,,,Bluefin Todo De Belize Co. Ltd.,IMPERIO PESQUERO DEL PACÍFICO S.A.,False,IATTC,
+False,WANG JIA MEN 99,WANG JIA MEN 99,Wang Jia Men 99,9257163,,V3LV,Belize,Fishing Vessel,Longline,Captura Todo de Belize Co Ltd,Captura Todo de Belize Co Ltd,False,IATTC,
+False,WANG JIA MEN NO. 88,WANG JIA MEN NO. 88,Wan Jia Men No. 88,,,,Unknown,Fishing Vessel,Longline,Captura Todo de Belize Co Ltd,IMPERIO PESQUERO DEL PACÍFICO S.A.,False,IATTC,
+True,WEN TENG NO. 688,WEN TENG NO. 688,Wen Teng No. 688,8994295,,,Unknown,Fishing Vessel,,Kee Yu Pao,Kee Yu Pao,True,"IOTC, ICCAT, IATTC, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+False,WEST OCEAN,WEST OCEAN,West Ocean,9230672,,BZTX8,China,Fishing Vessel,,"China National Fisheries Corporation, CHINA NATIONAL FISHERIES CORPORATION; CNFC International Fisheries Corporation","China National Fisheries Corporation, CHINA NATIONAL FISHERIES CORPORATION; CNFC International Fisheries Corporation",False,"CCAMLR, SEAFO",
+False,WISDOM,WISDOM,WISDOM,,,,India,Fishing Vessel,"Gillnets, Handline",Lowerence,,False,"IOTC, ICCAT",Fishing without a license and use of prohibited gear in the waters of the UK (OT)
+False,XIN SHI JI 16,XIN SHI JI 16,Xin Shi Ji 16,9627253,,3DTN,Fiji,Fishing Vessel,Longline,"Xin Shi Ji Fisheries Ltd, Xin Shi Ji Fisheries Limited","Xin Shi Ji Fisheries Ltd, Xin Shi Ji Fisheries Limited",False,"IOTC, ICCAT, IATTC, NEAFC, SIOFA",Cross-listing
+True,XING FA,XING FA,,8550740,668116259,S9Z6,Sao Tome and Principe,"Chemical/Products Tanker, Chemical Tanker, Tanker",Unknown,Redbay Trade International Co Ltd; Gold Charm International Enterprise Ltd,Gold Charm International Enterprise Ltd,False,SPRFMO,Unauthorised bunkering
+True,XING HAI FENG,XING HAI FENG,XING HAI FEN,7826233,,3FHW5,,Fishing Vessel,,Ocean Lion Shipping SA,Ocean Lion Shipping SA,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA","Contravention of IOTC Resolution 02/04, 02/05, 03/05"
+True,YAHOVA NICY,YAHOVA NICY,,,,,India,Fishing Vessel,,NITHIN S/O SESADIMAI,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,YI HONG 3,YI HONG 3,Yi Hong 3,,,,,,,,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,YONA,YONA,,,,,India,Fishing Vessel,,,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,YU FONG 168,YU FONG 168,Yu Fong 168,,,BJ4786,Unknown,,,Chang Lin Pao-Chun; Mr Jang Faa Sheng,Mr Jang Faa Sheng,True,"IOTC, ICCAT, WCPFC, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Operating in the IOTC area without authorisation
+False,YU FU 11,YU FU 11,Yu Fu 11,,,,Papua New Guinea,,,Coco Enterprises,Sunrise International,False,IOTC,Contravention of IOTC Resolution 02/04
+False,YU LONG,YU LONG,Yu Long,9257151,,HC5585,Ecuador,Fishing Vessel,Longline,Tankan S.A.,,False,IATTC,
+False,YU LONG 125,YU LONG 125,Yu Long 125,8995445,,,,Fishing Vessel,Longline,Shealth Services (Thailand) Co Ltd,Shealth Services (Thailand) Co Ltd,False,IATTC,
+False,YU LONG 66,YU LONG 66,Yu Long 66,8673023,,V3ZS6,Belize,Fishing Vessel,Longline,"Transportes El Pescador, S.A.",Pesca Tuna SA; Pescatuna Sociedad Anonima,False,IATTC,
+False,YU LONG 70,YU LONG 70,Yu Long 70,8673035,,,Costa Rica,Fishing Vessel,,Hung Chuan Wang Shih / Comercializadora El Pez Dorado del Mar SA,Pesca Tuna SA; Pescatuna Sociedad Anonima,False,IATTC,
+False,YU LONG 88,YU LONG 88,Yu Long 88,,,V3ZT6,Belize,,,,Pesca Tuna SA; Pescatuna Sociedad Anonima,False,IATTC,
+False,YU LONG NO. 10,YU LONG NO. 10,Yu Long No. 10,9265562,,V3TK6,Unknown,Fishing Vessel,,Yu Long Fishery Co Ltd,Yu Long Fishery Co Ltd,False,IATTC,
+False,YU LONG NO. 12,YU LONG NO. 12,Tarzan 18,,,,Unknown,Fishing Vessel,Longline,Yu Long Fishery Co Ltd,Yu Long Fishery Co Ltd,False,IATTC,
+False,YU LONG NO. 26,YU LONG NO. 26,Yu Long 26,2699817,,,,Fishing Vessel,Longline,Pesca Tuna SA; Pescatuna Sociedad Anonima,Pesca Tuna SA; Pescatuna Sociedad Anonima,False,IATTC,
+False,YU LONG NO. 35,YU LONG NO. 35,Yu Long 35,2700666,,,,Fishing Vessel,Longline,Pesca Tuna SA; Pescatuna Sociedad Anonima,Pesca Tuna SA; Pescatuna Sociedad Anonima,False,IATTC,
+False,YU LONG NO. 6,YU LONG NO. 6,Yu Long No. 6,9265550,,,,Fishing Vessel,Longline,Shealth Services (Thailand) Co Ltd,Shealth Services (Thailand) Co Ltd,False,IATTC,
+True,YU MAAN WON,YU MAAN WON,Yu Maan Won,,,,Unknown,,,,,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",IOTC Contravention of IOTC Resolution 07/02
+True,YUANDA 6,YUANDA 6,YUANDA 6,,412356488,,China,Fishing Vessel,,,,False,"IOTC, NEAFC, NAFO, NPFC, SIOFA",Cross-listing
+True,YUANDA 8,YUANDA 8,YUANDA 8,,412365486,,China,Fishing Vessel,,,,False,"IOTC, NEAFC, NAFO, NPFC, SIOFA",Cross-listing
+True,YUTUNA NO. 1,YUTUNA NO. 1,YUTUNA NO. 1,,,CPA302,,Fishing Vessel,Longline,Tseng Ming Tsai,Yen Shih Hsiung,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,YUTUNA NO. 3,YUTUNA NO. 3,YUTUNA 3 (HUNG SHENG NO. 166),,,CPA212,,Fishing Vessel,Longline,Yen Shih Hsiung,Lee Shih Yuan,True,"IOTC, ICCAT, NEAFC, NAFO, CCSBT, GFCM, SIOFA",Cross-listing
+True,ZHE LING YU LENG 90055,ZHE LING YU LENG 90055,ZHE LING YU LENG 90055,,,,,Fish carrier,,,,False,"IOTC, NEAFC, NAFO, NPFC, SIOFA",Cross-listing
+True,ZHE LING YU LENG 905,ZHE LING YU LENG 905,ZHE LING YU LENG 905,,,,,Fish carrier,,,,False,"IOTC, NEAFC, NAFO, NPFC, SIOFA",Cross-listing
+True,ZHEXIANG YU 23029,ZHEXIANG YU 23029,ZHEXIANG YU 23029,,412123526,,China,Fishing Vessel,,,,False,"IOTC, NEAFC, NAFO, NPFC, SIOFA",Cross-listing
+False,ZHOU YU 625,ZHOU YU 625,Zhou Yu 625,8982917,,,Unknown,Fishing Vessel,,Chen Cailong,Chen Cailong,False,IATTC,
+False,ZHOU YU 632,ZHOU YU 632,Zhou Yu 632,8982955,,,Unknown,Fishing Vessel,,Chen Cailong,Chen Cailong,False,IATTC,
+False,ZHOU YU 641,ZHOU YU 641,Zhou Yu 641,8833659,,,Unknown,Fishing Vessel,,Chen Cailong,Chen Cailong,False,IATTC,
+False,ZHOU YU 642,ZHOU YU 642,Zhou Yu 642,8833661,,,Unknown,Fishing Vessel,,Chen Cailong,Chen Cailong,False,IATTC,
+True,ZHOU YU 651,ZHOU YU 651|ZHOUYU651,ZHOU YU 651,,412658989,,,Fishing Vessel,Lift nets,,,False,"IOTC, NEAFC, NAFO, NPFC, SIOFA",Cross-listing
+True,ZHOU YU 652,ZHOU YU 652,ZHOU YU 652,,412569986,,,Fishing Vessel,Lift nets,,,False,"IOTC, NEAFC, NAFO, NPFC, SIOFA",Cross-listing
+True,ZHOU YU 653,ZHOU YU 653,ZHOU YU 653,,412008003,,,Fishing Vessel,Lift nets,,,False,"IOTC, NEAFC, NAFO, NPFC, SIOFA",Cross-listing
+True,ZHOU YU 656,ZHOU YU 656,ZHOU YU 656,,,,,Fishing Vessel,Lift nets,,,False,"IOTC, NEAFC, NAFO, NPFC, SIOFA",Cross-listing
+True,ZHOU YU 657,ZHOU YU 657,ZHOU YU 657,,,,China,Fishing Vessel,Lift nets,,,False,"IOTC, NEAFC, NAFO, NPFC, SIOFA",Cross-listing
+True,ZHOU YU 658,ZHOU YU 658,ZHOU YU 658,,,,,Fishing Vessel,Lift nets,,,False,"IOTC, NEAFC, NAFO, NPFC, SIOFA",Cross-listing
+True,ZHOU YU 659,ZHOU YU 659,ZHOU YU 659,,,,,Fishing Vessel,Lift nets,,,False,"IOTC, NEAFC, NAFO, NPFC, SIOFA",Cross-listing
+True,ZHOU YU 660,ZHOU YU 660,ZHOU YU 660,,,,,,Lift nets,,,False,"IOTC, NEAFC, NAFO, NPFC, SIOFA",Cross-listing
+True,ZHOU YU 661,ZHOU YU 661,ZHOU YU 661,,,,,Fishing Vessel,Lift nets,,,False,"IOTC, NEAFC, NAFO, NPFC, SIOFA",Cross-listing
+True,ZHOU YU 808,ZHOU YU 808|舟漁 808,Unknown (*),,,,China,Fishing Vessel,,,,False,"IOTC, NAFO, NPFC, SIOFA",Cross-listing
+True,ZHOU YU 809,ZHOU YU 809|舟漁 809,Unknown (*),,,,China,Fishing Vessel,,,,False,"IOTC, NAFO, NPFC, SIOFA",Cross-listing

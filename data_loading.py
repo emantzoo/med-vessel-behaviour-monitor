@@ -249,3 +249,18 @@ def load_fdi_landings():
     if os.path.exists(path):
         return pd.read_csv(path)
     return pd.DataFrame()
+
+
+# ========================= IUU VESSEL LIST =========================
+
+@st.cache_data
+def load_iuu_vessels():
+    """Load preprocessed IUU vessel list."""
+    path = os.path.join(os.path.dirname(__file__), "data", "iuu_vessels.csv")
+    if os.path.exists(path):
+        df = pd.read_csv(path, dtype={"mmsi": str, "imo": str})
+        df["mmsi"] = df["mmsi"].fillna("")
+        df["imo"] = df["imo"].fillna("")
+        df["all_names"] = df["all_names"].fillna("").astype(str)
+        return df
+    return pd.DataFrame()
