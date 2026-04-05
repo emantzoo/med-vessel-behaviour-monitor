@@ -341,7 +341,6 @@ with col1:
 
 with col2:
     st.metric("Mediterranean Behavioral Risk Index", f"{total_risk:.0f}")
-    st.caption("Encounters weighted highest . Russian/Iranian flags boosted")
     if not df_filtered.empty:
         st.metric("Events", len(df_filtered))
         st.metric("Unique Vessels", df_filtered["mmsi"].nunique())
@@ -388,11 +387,7 @@ with tab9:  render_encounter_analysis(df_filtered)
 with tab10: render_top_vessels(df_filtered)
 with tab11: render_fisheries_context(df_filtered, fdi_effort, fdi_landings)
 
-try:
-    gemini_key = st.secrets["gemini_key"]
-except (FileNotFoundError, KeyError):
-    gemini_key = ""
-with tab12: render_ai_analyst(df_filtered, fdi_effort, fdi_landings, knowledge_base, gemini_key, iuu_vessels, iccat_vessels)
+with tab12: render_ai_analyst(df_filtered, fdi_effort, fdi_landings, knowledge_base, "", iuu_vessels, iccat_vessels)
 
 # ========================= SIDEBAR METHODOLOGY =========================
 with st.sidebar.expander("Methodology & About"):

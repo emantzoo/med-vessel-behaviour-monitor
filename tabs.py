@@ -22,8 +22,11 @@ def render_daily_trend(df):
     if "iuu_matched" in df.columns:
         iuu_dates = df[df["iuu_matched"] == True]["date"].unique()
         for d in iuu_dates:
-            fig.add_vline(x=d, line_dash="dash", line_color="black",
-                          annotation_text="IUU", annotation_position="top")
+            d_str = str(d)
+            fig.add_shape(type="line", x0=d_str, x1=d_str, y0=0, y1=1,
+                          yref="paper", line=dict(dash="dash", color="black", width=1))
+            fig.add_annotation(x=d_str, y=1, yref="paper", text="IUU",
+                               showarrow=False, font=dict(color="black", size=10))
 
     st.plotly_chart(fig)
 

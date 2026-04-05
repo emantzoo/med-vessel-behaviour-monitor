@@ -190,13 +190,13 @@ def render_ai_analyst(df_filtered, fdi_effort, fdi_landings, knowledge_base, gem
     )
 
     if not gemini_key:
-        try:
-            gemini_key = st.secrets["gemini_key"]
-        except (FileNotFoundError, KeyError):
-            gemini_key = st.text_input(
-                "Gemini API Key", type="password",
-                help="Get a key at aistudio.google.com",
-            )
+        st.info("This feature requires a Gemini API key. Get a free key at [aistudio.google.com](https://aistudio.google.com).")
+        gemini_key = st.text_input(
+            "Gemini API Key", type="password",
+            help="Get a free key at aistudio.google.com",
+        )
+        if not gemini_key:
+            st.stop()
 
     if "ai_messages" not in st.session_state:
         st.session_state.ai_messages = []
