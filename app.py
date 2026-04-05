@@ -13,6 +13,7 @@ from config import (
 from data_loading import (
     load_knowledge_base, load_static_data, load_live_data,
     load_fdi_effort, load_fdi_landings, load_iuu_vessels, load_iccat_vessels,
+    lookup_vessel_imos,
 )
 from risk_model import compute_risk_score, get_fdi_context, match_iuu_vessels, match_iccat_vessels
 from tabs import (
@@ -101,6 +102,13 @@ if not df_filtered.empty:
     csq = df_filtered.apply(lambda r: assign_csquare(r["lat"], r["lon"]), axis=1)
     df_filtered["csq_lon"] = csq.apply(lambda x: x[0])
     df_filtered["csq_lat"] = csq.apply(lambda x: x[1])
+
+# IMO enrichment via GFW Vessels API (live mode only)
+if use_live and token and not df_filtered.empty:
+    unique_mmsis = df_filtered["mmsi"].dropna().unique().tolist()
+    imo_map = lookup_vessel_imos(unique_mmsis, token)
+    if imo_map:
+        df_filtered["imo"] = df_filtered["mmsi"].astype(str).map(imo_map)
 
 # IUU cross-reference (after risk scoring)
 if not df_filtered.empty and not iuu_vessels.empty:

@@ -146,10 +146,10 @@ _NO_MATCH = {
 }
 
 
-def check_iuu_match(mmsi, vessel_name, iuu_df, include_delisted=False):
+def check_iuu_match(mmsi, vessel_name, iuu_df, include_delisted=False, imo=None):
     """Check if a vessel matches any IUU-listed vessel.
 
-    Matching priority: MMSI exact → name exact → name fuzzy (substring).
+    Matching priority: MMSI exact → IMO exact → name exact → name fuzzy (substring).
     Returns dict with match details or _NO_MATCH.
     """
     if iuu_df.empty:
@@ -166,7 +166,15 @@ def check_iuu_match(mmsi, vessel_name, iuu_df, include_delisted=False):
         if not mmsi_matches.empty:
             return _build_match_result(mmsi_matches.iloc[0], "MMSI", "high")
 
-    # Priority 2 & 3: Name matching
+    # Priority 2: IMO exact match (high confidence)
+    if imo and pd.notna(imo) and str(imo).strip() not in ("", "0", "nan", "None"):
+        imo_str = str(imo).strip()
+        if "imo" in working.columns:
+            imo_matches = working[working["imo"] == imo_str]
+            if not imo_matches.empty:
+                return _build_match_result(imo_matches.iloc[0], "IMO", "high")
+
+    # Priority 3 & 4: Name matching
     if vessel_name and pd.notna(vessel_name):
         name_upper = str(vessel_name).strip().upper()
         if not name_upper:
@@ -202,7 +210,8 @@ def match_iuu_vessels(df, iuu_df, include_delisted=False):
 
     matches = df.apply(
         lambda row: check_iuu_match(
-            row["mmsi"], row.get("vessel_name"), iuu_df, include_delisted
+            row["mmsi"], row.get("vessel_name"), iuu_df, include_delisted,
+            imo=row.get("imo"),
         ),
         axis=1,
     )
@@ -229,15 +238,38 @@ _NO_ICCAT_MATCH = {
 _ICCAT_MIN_NAME_LEN = 4
 
 
-def check_iccat_match(vessel_name, iccat_df):
-    """Check if a vessel name matches any ICCAT Med-authorized vessel.
+def check_iccat_match(vessel_name, iccat_df, imo=None):
+    """Check if a vessel matches any ICCAT Med-authorized vessel.
 
-    Matching is vessel name only (ICCAT data has no MMSI).
+    Matching priority: IMO exact → vessel name exact.
     Names shorter than 4 characters are skipped to avoid false positives.
     """
     if iccat_df.empty:
         return dict(_NO_ICCAT_MATCH)
 
+    def _build_iccat_result(row):
+        tier = row.get("iccat_risk_tier", "")
+        multiplier = ICCAT_MULTIPLIERS.get(tier, 1.0)
+        return {
+            "iccat_authorized": True,
+            "iccat_authorizations": row.get("med_authorizations", ""),
+            "iccat_risk_tier": tier,
+            "iccat_multiplier": multiplier,
+            "iccat_vessel_name": row.get("VesselName", ""),
+        }
+
+    # Priority 1: IMO exact match
+    if imo and pd.notna(imo) and str(imo).strip() not in ("", "0", "nan", "None"):
+        imo_str = str(imo).strip()
+        if "IntRegNo" in iccat_df.columns and "IRNoTypeCode" in iccat_df.columns:
+            imo_matches = iccat_df[
+                (iccat_df["IRNoTypeCode"] == "IMO") &
+                (iccat_df["IntRegNo"].str.replace(".0", "", regex=False) == imo_str)
+            ]
+            if not imo_matches.empty:
+                return _build_iccat_result(imo_matches.iloc[0])
+
+    # Priority 2: Vessel name exact match
     if not vessel_name or not pd.notna(vessel_name):
         return dict(_NO_ICCAT_MATCH)
 
@@ -249,17 +281,7 @@ def check_iccat_match(vessel_name, iccat_df):
     if matches.empty:
         return dict(_NO_ICCAT_MATCH)
 
-    row = matches.iloc[0]
-    tier = row.get("iccat_risk_tier", "")
-    multiplier = ICCAT_MULTIPLIERS.get(tier, 1.0)
-
-    return {
-        "iccat_authorized": True,
-        "iccat_authorizations": row.get("med_authorizations", ""),
-        "iccat_risk_tier": tier,
-        "iccat_multiplier": multiplier,
-        "iccat_vessel_name": row.get("VesselName", ""),
-    }
+    return _build_iccat_result(matches.iloc[0])
 
 
 def match_iccat_vessels(df, iccat_df):
@@ -274,7 +296,9 @@ def match_iccat_vessels(df, iccat_df):
         return df
 
     matches = df.apply(
-        lambda row: check_iccat_match(row.get("vessel_name"), iccat_df),
+        lambda row: check_iccat_match(
+            row.get("vessel_name"), iccat_df, imo=row.get("imo"),
+        ),
         axis=1,
     )
     match_df = pd.DataFrame(matches.tolist(), index=df.index)

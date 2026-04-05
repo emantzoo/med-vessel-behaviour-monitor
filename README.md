@@ -53,7 +53,7 @@ The ICCAT Record of Vessels lists all vessels authorized to fish ICCAT-managed s
 
 - 9,203 vessels authorized for Mediterranean fisheries
 - Authorization types: SWO-Med (swordfish), ALB-Med (albacore), BFT-Catching (bluefin tuna), BFT-Other (support vessels), Carrier (transshipment)
-- Top flags: Morocco (3,284), Italy (2,000), Spain (875), Tunisia (715), Malta (612)
+- 786 vessels with IMO numbers for identity matching
 - Source: [ICCAT Record of Vessels](https://www.iccat.int/en/vesselsrecord.asp)
 
 ### Data source complementarity
@@ -110,6 +110,7 @@ GFW event vessels are matched against the Combined IUU Vessel List using three m
 | Match Method | Reliability | Coverage |
 |---|---|---|
 | MMSI exact match | High — direct AIS identifier | 64 IUU vessels have MMSI |
+| IMO exact match | High — permanent hull identifier | 168 IUU vessels have IMO |
 | Vessel name exact match | Medium — names can change | All 369 vessels |
 | Vessel name substring match | Lower — risk of false positives | All known previous names |
 
@@ -122,9 +123,7 @@ IUU-matched events are highlighted with distinct markers on the map and surfaced
 
 ## ICCAT Authorized Vessel Cross-Reference
 
-GFW event vessels are matched against the ICCAT Record of Vessels authorized for Mediterranean fisheries using vessel name exact match (minimum 4 characters to avoid false positives on common short names).
-
-Authorization is an **opportunity indicator** — the vessel has means, access, and motive:
+GFW event vessels are matched against the ICCAT Record of Vessels authorized for Mediterranean fisheries. Authorization is an **opportunity indicator** — the vessel has means, access, and motive:
 
 | Authorization | Multiplier | Rationale |
 |---|---|---|
@@ -134,12 +133,20 @@ Authorization is an **opportunity indicator** — the vessel has means, access, 
 | SWO-Med | 1.2x | Swordfish longliner — seasonal closures create incentive to fish outside authorized periods |
 | ALB-Med | 1.2x | Albacore — lower value but still quota-managed |
 
+Matching priority: IMO exact (where available via GFW Vessels API lookup) → vessel name exact (minimum 4 characters).
+
 Key signals:
 - ENCOUNTER + Carrier = highest concern (core transshipment scenario, verify Regional Observer Programme coverage under Rec. 24-05)
 - GAP + BFT-Catching = high concern (quota evasion)
 - A vessel that is BOTH IUU-listed and ICCAT-authorized is the highest-priority signal
 
 ICCAT-authorized events are marked with blue markers on the map.
+
+## Vessel Identity Resolution
+
+In live mode, the app queries the GFW Vessels API to resolve MMSI → IMO numbers for each unique vessel in the event dataset. IMO numbers are permanent hull identifiers that persist across name changes, flag changes, and ownership transfers. This enables stronger matching against both the IUU vessel list (168 vessels with IMO) and ICCAT authorized list (786 vessels with IMO).
+
+In static/demo mode, IMO numbers are pre-populated for known demo vessels. Matching falls back to MMSI and vessel name.
 
 ## Dashboard Tabs
 

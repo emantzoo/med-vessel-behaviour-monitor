@@ -31,7 +31,9 @@ def load_static_data():
     """Rich static fallback dataset (80 realistic Med events with extended fields)."""
     csv_path = os.path.join(os.path.dirname(__file__), "data", "med_events_static.csv")
     if os.path.exists(csv_path):
-        return pd.read_csv(csv_path, parse_dates=["date"])
+        df = pd.read_csv(csv_path, parse_dates=["date"], dtype={"imo": str})
+        df["imo"] = df["imo"].fillna("")
+        return df
 
     rng = np.random.default_rng(42)
 
@@ -112,6 +114,7 @@ def load_static_data():
     df.loc[loit_mask, "loitering_total_distance_km"] = np.round(rng.uniform(5, 150, loit_n), 1)
     df.loc[loit_mask, "loitering_avg_speed_knots"] = np.round(rng.uniform(0.3, 2.5, loit_n), 1)
 
+    df["imo"] = ""
     df["med_zone"] = df.apply(lambda r: classify_med_zone(r["lon"], r["lat"]), axis=1)
     return df
 
@@ -231,6 +234,87 @@ def load_live_data(token, start_date, end_date, _min_dur):
     except Exception as e:
         st.error(f"Live API error: {e}. Falling back to static demo data.")
         return load_static_data()
+
+
+# ========================= VESSEL IMO LOOKUP =========================
+
+@st.cache_data
+def lookup_vessel_imos(mmsi_list, token):
+    """Query GFW Vessels API to retrieve IMO numbers for unique MMSIs.
+
+    Returns dict of {mmsi_str: imo_str} where IMO is available.
+    Skips invalid MMSIs and handles errors per vessel gracefully.
+    """
+    import time
+
+    try:
+        import gfwapiclient as gfw
+    except ImportError:
+        return {}
+
+    unique_mmsis = list({
+        str(m).strip() for m in mmsi_list
+        if str(m).strip() not in ("", "0", "nan", "None")
+    })
+    if not unique_mmsis:
+        return {}
+
+    client = gfw.Client(access_token=token)
+    result = {}
+
+    async def _lookup_all():
+        for mmsi in unique_mmsis:
+            try:
+                resp = await client.vessels.search_vessels(
+                    where=f"ssvid = '{mmsi}'"
+                )
+                vessels = resp.df() if hasattr(resp, 'df') else pd.DataFrame()
+                if vessels.empty:
+                    continue
+
+                imo = None
+                # Preferred: registry_info
+                for _, v in vessels.iterrows():
+                    reg = v.get("registry_info") or v.get("registryInfo")
+                    if isinstance(reg, list):
+                        for entry in reg:
+                            if isinstance(entry, dict) and entry.get("imo"):
+                                imo = str(entry["imo"])
+                                break
+                    if imo:
+                        break
+
+                # Fallback: self_reported_info
+                if not imo:
+                    for _, v in vessels.iterrows():
+                        sri = v.get("self_reported_info") or v.get("selfReportedInfo")
+                        if isinstance(sri, list):
+                            for entry in sri:
+                                if isinstance(entry, dict) and entry.get("imo"):
+                                    imo = str(entry["imo"])
+                                    break
+                        if imo:
+                            break
+
+                if imo and imo not in ("0", "None", "nan", ""):
+                    result[mmsi] = imo
+
+                await asyncio.sleep(0.2)  # Rate limit courtesy
+
+            except Exception:
+                continue  # Skip vessel, don't fail batch
+
+    try:
+        asyncio.run(_lookup_all())
+    except RuntimeError:
+        # Event loop already running (e.g. Jupyter/Streamlit)
+        import nest_asyncio
+        nest_asyncio.apply()
+        asyncio.run(_lookup_all())
+    except Exception:
+        pass  # Fall back silently — name matching still works
+
+    return result
 
 
 # ========================= FDI DATA =========================
