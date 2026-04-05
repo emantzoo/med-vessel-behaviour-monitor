@@ -195,7 +195,8 @@ if len(date_range) < 2:
     st.warning("Please select both start and end dates.")
     st.stop()
 
-min_duration = st.sidebar.slider("Minimum event duration (hours)", 2, 48, 12)
+min_duration = st.sidebar.slider("Minimum event duration (hours)", 2, 48, 2,
+                                 help="GFW encounter threshold is 2h")
 
 # Advanced: editable risk weights
 with st.sidebar.expander("Advanced -- Risk Weights (optional)"):
@@ -219,7 +220,7 @@ def load_static_data():
              + ["GRC"] * 10 + ["TUR"] * 8 + ["ITA"] * 7 + ["MLT"] * 5)
 
     # Duration ranges by event type (hours)
-    dur_map = {"GAP": (6, 72), "LOITERING": (4, 48), "ENCOUNTER": (2, 12)}
+    dur_map = {"GAP": (6, 72), "LOITERING": (4, 48), "ENCOUNTER": (2, 24)}
     durations = [round(rng.uniform(*dur_map[et]), 1) for et in event_types]
 
     # Sea-only coordinate clusters
