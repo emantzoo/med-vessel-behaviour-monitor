@@ -54,3 +54,35 @@ history, though it no longer receives the risk multiplier.
 MMSI numbers can be spoofed or reassigned. An MMSI match is strong
 evidence but not proof. Matches are flagged as "potential match" not
 "confirmed IUU vessel."
+
+## ICCAT Authorized Vessel Cross-Reference
+
+The app cross-references GFW event vessels against the ICCAT Record
+of Vessels authorized for Mediterranean fisheries.
+
+Authorization types:
+- SWO-Med: Mediterranean swordfish (longline)
+- ALB-Med: Mediterranean albacore
+- BFT-Catching: Bluefin tuna catching vessels (purse seine, longline, trap)
+- BFT-Other: Support vessels for BFT operations (towing, transport)
+- Carrier: Authorized transshipment/carrier vessels
+
+ICCAT-authorized vessels appearing in suspicious events receive a
+risk multiplier (1.2x-1.4x) because authorization provides access,
+infrastructure, and economic incentive that makes IUU activity more
+operationally plausible:
+- Authorized carriers in encounters = potential catch laundering
+- BFT catching vessels going dark = potential quota evasion
+- SWO vessels active during seasonal closures = potential violation
+
+A vessel showing fishing behaviour for BFT/SWO that is NOT on the
+ICCAT authorized list is potentially fishing without authorization.
+
+An ICCAT-authorized vessel that is ALSO on the IUU vessel list is
+the highest-priority signal — a vessel with legitimate access that
+has been confirmed to have engaged in IUU fishing.
+
+ICCAT Regional Observer Programme (Rec. 24-05) requires observer
+coverage on all purse seiners authorized for BFT, during all
+transfers and caging operations. Transshipment by authorized
+carriers should also be observed.

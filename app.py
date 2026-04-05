@@ -12,9 +12,9 @@ from config import (
 )
 from data_loading import (
     load_knowledge_base, load_static_data, load_live_data,
-    load_fdi_effort, load_fdi_landings, load_iuu_vessels,
+    load_fdi_effort, load_fdi_landings, load_iuu_vessels, load_iccat_vessels,
 )
-from risk_model import compute_risk_score, get_fdi_context, match_iuu_vessels
+from risk_model import compute_risk_score, get_fdi_context, match_iuu_vessels, match_iccat_vessels
 from tabs import (
     render_daily_trend, render_flag_breakdown, render_event_types,
     render_duration_analysis, render_geographic_risk, render_risk_heatmap,
@@ -86,6 +86,7 @@ else:
 fdi_effort = load_fdi_effort()
 fdi_landings = load_fdi_landings()
 iuu_vessels = load_iuu_vessels()
+iccat_vessels = load_iccat_vessels()
 knowledge_base = load_knowledge_base()
 
 # ========================= FILTER & SCORE =========================
@@ -104,6 +105,11 @@ if not df_filtered.empty:
 # IUU cross-reference (after risk scoring)
 if not df_filtered.empty and not iuu_vessels.empty:
     df_filtered = match_iuu_vessels(df_filtered, iuu_vessels, include_delisted)
+    total_risk = df_filtered["risk_score"].sum()
+
+# ICCAT cross-reference (after IUU matching)
+if not df_filtered.empty and not iccat_vessels.empty:
+    df_filtered = match_iccat_vessels(df_filtered, iccat_vessels)
     total_risk = df_filtered["risk_score"].sum()
 
 # ========================= MAIN MAP & METRICS =========================
@@ -142,6 +148,19 @@ with col1:
                 if reason:
                     popup_text += f"<br><b>Reason:</b> {str(reason)[:200]}"
 
+            # ICCAT authorization enrichment
+            is_iccat = row.get("iccat_authorized", False)
+            if is_iccat:
+                popup_text += f"""
+                <hr style='margin:4px 0'>
+                <b style='color:blue'>ICCAT AUTHORIZED</b><br>
+                <b>Authorizations:</b> {row.get('iccat_authorizations', 'N/A')}<br>
+                <b>Risk tier:</b> {row.get('iccat_risk_tier', 'N/A')}<br>
+                <b>Multiplier:</b> {row.get('iccat_multiplier', 1.0):.1f}x
+                """
+                if is_iuu:
+                    popup_text += "<br><b style='color:darkred'>DUAL FLAG: IUU-listed + ICCAT-authorized</b>"
+
             if not fdi_effort.empty and "csq_lon" in row.index:
                 ctx = get_fdi_context(row["csq_lon"], row["csq_lat"], fdi_effort, fdi_landings)
                 if ctx and ctx["total_fishing_days"] > 0:
@@ -157,8 +176,15 @@ with col1:
                     <b>Landings:</b> {ctx['total_landings_tonnes']:,.0f} t
                     """
 
-            marker_color = "black" if is_iuu else color_map.get(row["event_type"], "blue")
-            marker_radius = 12 if is_iuu else 8
+            if is_iuu:
+                marker_color = "black"
+                marker_radius = 12
+            elif is_iccat:
+                marker_color = "blue"
+                marker_radius = 10
+            else:
+                marker_color = color_map.get(row["event_type"], "blue")
+                marker_radius = 8
 
             folium.CircleMarker(
                 location=[row["lat"], row["lon"]],
@@ -169,7 +195,7 @@ with col1:
             ).add_to(m)
 
         st_folium(m, width=700, height=500)
-        st.caption("Markers: red=GAP, orange=LOITERING, purple=ENCOUNTER, **black=IUU-listed vessel**")
+        st.caption("Markers: red=GAP, orange=LOITERING, purple=ENCOUNTER, **blue=ICCAT-authorized**, **black=IUU-listed vessel**")
     else:
         st.info("No events match the selected filters.")
 
@@ -226,7 +252,7 @@ try:
     gemini_key = st.secrets["gemini_key"]
 except (FileNotFoundError, KeyError):
     gemini_key = ""
-with tab12: render_ai_analyst(df_filtered, fdi_effort, fdi_landings, knowledge_base, gemini_key, iuu_vessels)
+with tab12: render_ai_analyst(df_filtered, fdi_effort, fdi_landings, knowledge_base, gemini_key, iuu_vessels, iccat_vessels)
 
 # ========================= SIDEBAR METHODOLOGY =========================
 with st.sidebar.expander("Methodology & About"):
@@ -236,7 +262,7 @@ with st.sidebar.expander("Methodology & About"):
 Risk model replicates Global Fishing Watch transshipment detection
 methodology (Miller et al. 2018).
 
-`risk = duration^0.75 x event_weight x flag_mult x shore_factor x event_factors`
+`risk = duration^0.75 x event_weight x flag_mult x shore_factor x event_factors x iuu_mult x iccat_mult`
 
 **Encounter factors** (GFW criteria):
 - Proximity: <500m = 1.8x (GFW threshold)
@@ -258,6 +284,12 @@ methodology (Miller et al. 2018).
 - GFCM-listed vessel in Med: 3.0x risk multiplier
 - Other RFMO-listed vessel in Med: 2.0x risk multiplier
 - Matching: MMSI (exact) > vessel name (exact) > name (substring)
+
+**ICCAT Authorized Vessels:**
+- Source: ICCAT Record of Vessels (iccat.int)
+- Carrier: 1.4x | BFT-Catching: 1.3x | BFT-Other: 1.3x
+- SWO-Med: 1.2x | ALB-Med: 1.2x
+- Matching: vessel name (exact, min 4 chars)
 
 **Data:** GFW Events API (GAP, ENCOUNTER, LOITERING)
 

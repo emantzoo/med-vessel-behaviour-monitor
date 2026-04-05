@@ -185,6 +185,13 @@ def render_repeat_offenders(df):
             vessel_counts = vessel_counts.sort_values(
                 ["_iuu_sort", "event_count"], ascending=[True, False]).drop(columns="_iuu_sort")
 
+    # Add ICCAT info if available
+    if "iccat_authorized" in df.columns:
+        iccat_map = (df[df["iccat_authorized"] == True]
+                     .drop_duplicates("mmsi").set_index("mmsi")["iccat_authorizations"])
+        if not iccat_map.empty:
+            vessel_counts["ICCAT Authorized"] = vessel_counts["mmsi"].map(iccat_map).fillna("")
+
     repeat_vessels = vessel_counts[vessel_counts["event_count"] >= 2]
     if not repeat_vessels.empty:
         fig = px.bar(
@@ -273,6 +280,23 @@ def render_encounter_analysis(df):
             partner_flags.columns = ["Vessel Flag", "Partner Flag", "Encounters", "Total Risk"]
             st.dataframe(partner_flags.style.format({"Total Risk": "{:.1f}"}))
 
+        # ICCAT carrier encounters — high-priority signal
+        if "iccat_authorized" in enc_df.columns:
+            iccat_carriers = enc_df[
+                (enc_df["iccat_authorized"] == True)
+                & (enc_df["iccat_risk_tier"] == "carrier")
+            ]
+            if not iccat_carriers.empty:
+                st.warning(
+                    f"**{len(iccat_carriers)} encounter(s) involve ICCAT-authorized carriers.** "
+                    "If legitimate, these should be operating under Regional Observer Programme "
+                    "coverage (Rec. 24-05). Verify observer coverage."
+                )
+                carrier_cols = ["vessel_name", "mmsi", "flag", "duration_h", "risk_score",
+                                "encounter_vessel_name", "encounter_vessel_flag", "iccat_authorizations"]
+                carrier_cols = [c for c in carrier_cols if c in iccat_carriers.columns]
+                st.dataframe(iccat_carriers[carrier_cols].sort_values("risk_score", ascending=False))
+
         st.markdown("**Why it matters:** Two vessels within 100m for 8 hours is almost certainly "
                     "a transshipment. Look for high-risk flag combinations (e.g. RUS + PAN).")
     elif not enc_df.empty:
@@ -306,6 +330,13 @@ def render_top_vessels(df):
                    .drop_duplicates("mmsi").set_index("mmsi")["iuu_listing_rfmos"])
         if not iuu_map.empty:
             vessel_risk["IUU Listed"] = vessel_risk["mmsi"].map(iuu_map).fillna("")
+
+    # Add ICCAT info if available
+    if "iccat_authorized" in df.columns:
+        iccat_map = (df[df["iccat_authorized"] == True]
+                     .drop_duplicates("mmsi").set_index("mmsi")["iccat_authorizations"])
+        if not iccat_map.empty:
+            vessel_risk["ICCAT Authorized"] = vessel_risk["mmsi"].map(iccat_map).fillna("")
 
     st.dataframe(vessel_risk.style.format({"risk": "{:.1f}"}))
 

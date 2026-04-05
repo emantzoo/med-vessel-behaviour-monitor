@@ -2,7 +2,7 @@
 
 import pandas as pd
 
-from config import TRANSSHIPMENT_VESSEL_TYPES, SPECIES_NAMES, IUU_MULTIPLIERS
+from config import TRANSSHIPMENT_VESSEL_TYPES, SPECIES_NAMES, IUU_MULTIPLIERS, ICCAT_MULTIPLIERS
 
 
 def compute_risk_score(row, event_weights, flag_risks):
@@ -212,4 +212,75 @@ def match_iuu_vessels(df, iuu_df, include_delisted=False):
 
     # Apply risk multiplier
     df["risk_score"] = (df["risk_score"] * df["iuu_multiplier"]).round(1)
+    return df
+
+
+# ========================= ICCAT MATCHING =========================
+
+_NO_ICCAT_MATCH = {
+    "iccat_authorized": False,
+    "iccat_authorizations": None,
+    "iccat_risk_tier": None,
+    "iccat_multiplier": 1.0,
+    "iccat_vessel_name": None,
+}
+
+# Minimum vessel name length to avoid false positives on common short names
+_ICCAT_MIN_NAME_LEN = 4
+
+
+def check_iccat_match(vessel_name, iccat_df):
+    """Check if a vessel name matches any ICCAT Med-authorized vessel.
+
+    Matching is vessel name only (ICCAT data has no MMSI).
+    Names shorter than 4 characters are skipped to avoid false positives.
+    """
+    if iccat_df.empty:
+        return dict(_NO_ICCAT_MATCH)
+
+    if not vessel_name or not pd.notna(vessel_name):
+        return dict(_NO_ICCAT_MATCH)
+
+    name_upper = str(vessel_name).strip().upper()
+    if len(name_upper) < _ICCAT_MIN_NAME_LEN:
+        return dict(_NO_ICCAT_MATCH)
+
+    matches = iccat_df[iccat_df["VesselName"] == name_upper]
+    if matches.empty:
+        return dict(_NO_ICCAT_MATCH)
+
+    row = matches.iloc[0]
+    tier = row.get("iccat_risk_tier", "")
+    multiplier = ICCAT_MULTIPLIERS.get(tier, 1.0)
+
+    return {
+        "iccat_authorized": True,
+        "iccat_authorizations": row.get("med_authorizations", ""),
+        "iccat_risk_tier": tier,
+        "iccat_multiplier": multiplier,
+        "iccat_vessel_name": row.get("VesselName", ""),
+    }
+
+
+def match_iccat_vessels(df, iccat_df):
+    """Match all vessels in df against ICCAT Med-authorized list.
+
+    Adds iccat_* columns and applies multiplier to risk_score.
+    Called from app.py after match_iuu_vessels.
+    """
+    if iccat_df.empty or df.empty:
+        for col, val in _NO_ICCAT_MATCH.items():
+            df[col] = val
+        return df
+
+    matches = df.apply(
+        lambda row: check_iccat_match(row.get("vessel_name"), iccat_df),
+        axis=1,
+    )
+    match_df = pd.DataFrame(matches.tolist(), index=df.index)
+    for col in match_df.columns:
+        df[col] = match_df[col]
+
+    # Apply risk multiplier
+    df["risk_score"] = (df["risk_score"] * df["iccat_multiplier"]).round(1)
     return df

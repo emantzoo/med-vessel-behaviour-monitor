@@ -264,3 +264,14 @@ def load_iuu_vessels():
         df["all_names"] = df["all_names"].fillna("").astype(str)
         return df
     return pd.DataFrame()
+
+
+# ========================= ICCAT VESSEL LIST =========================
+
+@st.cache_data
+def load_iccat_vessels():
+    """Load preprocessed ICCAT Med-authorized vessel list."""
+    path = os.path.join(os.path.dirname(__file__), "data", "iccat_med_vessels.csv")
+    if os.path.exists(path):
+        return pd.read_csv(path, dtype=str).fillna("")
+    return pd.DataFrame()

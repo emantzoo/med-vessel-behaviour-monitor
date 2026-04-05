@@ -10,7 +10,7 @@ import plotly.graph_objects as go
 from config import FORBIDDEN_CODE
 
 
-def build_system_prompt(df, knowledge_base, fdi_effort=None, fdi_landings=None, iuu_vessels=None):
+def build_system_prompt(df, knowledge_base, fdi_effort=None, fdi_landings=None, iuu_vessels=None, iccat_vessels=None):
     """Build system prompt with dataframe context and domain knowledge."""
     schema = f"""DATAFRAME SCHEMA (variable name: df)
 Columns: {list(df.columns)}
@@ -147,6 +147,28 @@ IUU-related columns in df (when matches exist):
 The iuu_vessels DataFrame is available for analysis.
 """
 
+    if iccat_vessels is not None and not iccat_vessels.empty:
+        iccat_matched_count = int(df["iccat_authorized"].sum()) if "iccat_authorized" in df.columns else 0
+        prompt += f"""
+
+ICCAT AUTHORIZED VESSEL CROSS-REFERENCE (variable name: iccat_vessels)
+ICCAT Med-authorized vessels: {len(iccat_vessels)}
+ICCAT matches in current data: {iccat_matched_count}
+
+ICCAT-related columns in df (when matches exist):
+- iccat_authorized: bool
+- iccat_authorizations: str (e.g., "SWO-Med, BFT-Catching")
+- iccat_risk_tier: str ("carrier", "bft_catching", "bft_other", "swo_med", "alb_med")
+- iccat_multiplier: float (1.4 for carrier, 1.3 for BFT, 1.2 for SWO/ALB, 1.0 if no match)
+- iccat_vessel_name: str (matched name from ICCAT list)
+
+ICCAT authorized vessels in suspicious events are an opportunity indicator --
+authorization provides access, cover, and infrastructure for IUU activity.
+A vessel that is BOTH IUU-listed and ICCAT-authorized is the highest-priority signal.
+
+The iccat_vessels DataFrame is available for analysis.
+"""
+
     return prompt
 
 
@@ -159,7 +181,7 @@ def is_safe_code(code):
     return True
 
 
-def render_ai_analyst(df_filtered, fdi_effort, fdi_landings, knowledge_base, gemini_key, iuu_vessels=None):
+def render_ai_analyst(df_filtered, fdi_effort, fdi_landings, knowledge_base, gemini_key, iuu_vessels=None, iccat_vessels=None):
     """Render the AI Maritime Analyst tab."""
     st.subheader("AI Maritime Analyst")
     st.markdown(
@@ -222,7 +244,7 @@ def render_ai_analyst(df_filtered, fdi_effort, fdi_landings, knowledge_base, gem
 
                 client_ai = genai.Client(api_key=gemini_key)
                 system_ctx = build_system_prompt(
-                    df_filtered, knowledge_base, fdi_effort, fdi_landings, iuu_vessels
+                    df_filtered, knowledge_base, fdi_effort, fdi_landings, iuu_vessels, iccat_vessels
                 )
 
                 contents = []
@@ -278,6 +300,7 @@ def render_ai_analyst(df_filtered, fdi_effort, fdi_landings, knowledge_base, gem
                                 "fdi_effort": fdi_effort,
                                 "fdi_landings": fdi_landings,
                                 "iuu_vessels": iuu_vessels,
+                                "iccat_vessels": iccat_vessels,
                             }
                             exec(code, exec_ns)
 

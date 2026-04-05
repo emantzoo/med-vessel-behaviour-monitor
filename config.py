@@ -17,6 +17,14 @@ TRANSSHIPMENT_VESSEL_TYPES = {"CARRIER", "TANKER"}
 
 IUU_MULTIPLIERS = {"GFCM": 3.0, "OTHER_RFMO": 2.0}
 
+ICCAT_MULTIPLIERS = {
+    "carrier": 1.4,
+    "bft_catching": 1.3,
+    "bft_other": 1.3,
+    "swo_med": 1.2,
+    "alb_med": 1.2,
+}
+
 # FAO 3-letter species code lookup (common Med species)
 SPECIES_NAMES = {
     "HKE": "Hake", "MUT": "Red mullet", "SWO": "Swordfish",
