@@ -232,15 +232,25 @@ def render_ai_analyst(df_filtered, fdi_effort, fdi_landings, knowledge_base, gem
 
     examples = [
         "",
-        "Which flag states have the highest total risk? Why?",
-        "Show me all encounters involving Russian-flagged vessels",
-        "Are there any vessels with repeated gap events?",
-        "What's happening in the eastern Mediterranean (longitude > 25)?",
-        "Which day had the most suspicious activity and why?",
-        "Plot all events on a scatter map colored by event type",
-        "Compare risk profiles of FOC-flagged vs Mediterranean-flagged vessels",
-        "What's the average gap duration by flag state? Any outliers?",
+        # Investigation walkthrough — the hero question
+        "Investigate KOOSHA 4",
+        # Cross-source intelligence (the differentiator)
+        "Show me IUU-listed vessels in c-squares with high swordfish landings",
+        "Which OFAC-sanctioned vessels appear in the data and what's their pattern?",
+        "Find ICCAT-authorized carriers involved in encounters",
+        "Are there any vessels matched to both IUU and ICCAT lists?",
+        # Domain-informed analysis
+        "Which flag states have the highest gap-to-encounter ratio and why is that suspicious?",
+        "Compare risk profiles of FOC-flagged vs Mediterranean EU-flagged vessels",
         "Rank the top 5 riskiest vessels and explain what makes each one suspicious",
+        # Spatial and temporal patterns
+        "What's happening in the eastern Mediterranean (longitude > 25)?",
+        "Which c-squares have the most events and what species are landed there?",
+        "Plot all events on a scatter map colored by event type",
+        # Behavioural deep-dives
+        "Show me long AIS gaps (>24h) with significant speed changes",
+        "Are there any vessels with repeated gap events in the same area?",
+        "Which day had the most suspicious activity and why?",
     ]
 
     picked = st.selectbox(
