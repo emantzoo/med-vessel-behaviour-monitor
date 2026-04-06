@@ -10,7 +10,7 @@ import plotly.graph_objects as go
 from config import FORBIDDEN_CODE
 
 
-def build_system_prompt(df, knowledge_base, fdi_effort=None, fdi_landings=None, iuu_vessels=None, iccat_vessels=None):
+def build_system_prompt(df, knowledge_base, fdi_effort=None, fdi_landings=None, iuu_vessels=None, iccat_vessels=None, ofac_vessels=None):
     """Build system prompt with dataframe context and domain knowledge."""
     schema = f"""DATAFRAME SCHEMA (variable name: df)
 Columns: {list(df.columns)}
@@ -169,6 +169,35 @@ A vessel that is BOTH IUU-listed and ICCAT-authorized is the highest-priority si
 The iccat_vessels DataFrame is available for analysis.
 """
 
+    if ofac_vessels is not None and not ofac_vessels.empty:
+        ofac_matched_count = int(df["ofac_sanctioned"].sum()) if "ofac_sanctioned" in df.columns else 0
+        prompt += f"""
+
+OFAC SDN SANCTIONED VESSEL CROSS-REFERENCE (variable name: ofac_vessels)
+OFAC vessel list size: {len(ofac_vessels)} vessels
+OFAC matches in current data: {ofac_matched_count}
+
+OFAC-related columns in df (when matches exist):
+- ofac_sanctioned: bool
+- ofac_vessel_name: str (matched SDN list name)
+- ofac_sanctions_program: str (e.g., "IRAN", "SYRIA", "UKRAINE-EO13662")
+- ofac_listing_date: str (date added to SDN list)
+- ofac_match_type: "MMSI" | "IMO" | "name_exact"
+- ofac_match_confidence: "high" | "medium"
+- ofac_multiplier: float (2.5 for sanctioned, 1.0 if no match)
+
+OFAC sanctions represent a legal compliance obligation beyond fisheries management.
+Vessels on the SDN list are subject to US economic sanctions. Any entity conducting
+business with a sanctioned vessel risks secondary sanctions exposure. OFAC matches
+are the highest-priority signal in this dashboard.
+
+When discussing vessels with an IMO number, include external lookup links:
+- MarineTraffic: https://www.marinetraffic.com/en/ais/details/ships/imo:{{IMO}}
+- VesselFinder: https://www.vesselfinder.com/vessels?name={{IMO}}
+
+The ofac_vessels DataFrame is available for analysis.
+"""
+
     return prompt
 
 
@@ -181,7 +210,7 @@ def is_safe_code(code):
     return True
 
 
-def render_ai_analyst(df_filtered, fdi_effort, fdi_landings, knowledge_base, gemini_key, iuu_vessels=None, iccat_vessels=None):
+def render_ai_analyst(df_filtered, fdi_effort, fdi_landings, knowledge_base, gemini_key, iuu_vessels=None, iccat_vessels=None, ofac_vessels=None):
     """Render the AI Maritime Analyst tab."""
     st.subheader("AI Maritime Analyst")
     st.markdown(
@@ -244,7 +273,7 @@ def render_ai_analyst(df_filtered, fdi_effort, fdi_landings, knowledge_base, gem
 
                 client_ai = genai.Client(api_key=gemini_key)
                 system_ctx = build_system_prompt(
-                    df_filtered, knowledge_base, fdi_effort, fdi_landings, iuu_vessels, iccat_vessels
+                    df_filtered, knowledge_base, fdi_effort, fdi_landings, iuu_vessels, iccat_vessels, ofac_vessels
                 )
 
                 contents = []
@@ -301,6 +330,7 @@ def render_ai_analyst(df_filtered, fdi_effort, fdi_landings, knowledge_base, gem
                                 "fdi_landings": fdi_landings.copy() if fdi_landings is not None and not fdi_landings.empty else pd.DataFrame(),
                                 "iuu_vessels": iuu_vessels.copy() if iuu_vessels is not None and not iuu_vessels.empty else pd.DataFrame(),
                                 "iccat_vessels": iccat_vessels.copy() if iccat_vessels is not None and not iccat_vessels.empty else pd.DataFrame(),
+                                "ofac_vessels": ofac_vessels.copy() if ofac_vessels is not None and not ofac_vessels.empty else pd.DataFrame(),
                             }
                             exec(code, exec_ns)
 

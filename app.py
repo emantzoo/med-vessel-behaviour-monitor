@@ -15,9 +15,9 @@ from config import (
 from data_loading import (
     load_knowledge_base, load_static_data, load_live_data,
     load_fdi_effort, load_fdi_landings, load_iuu_vessels, load_iccat_vessels,
-    lookup_vessel_imos,
+    load_ofac_vessels, lookup_vessel_imos,
 )
-from risk_model import compute_risk_score, get_fdi_context, match_iuu_vessels, match_iccat_vessels
+from risk_model import compute_risk_score, get_fdi_context, match_iuu_vessels, match_iccat_vessels, match_ofac_vessels
 from tabs import (
     render_daily_trend, render_flag_breakdown, render_event_types,
     render_duration_analysis, render_geographic_risk, render_risk_heatmap,
@@ -100,6 +100,7 @@ fdi_effort = load_fdi_effort()
 fdi_landings = load_fdi_landings()
 iuu_vessels = load_iuu_vessels()
 iccat_vessels = load_iccat_vessels()
+ofac_vessels = load_ofac_vessels()
 knowledge_base = load_knowledge_base()
 
 # ========================= FILTER & SCORE =========================
@@ -155,6 +156,11 @@ if not df_filtered.empty and not iccat_vessels.empty:
     df_filtered = match_iccat_vessels(df_filtered, iccat_vessels)
     total_risk = df_filtered["risk_score"].sum()
 
+# OFAC SDN cross-reference (after ICCAT matching — highest priority)
+if not df_filtered.empty and not ofac_vessels.empty:
+    df_filtered = match_ofac_vessels(df_filtered, ofac_vessels)
+    total_risk = df_filtered["risk_score"].sum()
+
 # ========================= MAIN MAP & METRICS =========================
 col1, col2 = st.columns([3, 1])
 
@@ -170,6 +176,7 @@ with col1:
         fg_encounter = folium.FeatureGroup(name="Encounter", show=True)
         fg_iuu = folium.FeatureGroup(name="IUU-Listed", show=True)
         fg_iccat = folium.FeatureGroup(name="ICCAT Authorized", show=True)
+        fg_ofac = folium.FeatureGroup(name="OFAC Sanctioned", show=True)
         fg_fdi = folium.FeatureGroup(name="FDI Fishing Effort", show=show_fdi_layer)
 
         # FDI fishing effort choropleth layer (only near events)
@@ -216,12 +223,16 @@ with col1:
                 fdi_cache[(csq_lon, csq_lat)] = get_fdi_context(csq_lon, csq_lat, fdi_effort, fdi_landings)
 
         for _, row in df_filtered.iterrows():
+            is_ofac = row.get("ofac_sanctioned", False)
             is_iuu = row.get("iuu_matched", False)
             is_iccat = row.get("iccat_authorized", False)
             vname = row.get("vessel_name", "")
             tooltip = f"{vname} | {row['event_type']} | {row['flag']}" if pd.notna(vname) else f"{row['event_type']} | {row['flag']}"
 
-            if is_iuu:
+            if is_ofac:
+                marker_color = "#8B0000"
+                marker_radius = 14
+            elif is_iuu:
                 marker_color = "black"
                 marker_radius = 12
             elif is_iccat:
@@ -240,7 +251,9 @@ with col1:
             )
 
             # Add marker to appropriate layer group
-            if is_iuu:
+            if is_ofac:
+                marker.add_to(fg_ofac)
+            elif is_iuu:
                 marker.add_to(fg_iuu)
             elif is_iccat:
                 marker.add_to(fg_iccat)
@@ -258,6 +271,7 @@ with col1:
         fg_encounter.add_to(m)
         fg_iccat.add_to(m)
         fg_iuu.add_to(m)
+        fg_ofac.add_to(m)
         folium.LayerControl(collapsed=True).add_to(m)
 
         map_data = st_folium(m, width=700, height=500)
@@ -270,7 +284,8 @@ with col1:
             f'{dot.format(c="orange")} Loitering&ensp;'
             f'{dot.format(c="purple")} Encounter&ensp;'
             f'{dot.format(c="blue")} ICCAT&ensp;'
-            f'{dot.format(c="black")} IUU&ensp;&ensp;'
+            f'{dot.format(c="black")} IUU&ensp;'
+            f'{dot.format(c="#8B0000")} OFAC&ensp;&ensp;'
             f'{sq.format(c="#ffffb2")} <small>&lt;50d</small>&ensp;'
             f'{sq.format(c="#fecc5c")} <small>50-500d</small>&ensp;'
             f'{sq.format(c="#fd8d3c")} <small>500-2kd</small>&ensp;'
@@ -287,6 +302,7 @@ with col1:
                 nearest_idx = dist.idxmin()
                 if dist[nearest_idx] < 0.01:
                     ev = df_filtered.loc[nearest_idx]
+                    is_ofac_ev = ev.get("ofac_sanctioned", False)
                     is_iuu_ev = ev.get("iuu_matched", False)
                     is_iccat_ev = ev.get("iccat_authorized", False)
 
@@ -300,6 +316,15 @@ with col1:
                     c4.metric("Flag", ev["flag"])
                     c5.metric("Duration", f"{ev['duration_h']} h")
                     c6.metric("Date", str(ev.get("date", ""))[:10])
+
+                    if is_ofac_ev:
+                        st.error(
+                            f"**OFAC SANCTIONED** | Name: {ev.get('ofac_vessel_name', 'N/A')} | "
+                            f"Program: {ev.get('ofac_sanctions_program', 'N/A')} | "
+                            f"Listed: {ev.get('ofac_listing_date', 'N/A')} | "
+                            f"Match: {ev.get('ofac_match_type', '')} ({ev.get('ofac_match_confidence', '')}) | "
+                            f"Multiplier: {ev.get('ofac_multiplier', 1.0):.1f}x"
+                        )
 
                     if is_iuu_ev:
                         tier = "GFCM (Med)" if ev.get("iuu_is_gfcm") else "Other RFMO"
@@ -319,8 +344,16 @@ with col1:
                             f"Risk tier: {ev.get('iccat_risk_tier', 'N/A')} | "
                             f"Multiplier: {ev.get('iccat_multiplier', 1.0):.1f}x"
                         )
-                        if is_iuu_ev:
-                            st.warning("**DUAL FLAG: IUU-listed + ICCAT-authorized**")
+
+                    # Multi-list combination warnings
+                    if is_ofac_ev and is_iuu_ev and is_iccat_ev:
+                        st.error("**TRIPLE FLAG: OFAC-sanctioned + IUU-listed + ICCAT-authorized**")
+                    elif is_ofac_ev and is_iuu_ev:
+                        st.error("**DUAL FLAG: OFAC-sanctioned + IUU-listed**")
+                    elif is_ofac_ev and is_iccat_ev:
+                        st.warning("**DUAL FLAG: OFAC-sanctioned + ICCAT-authorized**")
+                    elif is_iuu_ev and is_iccat_ev:
+                        st.warning("**DUAL FLAG: IUU-listed + ICCAT-authorized**")
 
                     if "csq_lon" in ev.index:
                         ctx = fdi_cache.get((ev["csq_lon"], ev["csq_lat"]))
@@ -336,6 +369,17 @@ with col1:
                                 f"Top species: {top_sp_str} | "
                                 f"Landings: {tonnes:,.0f} t ({level})"
                             )
+
+                    # External vessel lookup links
+                    imo_val = str(ev.get("imo", "")).strip()
+                    if imo_val and imo_val not in ("", "0", "nan", "None"):
+                        mt_url = f"https://www.marinetraffic.com/en/ais/details/ships/imo:{imo_val}"
+                        vf_url = f"https://www.vesselfinder.com/vessels?name={imo_val}"
+                        st.markdown(
+                            f"External lookups: "
+                            f"[MarineTraffic]({mt_url}) | "
+                            f"[VesselFinder]({vf_url})"
+                        )
     else:
         st.info("No events match the selected filters.")
 
@@ -349,6 +393,28 @@ with col2:
             iuu_count = int(df_filtered["iuu_matched"].sum())
             if iuu_count > 0:
                 st.metric("IUU-Listed Vessels", iuu_count)
+        if "ofac_sanctioned" in df_filtered.columns:
+            ofac_count = int(df_filtered["ofac_sanctioned"].sum())
+            if ofac_count > 0:
+                st.metric("OFAC Sanctioned", ofac_count)
+
+# OFAC Alert Box (full width, below map — highest priority)
+if not df_filtered.empty and "ofac_sanctioned" in df_filtered.columns:
+    ofac_events = df_filtered[df_filtered["ofac_sanctioned"] == True]
+    if not ofac_events.empty:
+        st.error(f"**OFAC SANCTIONS ALERT:** {len(ofac_events)} event(s) involve OFAC-sanctioned vessels")
+        with st.expander("OFAC Sanctions Details", expanded=True):
+            display_cols = [
+                "vessel_name", "mmsi", "imo", "flag", "event_type", "duration_h",
+                "risk_score", "ofac_vessel_name", "ofac_sanctions_program",
+                "ofac_listing_date", "ofac_match_type", "ofac_match_confidence",
+                "ofac_multiplier",
+            ]
+            display_cols = [c for c in display_cols if c in ofac_events.columns]
+            st.dataframe(
+                ofac_events[display_cols].sort_values("risk_score", ascending=False),
+                use_container_width=True,
+            )
 
 # IUU Alert Box (full width, below map)
 if not df_filtered.empty and "iuu_matched" in df_filtered.columns:
@@ -387,7 +453,7 @@ with tab9:  render_encounter_analysis(df_filtered)
 with tab10: render_top_vessels(df_filtered)
 with tab11: render_fisheries_context(df_filtered, fdi_effort, fdi_landings)
 
-with tab12: render_ai_analyst(df_filtered, fdi_effort, fdi_landings, knowledge_base, "", iuu_vessels, iccat_vessels)
+with tab12: render_ai_analyst(df_filtered, fdi_effort, fdi_landings, knowledge_base, "", iuu_vessels, iccat_vessels, ofac_vessels)
 
 # ========================= SIDEBAR METHODOLOGY =========================
 with st.sidebar.expander("Methodology & About"):
@@ -397,7 +463,7 @@ with st.sidebar.expander("Methodology & About"):
 Risk model replicates Global Fishing Watch transshipment detection
 methodology (Miller et al. 2018).
 
-`risk = duration^0.75 x event_weight x flag_mult x shore_factor x event_factors x iuu_mult x iccat_mult`
+`risk = duration^0.75 x event_weight x flag_mult x shore_factor x event_factors x iuu_mult x iccat_mult x ofac_mult`
 
 **Encounter factors** (GFW criteria):
 - Proximity: <500m = 1.8x (GFW threshold)
@@ -425,6 +491,12 @@ methodology (Miller et al. 2018).
 - Carrier: 1.4x | BFT-Catching: 1.3x | BFT-Other: 1.3x
 - SWO-Med: 1.2x | ALB-Med: 1.2x
 - Matching: vessel name (exact, min 4 chars)
+
+**OFAC SDN Cross-Reference:**
+- Source: US Treasury OFAC Specially Designated Nationals List
+- Sanctioned vessel: 2.5x risk multiplier
+- Matching: MMSI (exact) > IMO (exact) > vessel name (exact)
+- Programs: IRAN, SYRIA, UKRAINE, DPRK, etc.
 
 **Data:** GFW Events API (GAP, ENCOUNTER, LOITERING)
 

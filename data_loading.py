@@ -375,3 +375,17 @@ def load_iccat_vessels():
         except Exception as e:
             st.warning(f"Error loading ICCAT vessel list: {e}")
     return pd.DataFrame()
+
+
+# ========================= OFAC SDN VESSEL LIST =========================
+
+@st.cache_data
+def load_ofac_vessels():
+    """Load preprocessed OFAC SDN sanctioned vessel list."""
+    path = os.path.join(os.path.dirname(__file__), "data", "ofac_vessels.csv")
+    if os.path.exists(path):
+        try:
+            return pd.read_csv(path, dtype=str).fillna("")
+        except Exception as e:
+            st.warning(f"Error loading OFAC vessel list: {e}")
+    return pd.DataFrame()

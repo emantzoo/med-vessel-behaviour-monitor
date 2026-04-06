@@ -25,6 +25,8 @@ ICCAT_MULTIPLIERS = {
     "alb_med": 1.2,
 }
 
+OFAC_MULTIPLIER = 2.5
+
 FDI_EFFORT_COLORS = {
     "Very High": "#e31a1c",
     "High": "#fd8d3c",
