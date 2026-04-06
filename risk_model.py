@@ -2,7 +2,7 @@
 
 import pandas as pd
 
-from config import TRANSSHIPMENT_VESSEL_TYPES, SPECIES_NAMES, IUU_MULTIPLIERS, ICCAT_MULTIPLIERS
+from config import TRANSSHIPMENT_VESSEL_TYPES, SPECIES_NAMES, IUU_MULTIPLIERS, ICCAT_MULTIPLIERS, OFAC_MULTIPLIER
 
 
 def compute_risk_score(row, event_weights, flag_risks):
@@ -309,4 +309,105 @@ def match_iccat_vessels(df, iccat_df):
 
     # Apply risk multiplier
     df["risk_score"] = (df["risk_score"] * df["iccat_multiplier"]).round(1)
+    return df
+
+
+# ========================= OFAC MATCHING =========================
+
+_NO_OFAC_MATCH = {
+    "ofac_sanctioned": False,
+    "ofac_vessel_name": None,
+    "ofac_sanctions_program": None,
+    "ofac_listing_date": None,
+    "ofac_match_type": None,
+    "ofac_match_confidence": None,
+    "ofac_multiplier": 1.0,
+}
+
+
+def _build_ofac_result(ofac_row, match_type, confidence):
+    """Build match result dict from an OFAC SDN row."""
+    return {
+        "ofac_sanctioned": True,
+        "ofac_vessel_name": ofac_row.get("vessel_name", ""),
+        "ofac_sanctions_program": ofac_row.get("sanctions_program", ""),
+        "ofac_listing_date": ofac_row.get("listing_date", ""),
+        "ofac_match_type": match_type,
+        "ofac_match_confidence": confidence,
+        "ofac_multiplier": OFAC_MULTIPLIER,
+    }
+
+
+def check_ofac_match(mmsi, vessel_name, ofac_df, imo=None):
+    """Check if a vessel matches any OFAC SDN sanctioned vessel.
+
+    Matching priority: MMSI exact -> IMO exact -> vessel name exact.
+    No fuzzy matching — OFAC false positives have legal consequences.
+    Returns dict with match details or _NO_OFAC_MATCH.
+    """
+    if ofac_df.empty:
+        return dict(_NO_OFAC_MATCH)
+
+    # Priority 1: MMSI exact match (high confidence)
+    mmsi_str = str(mmsi).strip()
+    if mmsi_str and mmsi_str not in ("0", "nan", ""):
+        if "mmsi" in ofac_df.columns:
+            mmsi_matches = ofac_df[ofac_df["mmsi"] == mmsi_str]
+            if not mmsi_matches.empty:
+                return _build_ofac_result(mmsi_matches.iloc[0], "MMSI", "high")
+
+    # Priority 2: IMO exact match (high confidence)
+    if imo and pd.notna(imo) and str(imo).strip() not in ("", "0", "nan", "None"):
+        imo_str = str(imo).strip()
+        if "imo" in ofac_df.columns:
+            imo_matches = ofac_df[ofac_df["imo"] == imo_str]
+            if not imo_matches.empty:
+                return _build_ofac_result(imo_matches.iloc[0], "IMO", "high")
+
+    # Priority 3: Name exact match (medium confidence)
+    if vessel_name and pd.notna(vessel_name):
+        name_upper = str(vessel_name).strip().upper()
+        if not name_upper:
+            return dict(_NO_OFAC_MATCH)
+
+        # Exact match against all known names (pipe-delimited)
+        if "all_names" in ofac_df.columns:
+            name_mask = ofac_df["all_names"].str.upper().str.split("|").apply(
+                lambda names: name_upper in [n.strip() for n in names]
+            )
+            exact_matches = ofac_df[name_mask]
+            if not exact_matches.empty:
+                return _build_ofac_result(exact_matches.iloc[0], "name_exact", "medium")
+        else:
+            matches = ofac_df[ofac_df["vessel_name"].str.upper() == name_upper]
+            if not matches.empty:
+                return _build_ofac_result(matches.iloc[0], "name_exact", "medium")
+
+    return dict(_NO_OFAC_MATCH)
+
+
+def match_ofac_vessels(df, ofac_df):
+    """Match all vessels in df against OFAC SDN sanctioned vessel list.
+
+    Adds ofac_* columns and applies multiplier to risk_score.
+    Called from app.py after match_iccat_vessels.
+    """
+    if ofac_df.empty or df.empty:
+        for col, val in _NO_OFAC_MATCH.items():
+            df[col] = val
+        return df
+
+    matches = df.apply(
+        lambda row: check_ofac_match(
+            row["mmsi"], row.get("vessel_name"), ofac_df,
+            imo=row.get("imo"),
+        ),
+        axis=1,
+    )
+    match_df = pd.DataFrame(matches.tolist(), index=df.index)
+    for col in match_df.columns:
+        df[col] = match_df[col]
+
+    # Apply risk multiplier
+    df["risk_score"] = (df["risk_score"] * df["ofac_multiplier"]).round(1)
     return df

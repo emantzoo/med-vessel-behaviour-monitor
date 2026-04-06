@@ -49,3 +49,56 @@ risk = (duration_h ^ 0.75)
 ### Gap-Specific Factors
 - **Speed change**: |speed_before - speed_after| > 5kn = 1.5x (evasion indicator),
   > 2kn = 1.2x (vessel was moving, went dark, reappeared at different speed)
+
+## Vessel Investigation Template
+
+When asked to investigate a specific vessel, follow this structured workflow
+using all available data sources.
+
+### Step 1: Identity Confirmation
+Query the df for the vessel by name or MMSI. Report vessel name, MMSI, IMO,
+flag, vessel type, number of events, and match confidence.
+
+### Step 2: IUU Listing Status
+Check iuu_matched, iuu_vessel_name, iuu_listing_rfmos, iuu_match_type,
+iuu_match_confidence, iuu_is_gfcm. Report listing RFMOs and reason.
+
+### Step 3: ICCAT Authorization Status
+Check iccat_authorized, iccat_authorizations, iccat_risk_tier. Note if
+authorized as a Carrier (requires Regional Observer Programme coverage).
+
+### Step 4: Sanctions Status
+Check ofac_sanctioned, ofac_sanctions_program, ofac_vessel_name. OFAC
+sanctions are the most severe compliance flag.
+
+### Step 5: Fisheries Context
+Look up FDI baseline for the c-square(s) where events occurred. Report
+fishing days, top species, gear types, and whether the activity makes
+sense in this fisheries context.
+
+### Step 6: Behavioural Pattern Analysis
+Analyse event patterns: event type mix, duration patterns, speed analysis,
+geographic spread, temporal clustering. For AIS gaps: speed drop suggests
+mid-sea operation; >12h suggests deliberate AIS disabling. For encounters:
+proximity + duration = transfer likelihood.
+
+### Step 7: Risk Score Decomposition
+Break down risk_score into: base (duration^0.75), event weight, flag
+multiplier, shore factor, event-specific factors, IUU/ICCAT/OFAC multipliers.
+
+### Step 8: Hypothesis Generation
+State most likely explanation: unauthorized fishing, at-sea transshipment,
+sanctions evasion, or legitimate operation. Be specific about supporting
+and undermining evidence.
+
+### Step 9: External Lookups
+If IMO available, provide links:
+- MarineTraffic: https://www.marinetraffic.com/en/ais/details/ships/imo:{IMO}
+- VesselFinder: https://www.vesselfinder.com/vessels?name={IMO}
+
+### Step 10: Summary and Priority Assessment
+Conclude with: overall threat level (Critical/High/Moderate/Low), key
+evidence points (3-5 bullets), recommended actions, what additional
+information would strengthen the assessment.
+
+Assign the summary table to result_df and any chart to fig.

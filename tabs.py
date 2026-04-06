@@ -57,22 +57,33 @@ def render_flag_breakdown(df):
                   title="Risk by Flag State and Event Type")
     st.plotly_chart(fig2)
 
-    # IUU/ICCAT summary by flag
-    cols = st.columns(2)
+    # IUU/ICCAT/OFAC summary by flag
+    n_summary_cols = 2 + (1 if "ofac_sanctioned" in df.columns else 0)
+    cols = st.columns(n_summary_cols)
+    col_idx = 0
     if "iuu_matched" in df.columns:
         iuu_by_flag = df[df["iuu_matched"] == True].groupby("flag")["mmsi"].nunique()
         if not iuu_by_flag.empty:
-            with cols[0]:
+            with cols[col_idx]:
                 st.markdown("**IUU-listed vessels by flag:**")
                 st.dataframe(iuu_by_flag.reset_index().rename(
                     columns={"mmsi": "IUU Vessels", "flag": "Flag"}))
+        col_idx += 1
     if "iccat_authorized" in df.columns:
         iccat_by_flag = df[df["iccat_authorized"] == True].groupby("flag")["mmsi"].nunique()
         if not iccat_by_flag.empty:
-            with cols[1]:
+            with cols[col_idx]:
                 st.markdown("**ICCAT-authorized vessels by flag:**")
                 st.dataframe(iccat_by_flag.reset_index().rename(
                     columns={"mmsi": "ICCAT Vessels", "flag": "Flag"}))
+        col_idx += 1
+    if "ofac_sanctioned" in df.columns:
+        ofac_by_flag = df[df["ofac_sanctioned"] == True].groupby("flag")["mmsi"].nunique()
+        if not ofac_by_flag.empty:
+            with cols[col_idx]:
+                st.markdown("**OFAC-sanctioned vessels by flag:**")
+                st.dataframe(ofac_by_flag.reset_index().rename(
+                    columns={"mmsi": "OFAC Vessels", "flag": "Flag"}))
 
 
 def render_event_types(df):
@@ -279,6 +290,13 @@ def render_repeat_offenders(df):
         if not iccat_map.empty:
             vessel_counts["ICCAT Authorized"] = vessel_counts["mmsi"].map(iccat_map).fillna("")
 
+    # Add OFAC info if available
+    if "ofac_sanctioned" in df.columns:
+        ofac_map = (df[df["ofac_sanctioned"] == True]
+                    .drop_duplicates("mmsi").set_index("mmsi")["ofac_sanctions_program"])
+        if not ofac_map.empty:
+            vessel_counts["OFAC Sanctioned"] = vessel_counts["mmsi"].map(ofac_map).fillna("")
+
     repeat_vessels = vessel_counts[vessel_counts["event_count"] >= 2]
     if not repeat_vessels.empty:
         fig = px.bar(
@@ -473,6 +491,13 @@ def render_top_vessels(df):
         if not iccat_map.empty:
             vessel_risk["ICCAT Authorized"] = vessel_risk["mmsi"].map(iccat_map).fillna("")
 
+    # Add OFAC info if available
+    if "ofac_sanctioned" in df.columns:
+        ofac_map = (df[df["ofac_sanctioned"] == True]
+                    .drop_duplicates("mmsi").set_index("mmsi")["ofac_sanctions_program"])
+        if not ofac_map.empty:
+            vessel_risk["OFAC Sanctioned"] = vessel_risk["mmsi"].map(ofac_map).fillna("")
+
     st.dataframe(vessel_risk.style.format({"risk": "{:.1f}"}))
 
     # Risk decomposition for #1 vessel
@@ -486,7 +511,8 @@ def render_top_vessels(df):
             f"- Flag: {top.get('flag', 'N/A')} (multiplier: {FLAG_RISKS.get(top.get('flag', ''), 1.0)}x)\n"
             f"- Avg duration: {top_events['duration_h'].mean():.1f}h\n"
             f"- IUU listed: {'Yes' if top.get('IUU Listed', '') else 'No'}\n"
-            f"- ICCAT authorized: {'Yes' if top.get('ICCAT Authorized', '') else 'No'}"
+            f"- ICCAT authorized: {'Yes' if top.get('ICCAT Authorized', '') else 'No'}\n"
+            f"- OFAC sanctioned: {'Yes (' + str(top.get('OFAC Sanctioned', '')) + ')' if top.get('OFAC Sanctioned', '') else 'No'}"
         )
 
     if "vessel_type" in df.columns and df["vessel_type"].notna().any():

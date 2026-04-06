@@ -86,3 +86,33 @@ ICCAT Regional Observer Programme (Rec. 24-05) requires observer
 coverage on all purse seiners authorized for BFT, during all
 transfers and caging operations. Transshipment by authorized
 carriers should also be observed.
+
+## OFAC SDN Sanctions Cross-Reference
+
+The app cross-references GFW event vessels against the US Treasury OFAC
+Specially Designated Nationals (SDN) list, filtered to vessel entries.
+
+OFAC sanctions are a legal compliance obligation distinct from fisheries
+management. The SDN list includes vessels sanctioned under programs such as:
+- IRAN: Iranian shipping (NITC, IRISL fleets)
+- SYRIA: Syrian regime-linked vessels
+- UKRAINE-EO13662: Russia-related sanctions (Crimea)
+- DPRK: North Korean vessels
+
+Matching is performed on MMSI (exact), IMO (exact), and vessel name (exact).
+No fuzzy matching is used for OFAC due to the serious legal implications
+of false positives.
+
+A vessel on the OFAC SDN list receives a 2.5x risk multiplier. This is
+additive with IUU and ICCAT multipliers -- a vessel that is OFAC-sanctioned,
+IUU-listed, AND ICCAT-authorized receives all three multipliers.
+
+Priority signals:
+- OFAC + IUU: Sanctioned vessel with confirmed illegal fishing history
+- OFAC + ICCAT: Sanctioned vessel holding legitimate fishing authorization
+- OFAC + IUU + ICCAT: Triple-flagged -- highest possible compliance concern
+
+Any entity (port, company, financial institution) engaging in business
+with an OFAC-sanctioned vessel risks exposure to US secondary sanctions.
+This makes OFAC matches a concern for port authorities, insurers, and
+flag state registries in addition to fisheries enforcement.
