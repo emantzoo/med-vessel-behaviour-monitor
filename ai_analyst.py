@@ -10,6 +10,42 @@ import plotly.graph_objects as go
 from config import FORBIDDEN_CODE
 
 
+def _cross_ref_summary(df):
+    """Build a concise ground-truth summary of IUU/ICCAT/OFAC flags per vessel."""
+    flag_cols = []
+    if "iuu_matched" in df.columns:
+        flag_cols.append("iuu_matched")
+    if "iccat_authorized" in df.columns:
+        flag_cols.append("iccat_authorized")
+    if "ofac_sanctioned" in df.columns:
+        flag_cols.append("ofac_sanctioned")
+    if not flag_cols:
+        return "No cross-reference columns available."
+
+    lines = []
+    for name, group in df.groupby("vessel_name"):
+        row = group.iloc[0]
+        iuu = bool(row.get("iuu_matched", False))
+        iccat = bool(row.get("iccat_authorized", False))
+        ofac = bool(row.get("ofac_sanctioned", False))
+        if iuu or iccat or ofac:
+            flags = []
+            if iuu:
+                flags.append(f"IUU={row.get('iuu_listing_rfmos', 'yes')}")
+            if iccat:
+                flags.append(f"ICCAT={row.get('iccat_authorizations', 'yes')}")
+            if ofac:
+                flags.append(f"OFAC={row.get('ofac_sanctions_program', 'yes')}")
+            lines.append(f"- {name}: {', '.join(flags)}")
+    if not lines:
+        return "No vessels matched to IUU, ICCAT, or OFAC lists."
+    # Also list a few clean vessels
+    clean = df[~df["vessel_name"].isin([l.split(":")[0].strip("- ") for l in lines])]["vessel_name"].unique()[:3]
+    for c in clean:
+        lines.append(f"- {c}: IUU=no, ICCAT=no, OFAC=no")
+    return "\n".join(lines)
+
+
 def build_system_prompt(df, knowledge_base, fdi_effort=None, fdi_landings=None, iuu_vessels=None, iccat_vessels=None, ofac_vessels=None):
     """Build system prompt with dataframe context and domain knowledge."""
     schema = f"""DATAFRAME SCHEMA (variable name: df)
@@ -30,6 +66,9 @@ Basic stats:
 - duration_h: mean={df['duration_h'].mean():.1f}, min={df['duration_h'].min()}, max={df['duration_h'].max()}
 - risk_score: mean={df['risk_score'].mean():.1f}, total={df['risk_score'].sum():.0f}
 - date range: {df['date'].min()} to {df['date'].max()}
+
+CROSS-REFERENCE STATUS (ground truth — use these values, do NOT guess):
+{_cross_ref_summary(df)}
 """
 
     prompt = f"""You are a maritime intelligence analyst assistant embedded in the
@@ -77,6 +116,7 @@ RULES:
 - NEVER claim a vessel is not in the data based on the sample above. The sample only shows 5 rows but df has {df.shape[0]} rows. ALWAYS write code to search: df[df["vessel_name"].str.contains("NAME", case=False, na=False)]
 - When asked to investigate a vessel, ALWAYS generate code that filters df for that vessel and displays its key columns as result_df. Follow the investigation template from the knowledge base.
 - Do not fabricate data or make up vessel names/MMSIs
+- CRITICAL ANTI-HALLUCINATION RULE: For IUU, ICCAT, and OFAC status you MUST generate code that reads and displays the actual boolean column values (iuu_matched, iccat_authorized, ofac_sanctioned) for the vessel. Your ANALYSIS section MUST match what the code outputs — do not contradict the data. Do NOT infer or assume a vessel is IUU/ICCAT/OFAC based on its flag, type, or name. An Iranian tanker is NOT necessarily OFAC-sanctioned unless ofac_sanctioned==True. A vessel can be IUU-listed but NOT OFAC-sanctioned — these are independent data sources. When investigating a vessel, your code MUST include these columns in result_df: iuu_matched, ofac_sanctioned, iccat_authorized, iuu_multiplier, ofac_multiplier, iccat_multiplier.
 - When discussing flags, use the domain knowledge to explain risk context
 - When discussing locations, reference relevant Med geography
 
