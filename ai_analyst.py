@@ -73,8 +73,9 @@ RULES:
 - Use `df` as the dataframe variable (already in scope)
 - For charts, always use plotly (px or go) and assign to `fig`
 - For tables, assign to `result_df`
-- Keep code concise -- under 20 lines
-- If the question cannot be answered from the data, say so clearly
+- Keep code concise -- under 30 lines
+- NEVER claim a vessel is not in the data based on the sample above. The sample only shows 5 rows but df has {df.shape[0]} rows. ALWAYS write code to search: df[df["vessel_name"].str.contains("NAME", case=False, na=False)]
+- When asked to investigate a vessel, ALWAYS generate code that filters df for that vessel and displays its key columns as result_df. Follow the investigation template from the knowledge base.
 - Do not fabricate data or make up vessel names/MMSIs
 - When discussing flags, use the domain knowledge to explain risk context
 - When discussing locations, reference relevant Med geography
@@ -311,7 +312,7 @@ def render_ai_analyst(df_filtered, fdi_effort, fdi_landings, knowledge_base, gem
                     contents=contents,
                     config=genai.types.GenerateContentConfig(
                         system_instruction=system_ctx,
-                        max_output_tokens=2000,
+                        max_output_tokens=8000,
                     ),
                 )
 
