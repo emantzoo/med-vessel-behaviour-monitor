@@ -30,8 +30,8 @@ def investigate_vessel(vessel_identifier, df, iuu_df, iccat_df, ofac_df, fdi_eff
     # ===== Step 1: Identity =====
     report["identity"] = {
         "vessel_name": primary.get("vessel_name", "Unknown"),
-        "mmsi": str(primary.get("mmsi", "")),
-        "imo": str(primary.get("imo", "")),
+        "mmsi": str(primary.get("mmsi", "")).replace(".0", ""),
+        "imo": str(primary.get("imo", "")).replace(".0", ""),
         "flag": primary.get("flag", ""),
         "vessel_type": primary.get("vessel_type", ""),
         "events_in_dataset": len(vessel_events),
