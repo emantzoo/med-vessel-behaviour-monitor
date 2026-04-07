@@ -82,10 +82,12 @@ RULES:
 CODE STYLE (critical -- follow exactly):
 - ALWAYS work from `df` directly. Do NOT redefine or overwrite `df`.
 - For bar charts: group first into a small df, then pass that to px.bar()
-- For scatter/map: pass df directly to px.scatter() or px.scatter_geo()
+- For scatter/map: use px.scatter(df, x="lon", y="lat", ...) -- NOT px.scatter_geo() or px.scatter_mapbox()
 - For spatial plots: use px.scatter(df, x="lon", y="lat", color=..., size=...) -- NOT density_heatmap (too blocky with small data)
+- NEVER use px.scatter_geo with scope="mediterranean" -- that is not a valid Plotly scope. Use px.scatter with x="lon", y="lat" instead.
 - NEVER pass a Series where a DataFrame is expected
 - NEVER use chained expressions inside plotly function arguments
+- After groupby().agg(), ONLY use column names that you explicitly created. If you used .size() or .count(), name the result explicitly with .reset_index(name="count") or assign it.
 - Test mentally that all column names exist in df before using them
 - Prefer simple one-step groupby().agg().reset_index() patterns
 - Assign intermediate results to variables, do not nest complex expressions
@@ -102,12 +104,21 @@ result_df = df[df["flag"]=="RUS"][["mmsi","flag","duration_h","risk_score"]]
 # Single value pattern
 result_value = f"{{df['risk_score'].sum():.0f}} total risk"
 
-# Scatter map pattern
+# Scatter map pattern (ALWAYS use px.scatter with x/y, NOT px.scatter_geo)
 fig = px.scatter(df, x="lon", y="lat", color="event_type", size="risk_score", title="Events")
 
 # Spatial scatter pattern (preferred over density_heatmap)
 fig = px.scatter(df, x="lon", y="lat", color="event_type", size="duration_h",
                  hover_data=["flag","mmsi","risk_score"], title="Event Locations")
+
+# FDI join pattern — df has csq_lon/csq_lat, fdi has rectangle_lon/rectangle_lat
+# IMPORTANT: df does NOT have quarter, gear_type, species — those are in fdi_effort/fdi_landings
+merged = df.merge(fdi_effort.groupby(["rectangle_lon","rectangle_lat"]).agg(total_days=("totfishdays","sum")).reset_index(),
+                  left_on=["csq_lon","csq_lat"], right_on=["rectangle_lon","rectangle_lat"], how="left")
+
+# Pivot/crosstab pattern — always use fill_value=0 and avoid .loc with values that may not exist
+ct = pd.crosstab(df["flag"], df["event_type"]).fillna(0)
+# Use .get() or .reindex() instead of direct column access to avoid KeyError
 ```
 """
 
