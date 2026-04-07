@@ -893,3 +893,36 @@ def render_vessel_investigation(df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_l
     for ev in report["assessment"]["key_evidence"]:
         st.write(f"- {ev}")
     st.write(f"**Recommended action:** {report['assessment']['recommended_action']}")
+
+    # Per-vessel risk tree
+    if "trace" in report:
+        st.markdown("---")
+        st.markdown("### Risk Tree -- This Vessel's Path")
+        st.markdown(
+            "The framework applied to this specific vessel. "
+            "Coloured nodes show which questions raised concerns and which "
+            "rules fired. The highlighted tier is the final classification."
+        )
+
+        vessel_label = (
+            f"{report['identity']['vessel_name']}\n"
+            f"{report['identity']['flag']} | {report['identity']['vessel_type'] or 'Unknown type'}"
+        )
+        try:
+            dot_vessel = render_framework_tree(
+                trace=report["trace"],
+                tier=report["assessment"]["threat_level"],
+                vessel_label=vessel_label,
+            )
+            st.graphviz_chart(dot_vessel)
+        except Exception as e:
+            st.warning(f"Per-vessel tree render error: {e}")
+
+        with st.expander("Evaluation trace (raw)", expanded=False):
+            for entry in report["trace"]:
+                prefix = "**" if entry.get("rule_fired") else ""
+                suffix = "**" if entry.get("rule_fired") else ""
+                st.markdown(
+                    f"- {prefix}{entry['branch_id']} / {entry['question_id']}{suffix} -- "
+                    f"[{entry.get('answer', '?')}] {entry.get('note', '')}"
+                )

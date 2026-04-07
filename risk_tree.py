@@ -13,8 +13,37 @@ def load_framework(path=None):
         return yaml.safe_load(f)["framework"]
 
 
-def render_framework_tree():
-    """Render the static framework as a graphviz diagram."""
+# Severity-to-colour mapping for per-vessel trace
+_SEVERITY_FILL = {
+    "none": "#E8F5E9",
+    "low": "#FFF9C4",
+    "medium": "#FFE0B2",
+    "high": "#FFAB91",
+    "critical": "#EF5350",
+}
+_SEVERITY_TEXT = {
+    "none": "black",
+    "low": "black",
+    "medium": "black",
+    "high": "white",
+    "critical": "white",
+}
+
+
+def render_framework_tree(trace=None, tier=None, vessel_label=None):
+    """Render the framework as a graphviz diagram.
+
+    Parameters
+    ----------
+    trace : list of dict, optional
+        Per-vessel evaluation trace from investigate_vessel().
+        When provided, nodes are coloured by severity.
+    tier : str, optional
+        Assigned tier (e.g. "Critical", "High"). Highlights the
+        matching tier node and mutes the others.
+    vessel_label : str, optional
+        Display label for the vessel shown in the root node.
+    """
     framework = load_framework()
 
     dot = graphviz.Digraph(
@@ -41,10 +70,22 @@ def render_framework_tree():
         },
     )
 
+    # Build trace lookup
+    trace_lookup = {}
+    if trace:
+        for entry in trace:
+            trace_lookup[entry["question_id"]] = entry
+
     # Root node
+    root_label = framework["name"]
+    if vessel_label:
+        root_label = f"{framework['name']}\n{vessel_label}"
+    else:
+        root_label = f"{framework['name']}\nVessel under assessment"
+
     dot.node(
         "root",
-        f"{framework['name']}\nVessel under assessment",
+        root_label,
         fillcolor="#1f77b4",
         fontcolor="white",
         fontsize="14",
@@ -53,12 +94,23 @@ def render_framework_tree():
     # Branch nodes
     for branch in framework["branches"]:
         branch_id = branch["id"]
+
+        # Check if any question in this branch fired a rule
+        branch_fired = False
+        if trace:
+            for q in branch.get("questions", []):
+                entry = trace_lookup.get(q["id"])
+                if entry and entry.get("rule_fired"):
+                    branch_fired = True
+                    break
+
+        # Branch colour: deepens when a rule fired
         if branch["type"] == "gate":
-            branch_color = "#FF6B6B"
+            branch_color = "#C62828" if branch_fired else "#FF6B6B"
         elif branch["type"] == "contextual":
-            branch_color = "#9B59B6"
+            branch_color = "#6A1B9A" if branch_fired else "#9B59B6"
         else:
-            branch_color = "#4ECDC4"
+            branch_color = "#00897B" if branch_fired else "#4ECDC4"
 
         dot.node(
             branch_id,
@@ -72,30 +124,61 @@ def render_framework_tree():
         for q in branch.get("questions", []):
             q_id = f"{branch_id}_{q['id']}"
             q_text = q["text"]
-            # Wrap long text
             if len(q_text) > 50:
                 q_text = q_text[:50] + "..."
+
+            # Colour from trace if available
+            if trace:
+                entry = trace_lookup.get(q["id"])
+                if entry:
+                    severity = entry.get("severity", "none")
+                    fill = _SEVERITY_FILL.get(severity, "#F0F0F0")
+                    fontcolor = _SEVERITY_TEXT.get(severity, "black")
+                    answer = entry.get("answer", "unknown")
+                    q_text = f"{q_text}\n[{answer.upper()}]"
+                else:
+                    fill = "#F0F0F0"
+                    fontcolor = "black"
+            else:
+                fill = "#F0F0F0"
+                fontcolor = "black"
 
             dot.node(
                 q_id,
                 q_text,
-                fillcolor="#F0F0F0",
-                fontcolor="black",
+                fillcolor=fill,
+                fontcolor=fontcolor,
                 fontsize="9",
             )
             dot.edge(branch_id, q_id)
 
-    # Tier outcome nodes (rendered as a separate cluster at the bottom)
+    # Tier outcome nodes
     with dot.subgraph(name="cluster_tiers") as tiers:
         tiers.attr(label="Tier Outcomes", style="dashed", color="gray")
-        for tier in framework["tier_outcomes"]:
+        for t in framework["tier_outcomes"]:
+            tier_name = t["tier"]
+            # Mute non-assigned tiers when a specific tier is highlighted
+            if tier and tier_name.lower() != tier.lower():
+                fillcolor = "#E0E0E0"
+                fontcolor = "#9E9E9E"
+                penwidth = "1"
+            elif tier and tier_name.lower() == tier.lower():
+                fillcolor = t["color"]
+                fontcolor = "white"
+                penwidth = "3"
+            else:
+                fillcolor = t["color"]
+                fontcolor = "white"
+                penwidth = "1"
+
             tiers.node(
-                f"tier_{tier['tier'].lower()}",
-                tier["tier"],
-                fillcolor=tier["color"],
-                fontcolor="white",
+                f"tier_{tier_name.lower()}",
+                tier_name,
+                fillcolor=fillcolor,
+                fontcolor=fontcolor,
                 shape="ellipse",
                 fontsize="11",
+                penwidth=penwidth,
             )
 
     return dot
