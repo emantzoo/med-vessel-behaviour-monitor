@@ -712,11 +712,42 @@ def render_fisheries_context(df, fdi_effort, fdi_landings):
 def render_vessel_investigation(df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_landings):
     """Deterministic vessel investigation tab."""
     from investigation import investigate_vessel
+    from risk_tree import render_framework_tree, load_framework
 
     st.subheader("Vessel Investigation")
+
+    # Risk Assessment Framework section
+    with st.expander("Risk Assessment Framework (methodology)", expanded=False):
+        try:
+            framework = load_framework()
+            st.markdown(f"**{framework['name']}** -- version {framework['version']}")
+            st.markdown(framework["description"])
+
+            st.markdown("### Framework Diagram")
+            dot = render_framework_tree()
+            st.graphviz_chart(dot)
+
+            st.markdown("### Tier Outcomes")
+            for tier in framework["tier_outcomes"]:
+                st.markdown(f"- **{tier['tier']}** -- {tier['description']}")
+
+            st.markdown("### Compound Logic Rules")
+            for rule in framework["tier_assignment_rules"]["rules"]:
+                st.markdown(f"- {rule}")
+
+            st.markdown(
+                "*This framework is adapted from Kpler's April 2026 blog post on "
+                "shadow fleet risk trees, applied to Mediterranean IUU fishing. "
+                "The investigation below applies these rules to a specific vessel.*"
+            )
+        except Exception as e:
+            st.warning(f"Framework render error: {e}")
+
+    st.markdown("---")
+    st.markdown("### Per-Vessel Investigation")
     st.markdown(
         "Run a structured 10-step investigation on any vessel in the current "
-        "dataset. This is a rule-based analysis — no LLM required, instant results."
+        "dataset. Rule-based analysis -- no LLM required, instant results."
     )
 
     if df.empty:

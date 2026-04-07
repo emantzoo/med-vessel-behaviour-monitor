@@ -1,0 +1,160 @@
+framework:
+  name: "Mediterranean IUU Risk Tree"
+  version: "1.0"
+  description: >
+    Hierarchical risk framework for assessing IUU fishing exposure in
+    Mediterranean vessel behaviour. Adapted from Kpler's shadow fleet
+    risk tree methodology (April 2026) for fisheries-specific application.
+    Three branch types: gating (override), additive (cumulative), and
+    contextual (direction-dependent). Compound logic matters more than
+    individual factors.
+
+  tier_outcomes:
+    - tier: "Critical"
+      color: "#8B0000"
+      description: "Immediate escalation required. Sanctions, IUU history, and active suspicious behaviour."
+    - tier: "High"
+      color: "#D62728"
+      description: "Strong evidence of IUU exposure. Notify GFCM and relevant authorities."
+    - tier: "Elevated"
+      color: "#FF7F0E"
+      description: "Multiple risk factors present. Add to watchlist."
+    - tier: "Moderate"
+      color: "#FFD700"
+      description: "Some risk factors present. Continue monitoring."
+    - tier: "Low"
+      color: "#2CA02C"
+      description: "No significant risk factors identified."
+
+  branches:
+    - id: identity
+      name: "Identity Verification"
+      type: gate
+      questions:
+        - id: imo_present
+          text: "Does the vessel have a valid IMO number?"
+          escalation: "If no IMO, vessel cannot be reliably tracked across name/flag changes -- escalate to Elevated minimum."
+        - id: mmsi_consistent
+          text: "Has the MMSI been consistent in the dataset?"
+          escalation: "Recent MMSI changes indicate identity manipulation."
+        - id: name_history
+          text: "Has the vessel changed names more than twice?"
+          escalation: "Multiple name changes are a classic identity-laundering indicator."
+      gate_rule: "If IMO is missing AND name has changed multiple times, escalate to High regardless of other branches."
+
+    - id: flag_risk
+      name: "Flag State Risk"
+      type: additive
+      questions:
+        - id: flag_iuu_country
+          text: "Is the flag a high-risk IUU country (Iran, North Korea, Cambodia red-card list)?"
+          weight: high
+        - id: flag_of_convenience
+          text: "Is the flag an ITF-recognised flag of convenience?"
+          weight: medium
+          note: "FOC alone is not suspicious. Must combine with other factors."
+        - id: flag_recent_change
+          text: "Has the flag changed in the last 12 months?"
+          weight: medium
+        - id: flag_psc_blacklist
+          text: "Is the flag on the Paris MoU or Tokyo MoU black list?"
+          weight: medium
+
+    - id: regulatory_status
+      name: "Regulatory Status"
+      type: gate
+      questions:
+        - id: iuu_listed
+          text: "Is the vessel on any RFMO IUU vessel list?"
+          escalation: "GFCM-listed vessels in the Med are an automatic High tier signal."
+        - id: ofac_sanctioned
+          text: "Is the vessel OFAC SDN-listed?"
+          escalation: "Automatic Critical tier."
+        - id: eu_sanctioned
+          text: "Is the vessel on EU sanctions lists?"
+          escalation: "Automatic Critical or High depending on program."
+      gate_rule: "Any sanctions hit = Critical. Any IUU listing = High minimum. Both = Critical."
+
+    - id: authorization
+      name: "Fishing Authorization Status"
+      type: contextual
+      questions:
+        - id: iccat_authorized
+          text: "Is the vessel ICCAT-authorized for Mediterranean fisheries?"
+          note: "Authorization is an opportunity indicator, not exoneration. Context-dependent."
+        - id: gfcm_authorized
+          text: "Is the vessel on the GFCM Authorized Vessel List?"
+          note: "Vessels >15m LOA must be on this list to fish in GFCM area."
+        - id: authorization_mismatch
+          text: "Does the vessel's flag have legitimate fishing rights in the area where it was observed?"
+          escalation: "Iranian or Russian vessels in EU waters have no legitimate fishing rights."
+
+    - id: behavioural_history
+      name: "Behavioural History (last 90 days)"
+      type: additive
+      questions:
+        - id: ais_gap_count
+          text: "How many AIS gaps >6 hours in the last 90 days?"
+          thresholds:
+            - "0-1: no escalation"
+            - "2-3: Moderate escalation"
+            - "4+: Elevated escalation"
+        - id: encounter_with_carrier
+          text: "Has the vessel encountered a carrier or reefer vessel?"
+          escalation: "Encounter + carrier = potential transshipment scenario."
+        - id: loitering_in_fishing_grounds
+          text: "Has the vessel loitered in known fishing grounds?"
+          escalation: "Loitering by non-fishing vessels in fishing areas is a transshipment staging indicator."
+        - id: speed_change_at_gap
+          text: "Did the vessel show significant speed change (>3 knots) before/after AIS gap?"
+          escalation: "Speed drop indicates mid-sea operation, not equipment failure."
+
+    - id: spatial_context
+      name: "Spatial / Contextual Risk"
+      type: additive
+      questions:
+        - id: contested_eez
+          text: "Did the activity occur in a contested or weakly enforced EEZ (Libyan, Syrian, Lebanese)?"
+          weight: high
+        - id: closed_fishery
+          text: "Did the activity occur in a closed fishery area or seasonal closure period?"
+          weight: high
+        - id: high_value_grounds
+          text: "Is the c-square a known high-value fishing ground (BFT, swordfish, hake)?"
+          weight: medium
+          note: "Higher economic incentive for IUU activity."
+
+    - id: network_exposure
+      name: "Network Exposure"
+      type: gate
+      questions:
+        - id: encounter_iuu_vessel
+          text: "Has the vessel encountered any IUU-listed vessel?"
+          escalation: "Direct encounter with confirmed IUU = High tier minimum."
+        - id: encounter_sanctioned_vessel
+          text: "Has the vessel encountered any OFAC/EU sanctioned vessel?"
+          escalation: "Direct encounter with sanctioned vessel = Critical tier minimum."
+        - id: shared_ownership
+          text: "Does the vessel share beneficial ownership with known IUU operators?"
+          escalation: "Common ownership networks are how IUU operations scale."
+          note: "Requires vessel ownership data -- flagged as enrichment opportunity."
+
+  tier_assignment_rules:
+    description: >
+      Compound logic that combines branch outcomes into a final tier.
+      Gating branches override additive scores. Additive branches contribute
+      to tier escalation cumulatively.
+    rules:
+      - "OFAC sanctioned OR (IUU listed AND ICCAT authorized AND active suspicious behaviour) -> Critical"
+      - "GFCM IUU listed -> High minimum"
+      - "Other RFMO IUU listed -> Elevated minimum"
+      - "Non-cooperating flag AND (multiple AIS gaps OR encounter with carrier) -> Elevated minimum"
+      - "Identity unverifiable AND any behavioural flag -> Elevated minimum"
+      - "Three or more additive flags raised -> escalate one tier"
+      - "No flags raised -> Low"
+
+  notes:
+    - "This framework encodes compound logic, not multiplicative scoring. Combinations matter more than individual factors."
+    - "Authorization is treated as an opportunity indicator. ICCAT-authorized carriers in encounters are higher concern, not lower."
+    - "Identity verification is gating. A vessel that cannot be reliably identified cannot be cleared regardless of behavioural data."
+    - "The framework is designed to be auditable -- any tier classification should be traceable back to specific branch outcomes."
