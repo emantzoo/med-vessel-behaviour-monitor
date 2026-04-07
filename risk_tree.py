@@ -20,23 +20,24 @@ def render_framework_tree():
     dot = graphviz.Digraph(
         "iuu_risk_tree",
         graph_attr={
-            "rankdir": "TB",
+            "rankdir": "LR",
             "fontname": "Helvetica",
             "fontsize": "12",
             "bgcolor": "white",
-            "splines": "ortho",
-            "nodesep": "0.4",
-            "ranksep": "0.6",
+            "splines": "polyline",
+            "nodesep": "0.3",
+            "ranksep": "1.0",
         },
         node_attr={
             "fontname": "Helvetica",
-            "fontsize": "10",
+            "fontsize": "9",
             "shape": "box",
             "style": "rounded,filled",
+            "width": "2.5",
         },
         edge_attr={
             "fontname": "Helvetica",
-            "fontsize": "9",
+            "fontsize": "8",
         },
     )
 
