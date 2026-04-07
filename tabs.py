@@ -707,3 +707,158 @@ def render_fisheries_context(df, fdi_effort, fdi_landings):
             st.info("No FDI landings data matches GFW event c-squares.")
     else:
         st.info("FDI landings data not available.")
+
+
+def render_vessel_investigation(df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_landings):
+    """Deterministic vessel investigation tab."""
+    from investigation import investigate_vessel
+
+    st.subheader("Vessel Investigation")
+    st.markdown(
+        "Run a structured 10-step investigation on any vessel in the current "
+        "dataset. This is a rule-based analysis — no LLM required, instant results."
+    )
+
+    if df.empty:
+        st.info("No vessel data available.")
+        return
+
+    # Vessel selector — default to highest risk
+    vessel_options = df.sort_values("risk_score", ascending=False)["vessel_name"].dropna().unique().tolist()
+    if not vessel_options:
+        st.info("No vessels with names available.")
+        return
+
+    selected = st.selectbox(
+        "Select vessel to investigate",
+        options=vessel_options,
+        index=0,
+        help="Vessels are ordered by total risk score (highest first).",
+    )
+
+    if not st.button("Run Investigation", type="primary"):
+        return
+
+    report = investigate_vessel(selected, df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_landings)
+
+    if "error" in report:
+        st.error(report["error"])
+        return
+
+    # Render the report sections
+    # Step 10 first as a banner
+    threat = report["assessment"]["threat_level"]
+    if threat == "Critical":
+        st.error(f"**Threat Level: {threat}**")
+    elif threat == "High":
+        st.warning(f"**Threat Level: {threat}**")
+    elif threat == "Moderate":
+        st.info(f"**Threat Level: {threat}**")
+    else:
+        st.success(f"**Threat Level: {threat}**")
+
+    # Step 1: Identity
+    st.markdown("### 1. Identity Confirmation")
+    cols = st.columns(5)
+    cols[0].metric("Vessel", report["identity"]["vessel_name"])
+    cols[1].metric("MMSI", report["identity"]["mmsi"])
+    cols[2].metric("IMO", report["identity"]["imo"] or "Unknown")
+    cols[3].metric("Flag", report["identity"]["flag"])
+    cols[4].metric("Events", report["identity"]["events_in_dataset"])
+
+    # Step 2: IUU
+    st.markdown("### 2. IUU Listing Status")
+    if report["iuu"]["matched"]:
+        st.error(
+            f"**IUU-LISTED**\n\n"
+            f"- Listed by: {report['iuu']['rfmos']}\n"
+            f"- Tier: {'GFCM (Mediterranean)' if report['iuu']['is_gfcm'] else 'Other RFMO'}\n"
+            f"- Match type: {report['iuu']['match_type']} ({report['iuu']['match_confidence']} confidence)\n"
+            f"- Risk multiplier: {report['iuu']['multiplier']}x"
+        )
+    else:
+        st.success("Not on any IUU vessel list.")
+
+    # Step 3: ICCAT
+    st.markdown("### 3. ICCAT Authorization Status")
+    if report["iccat"]["authorized"]:
+        st.warning(
+            f"**ICCAT-AUTHORIZED**\n\n"
+            f"- Authorizations: {report['iccat']['authorizations']}\n"
+            f"- Risk tier: {report['iccat']['risk_tier']}\n"
+            f"- Risk multiplier: {report['iccat']['multiplier']}x\n\n"
+            f"Authorization is an opportunity indicator — provides access and infrastructure."
+        )
+    else:
+        st.info("Not on ICCAT Mediterranean authorized vessel list.")
+
+    # Step 4: OFAC
+    st.markdown("### 4. OFAC Sanctions Status")
+    if report["ofac"]["sanctioned"]:
+        st.error(
+            f"**OFAC-SANCTIONED**\n\n"
+            f"- Program: {report['ofac']['program']}\n"
+            f"- Risk multiplier: {report['ofac']['multiplier']}x\n\n"
+            f"Highest-priority compliance flag. Any commercial counterparty faces secondary sanctions exposure."
+        )
+    else:
+        st.success("Not on OFAC SDN list.")
+
+    # Step 5: Fisheries Context
+    st.markdown("### 5. Fisheries Context")
+    if report["fisheries"]:
+        for ctx in report["fisheries"]:
+            with st.expander(f"Event {ctx['event_date']} — {ctx['event_type']}"):
+                st.write(f"**C-square:** {ctx['csq']}")
+                st.write(f"**Known fishing ground:** {'Yes' if ctx['is_known_ground'] else 'No'}")
+                st.write(f"**Fishing days reported:** {ctx['fishing_days']:,.0f}")
+                if ctx["top_species"]:
+                    st.write(f"**Top species in area:** {', '.join(ctx['top_species'])}")
+    else:
+        st.info("No FDI fisheries context available for this vessel's events.")
+
+    # Step 6: Behaviour
+    st.markdown("### 6. Behavioural Pattern")
+    st.write(f"**Event types:** {report['behaviour']['event_types']}")
+    st.write(f"**Total events:** {report['behaviour']['total_events']}")
+    st.write(f"**Average duration:** {report['behaviour']['avg_duration_h']:.1f} hours")
+    st.write(f"**Date range:** {report['behaviour']['unique_dates']} unique dates")
+    if "gap_analysis" in report["behaviour"]:
+        ga = report["behaviour"]["gap_analysis"]
+        if ga["avg_speed_before"] and ga["avg_speed_after"]:
+            speed_drop = ga["avg_speed_before"] - ga["avg_speed_after"]
+            st.write(f"**Gap speed analysis:** before={ga['avg_speed_before']:.1f}kn, after={ga['avg_speed_after']:.1f}kn (drop: {speed_drop:.1f}kn)")
+
+    # Step 7: Risk Decomposition
+    st.markdown("### 7. Risk Score Decomposition")
+    cols = st.columns(4)
+    cols[0].metric("Total Risk Score", f"{report['risk']['total_risk_score']:.1f}")
+    cols[1].metric("Flag Multiplier", f"{report['risk']['flag_multiplier']:.1f}x")
+    cols[2].metric("Compounded Multiplier", f"{report['risk']['compounded_multiplier']:.1f}x")
+    cols[3].metric("Max Single Event", f"{report['risk']['max_single_event']:.1f}")
+
+    # Step 8: Hypotheses
+    st.markdown("### 8. Hypotheses")
+    for h in report["hypotheses"]:
+        if h["level"] == "critical":
+            st.error(h["text"])
+        elif h["level"] == "high":
+            st.warning(h["text"])
+        else:
+            st.info(h["text"])
+
+    # Step 9: External Lookups
+    if report["external_links"]:
+        st.markdown("### 9. External Lookups")
+        st.markdown(
+            f"- [MarineTraffic]({report['external_links']['marinetraffic']}) — current position and history\n"
+            f"- [VesselFinder]({report['external_links']['vesselfinder']}) — ownership and particulars\n"
+            f"- [Equasis]({report['external_links']['equasis']}) — IMO ship database"
+        )
+
+    # Step 10: Assessment
+    st.markdown("### 10. Threat Assessment")
+    st.write("**Key evidence:**")
+    for ev in report["assessment"]["key_evidence"]:
+        st.write(f"- {ev}")
+    st.write(f"**Recommended action:** {report['assessment']['recommended_action']}")

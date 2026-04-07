@@ -22,7 +22,7 @@ from tabs import (
     render_daily_trend, render_flag_breakdown, render_event_types,
     render_duration_analysis, render_geographic_risk, render_risk_heatmap,
     render_repeat_offenders, render_gap_behaviour, render_encounter_analysis,
-    render_top_vessels, render_fisheries_context,
+    render_top_vessels, render_vessel_investigation, render_fisheries_context,
 )
 from ai_analyst import render_ai_analyst
 
@@ -437,9 +437,10 @@ if not df_filtered.empty and "iuu_matched" in df_filtered.columns:
 tab_names = [
     "Daily Trend", "Flag Breakdown", "Event Types", "Duration Analysis",
     "Geographic Risk", "Risk Heatmap", "Repeat Offenders", "Gap Behaviour",
-    "Encounter Analysis", "Top Vessels", "Fisheries Context", "AI Analyst",
+    "Encounter Analysis", "Top Vessels", "Vessel Investigation",
+    "Fisheries Context", "AI Analyst",
 ]
-tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11, tab12 = st.tabs(tab_names)
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11, tab12, tab13 = st.tabs(tab_names)
 
 with tab1:  render_daily_trend(df_filtered)
 with tab2:  render_flag_breakdown(df_filtered)
@@ -451,9 +452,10 @@ with tab7:  render_repeat_offenders(df_filtered)
 with tab8:  render_gap_behaviour(df_filtered)
 with tab9:  render_encounter_analysis(df_filtered)
 with tab10: render_top_vessels(df_filtered)
-with tab11: render_fisheries_context(df_filtered, fdi_effort, fdi_landings)
+with tab11: render_vessel_investigation(df_filtered, iuu_vessels, iccat_vessels, ofac_vessels, fdi_effort, fdi_landings)
+with tab12: render_fisheries_context(df_filtered, fdi_effort, fdi_landings)
 
-with tab12: render_ai_analyst(df_filtered, fdi_effort, fdi_landings, knowledge_base, "", iuu_vessels, iccat_vessels, ofac_vessels)
+with tab13: render_ai_analyst(df_filtered, fdi_effort, fdi_landings, knowledge_base, "", iuu_vessels, iccat_vessels, ofac_vessels)
 
 # ========================= SIDEBAR METHODOLOGY =========================
 with st.sidebar.expander("Methodology & About"):
