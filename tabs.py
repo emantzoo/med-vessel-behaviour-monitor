@@ -918,11 +918,57 @@ def render_vessel_investigation(df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_l
         except Exception as e:
             st.warning(f"Per-vessel tree render error: {e}")
 
-        with st.expander("Evaluation trace (raw)", expanded=False):
+        # Interactive trace table grouped by branch
+        _SEV_COLORS = {
+            "none": "#E8F5E9", "low": "#FFF9C4", "medium": "#FFE0B2",
+            "high": "#FFAB91", "critical": "#EF5350",
+        }
+        _BRANCH_NAMES = {
+            "identity": "Identity Verification",
+            "flag_risk": "Flag State Risk",
+            "regulatory_status": "Regulatory Status",
+            "authorization": "Fishing Authorization",
+            "behavioural_history": "Behavioural History",
+            "spatial_context": "Spatial / Contextual",
+            "network_exposure": "Network Exposure",
+        }
+
+        with st.expander("Evaluation trace (details)", expanded=False):
+            # Group trace entries by branch
+            from collections import OrderedDict
+            branches = OrderedDict()
             for entry in report["trace"]:
-                prefix = "**" if entry.get("rule_fired") else ""
-                suffix = "**" if entry.get("rule_fired") else ""
-                st.markdown(
-                    f"- {prefix}{entry['branch_id']} / {entry['question_id']}{suffix} -- "
-                    f"[{entry.get('answer', '?')}] {entry.get('note', '')}"
+                bid = entry["branch_id"]
+                if bid not in branches:
+                    branches[bid] = []
+                branches[bid].append(entry)
+
+            for bid, entries in branches.items():
+                branch_fired = any(e.get("rule_fired") for e in entries)
+                branch_label = _BRANCH_NAMES.get(bid, bid)
+                if branch_fired:
+                    st.markdown(f"**{branch_label}** -- rules fired")
+                else:
+                    st.markdown(f"**{branch_label}**")
+
+                trace_df = pd.DataFrame([
+                    {
+                        "Question": e["question_id"].replace("_", " ").title(),
+                        "Answer": e.get("answer", "?").upper(),
+                        "Severity": e.get("severity", "none").title(),
+                        "Finding": e.get("note", ""),
+                    }
+                    for e in entries
+                ])
+
+                def _color_severity(val):
+                    sev = val.lower()
+                    bg = _SEV_COLORS.get(sev, "#F0F0F0")
+                    fg = "white" if sev in ("high", "critical") else "black"
+                    return f"background-color: {bg}; color: {fg}"
+
+                st.dataframe(
+                    trace_df.style.applymap(_color_severity, subset=["Severity"]),
+                    use_container_width=True,
+                    hide_index=True,
                 )
