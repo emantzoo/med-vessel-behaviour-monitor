@@ -17,7 +17,13 @@ Vessels are cross-referenced against the Combined IUU Vessel List (13 RFMOs), wi
 
 This cross-referencing of observed vessel behaviour against officially compiled fisheries data, regulatory IUU records, and ICCAT authorization lists is the core analytical value of the tool — turning raw AIS events into contextualised maritime intelligence.
 
-12 analytical tabs expose patterns from daily risk trends to encounter proximity analysis, gap speed profiling, and fisheries context mapping. An embedded AI Maritime Analyst (Gemini 2.5 Flash) answers natural-language questions with executable code across all data sources.
+13 analytical tabs expose patterns from daily risk trends to encounter proximity analysis, gap speed profiling, vessel-level aggregation, and fisheries context mapping. An embedded AI Maritime Analyst (Gemini 2.5 Flash) answers natural-language questions with executable code across all data sources.
+
+### Risk bands and vessel-level aggregation
+
+The final compounded risk score for each event is classified into named bands aligned with Kpler R&C's *"Turning Tides: Maritime Risk and Compliance Insights 2025-2026"* (Dec 2025) whitepaper: **Low** (<50), **Emerging** (50-60), **Elevated** (60-80), **Severe** (80-100), **Critical** (≥100). The band labels make output instantly legible to anyone familiar with Kpler's Risk & Compliance product.
+
+A dedicated **Vessel Summary** tab aggregates events per vessel — event count, base behavioural score, final compounded score, compound multiplier, band, and IUU/ICCAT/OFAC flags — mirroring the per-vessel presentation style used in Kpler's whitepapers (302 high-risk vessels, 71 critical in the October 2025 cohort). The base behavioural score is preserved separately from the compounded score so readers can see how much of a vessel's risk comes from behaviour versus structural amplifiers (flag, authorisation, listings, sanctions).
 
 ## Data Sources
 

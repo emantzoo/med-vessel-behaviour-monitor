@@ -5,7 +5,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 
-from config import EVENT_COLORS, SPECIES_NAMES, FLAG_RISKS
+from config import EVENT_COLORS, SPECIES_NAMES, FLAG_RISKS, RISK_BAND_COLORS, classify_risk_band
 from risk_model import get_fdi_context
 
 
@@ -36,6 +36,29 @@ def render_daily_trend(df):
                    color_discrete_map=EVENT_COLORS,
                    title="Daily Risk by Event Type")
     st.plotly_chart(fig2)
+
+    # Monthly multi-behaviour event counts (Kpler Graph 4 analogue)
+    df_m = df.copy()
+    df_m["date"] = pd.to_datetime(df_m["date"], errors="coerce")
+    df_m = df_m.dropna(subset=["date"])
+    if not df_m.empty:
+        monthly = (df_m.set_index("date")
+                   .groupby("event_type")
+                   .resample("MS")
+                   .size()
+                   .reset_index(name="events"))
+        fig3 = px.line(
+            monthly, x="date", y="events", color="event_type",
+            color_discrete_map=EVENT_COLORS, markers=True,
+            title="Monthly Event Counts by Behaviour Type",
+            labels={"date": "Month", "events": "Event count", "event_type": "Behaviour"},
+        )
+        st.plotly_chart(fig3)
+        st.caption(
+            "Same analytic frame as Kpler's \"Turning Tides\" whitepaper Graph 4 "
+            "(monthly deceptive behaviour trends), applied here to Mediterranean GFW "
+            "event types over the selected date range."
+        )
 
 
 def render_flag_breakdown(df):
@@ -113,6 +136,20 @@ def render_event_types(df):
     st.dataframe(summary.style.format({
         "avg_duration": "{:.1f}h", "avg_risk": "{:.1f}", "total_risk": "{:.0f}"
     }))
+
+    # Band distribution (Kpler R&C "Turning Tides" vocabulary)
+    if "risk_band" in df.columns:
+        st.markdown("**Event distribution by risk band:**")
+        band_order = ["Low", "Emerging", "Elevated", "Severe", "Critical"]
+        band_counts = (df["risk_band"].value_counts()
+                       .reindex(band_order, fill_value=0).reset_index())
+        band_counts.columns = ["risk_band", "events"]
+        band_styled = band_counts.style.map(
+            lambda v: f"background-color: {RISK_BAND_COLORS.get(v, '')}; color: white"
+            if v in RISK_BAND_COLORS else "",
+            subset=["risk_band"],
+        )
+        st.dataframe(band_styled)
 
 
 def render_duration_analysis(df):
@@ -473,9 +510,19 @@ def render_top_vessels(df):
     if "vessel_type" in df.columns:
         group_cols.append("vessel_type")
 
+    agg_dict = {"risk": ("risk_score", "sum"), "events": ("mmsi", "count")}
+    if "base_risk_score" in df.columns:
+        agg_dict["base_risk"] = ("base_risk_score", "sum")
     vessel_risk = (df.groupby(group_cols)
-                   .agg(risk=("risk_score", "sum"), events=("mmsi", "count"))
+                   .agg(**agg_dict)
                    .reset_index().sort_values("risk", ascending=False).head(10))
+
+    # Score decomposition: base behaviour vs structural amplifiers
+    if "base_risk" in vessel_risk.columns:
+        vessel_risk["compound_mult"] = (
+            vessel_risk["risk"] / vessel_risk["base_risk"].replace(0, pd.NA)
+        ).round(2)
+        vessel_risk["risk_band"] = vessel_risk["risk"].apply(classify_risk_band)
 
     # Add IUU info if available
     if "iuu_matched" in df.columns:
@@ -498,7 +545,16 @@ def render_top_vessels(df):
         if not ofac_map.empty:
             vessel_risk["OFAC Sanctioned"] = vessel_risk["mmsi"].map(ofac_map).fillna("")
 
-    st.dataframe(vessel_risk.style.format({"risk": "{:.1f}"}))
+    fmt = {"risk": "{:.1f}"}
+    if "base_risk" in vessel_risk.columns:
+        fmt["base_risk"] = "{:.1f}"
+        fmt["compound_mult"] = "{:.2f}x"
+    styled = vessel_risk.style.format(fmt)
+    if "risk_band" in vessel_risk.columns:
+        def _band_bg(val):
+            return f"background-color: {RISK_BAND_COLORS.get(val, '')}; color: white" if val in RISK_BAND_COLORS else ""
+        styled = styled.map(_band_bg, subset=["risk_band"])
+    st.dataframe(styled)
 
     # Risk decomposition for #1 vessel
     if not vessel_risk.empty:
@@ -527,6 +583,71 @@ def render_top_vessels(df):
                      title="Risk by Vessel Type",
                      labels={"vessel_type": "Vessel Type", "total_risk": "Total Risk"})
         st.plotly_chart(fig)
+
+
+def render_vessel_summary(df):
+    st.subheader("Vessel Summary")
+    st.caption(
+        "Vessel-level aggregation mirrors the presentation style in Kpler's "
+        "\"Turning Tides\" whitepaper (Dec 2025), where risk is reported per vessel "
+        "across multiple behavioural events rather than per individual event."
+    )
+    if df.empty:
+        st.info("No data.")
+        return
+
+    top_n = st.slider("Number of vessels to show", min_value=5, max_value=100, value=25, step=5)
+
+    # First non-null helper
+    def _first(series):
+        s = series.dropna()
+        return s.iloc[0] if len(s) else ""
+
+    grouped = df.groupby("mmsi")
+    rows = []
+    for mmsi, g in grouped:
+        base_total = float(g["base_risk_score"].sum()) if "base_risk_score" in g.columns else 0.0
+        risk_total = float(g["risk_score"].sum())
+        compound = round(risk_total / base_total, 2) if base_total > 0 else 1.0
+        rows.append({
+            "mmsi": mmsi,
+            "vessel_name": _first(g["vessel_name"]) if "vessel_name" in g.columns else "",
+            "flag": _first(g["flag"]) if "flag" in g.columns else "",
+            "event_count": int(len(g)),
+            "event_types": ", ".join(sorted(g["event_type"].dropna().unique())),
+            "base_score_total": round(base_total, 1),
+            "risk_score_total": round(risk_total, 1),
+            "max_event_risk": round(float(g["risk_score"].max()), 1),
+            "compound_multiplier": compound,
+            "risk_band": classify_risk_band(risk_total),
+            "iuu_matched": bool(g["iuu_matched"].any()) if "iuu_matched" in g.columns else False,
+            "iccat_authorized": bool(g["iccat_authorized"].any()) if "iccat_authorized" in g.columns else False,
+            "ofac_sanctioned": bool(g["ofac_sanctioned"].any()) if "ofac_sanctioned" in g.columns else False,
+        })
+
+    vessel_df = (pd.DataFrame(rows)
+                 .sort_values("risk_score_total", ascending=False)
+                 .head(top_n)
+                 .reset_index(drop=True))
+
+    styled = vessel_df.style.format({
+        "base_score_total": "{:.1f}",
+        "risk_score_total": "{:.1f}",
+        "max_event_risk": "{:.1f}",
+        "compound_multiplier": "{:.2f}x",
+    }).map(
+        lambda v: f"background-color: {RISK_BAND_COLORS.get(v, '')}; color: white"
+        if v in RISK_BAND_COLORS else "",
+        subset=["risk_band"],
+    )
+    st.dataframe(styled, use_container_width=True)
+
+    # Band summary under the table
+    band_order = ["Critical", "Severe", "Elevated", "Emerging", "Low"]
+    counts = vessel_df["risk_band"].value_counts().reindex(band_order, fill_value=0)
+    st.markdown("**Band distribution across shown vessels:** " + " | ".join(
+        f"{b}: {int(counts[b])}" for b in band_order
+    ))
 
 
 def render_fisheries_context(df, fdi_effort, fdi_landings):

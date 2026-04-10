@@ -27,6 +27,26 @@ ICCAT_MULTIPLIERS = {
 
 OFAC_MULTIPLIER = 2.5
 
+# ========================= RISK BANDS =========================
+# Aligned with Kpler R&C "Turning Tides" (Dec 2025) score-band vocabulary.
+# Applied to final compounded risk_score after all multipliers.
+
+RISK_BANDS = [
+    (0,    50,             "Low",      "Sparse risk signals"),
+    (50,   60,             "Emerging", "First risk flags"),
+    (60,   80,             "Elevated", "Multiple risk indicators"),
+    (80,   100,            "Severe",   "Compounding risk"),
+    (100,  float("inf"),   "Critical", "Threshold breach"),
+]
+
+RISK_BAND_COLORS = {
+    "Low":      "#2ecc71",
+    "Emerging": "#f1c40f",
+    "Elevated": "#e67e22",
+    "Severe":   "#e74c3c",
+    "Critical": "#8e0000",
+}
+
 FDI_EFFORT_COLORS = {
     "Very High": "#e31a1c",
     "High": "#fd8d3c",
@@ -74,6 +94,16 @@ def classify_med_zone(lon, lat):
         return "Levantine"
     else:
         return "Eastern Med / Near East"
+
+
+def classify_risk_band(score):
+    """Return band label for a compounded risk score."""
+    if score is None or (hasattr(score, "__float__") and score != score):  # NaN guard
+        return "Low"
+    for low, high, label, _desc in RISK_BANDS:
+        if low <= score < high:
+            return label
+    return "Critical"
 
 
 def assign_csquare(lat, lon):
