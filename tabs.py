@@ -845,6 +845,7 @@ def render_fisheries_context(df, fdi_effort, fdi_landings):
 def render_vessel_investigation(df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_landings):
     """Deterministic vessel investigation tab."""
     from investigation import investigate_vessel
+    from risk_tree import render_framework_tree
 
     st.subheader("Vessel Investigation")
     st.markdown(
@@ -870,11 +871,33 @@ def render_vessel_investigation(df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_l
         st.info("No vessels with names available.")
         return
 
+    # Two-way binding between the map click and the dropdown:
+    # - If the user just clicked a new vessel on the map, that click
+    #   (stored under "map_clicked_vessel") overrides any existing
+    #   dropdown selection for this render.
+    # - Otherwise the dropdown's own prior selection is preserved.
+    # - If neither exists, fall back to the highest-risk vessel.
+    # The user can always override the map click by picking a different
+    # vessel from the dropdown afterwards.
+    map_clicked = st.session_state.get("map_clicked_vessel")
+    if map_clicked and map_clicked in vessel_options:
+        # Seed the selectbox key so it opens on the clicked vessel, then
+        # clear the click sentinel so it doesn't keep overriding manual picks.
+        st.session_state["investigation_vessel"] = map_clicked
+        st.session_state.pop("map_clicked_vessel", None)
+        st.caption(
+            f"Pre-selected **{map_clicked}** from your last map click. "
+            "Pick any vessel from the dropdown to override."
+        )
+    elif "investigation_vessel" not in st.session_state:
+        st.session_state["investigation_vessel"] = vessel_options[0]
+
     selected = st.selectbox(
         "Select vessel to investigate",
         options=vessel_options,
-        index=0,
-        help="Vessels are ordered by total risk score (highest first).",
+        help="Vessels are ordered by total risk score (highest first). "
+             "Click a marker on the Map & Overview tab to pre-select a vessel here.",
+        key="investigation_vessel",
     )
 
     report = investigate_vessel(selected, df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_landings)
@@ -942,16 +965,26 @@ def render_vessel_investigation(df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_l
     else:
         st.success("Not on OFAC SDN list.")
 
-    # Step 5: Fisheries Context
+    # Step 5: Fisheries Context — compact summary table (one row per event)
     st.markdown("### 5. Fisheries Context")
     if report["fisheries"]:
+        fisheries_rows = []
         for ctx in report["fisheries"]:
-            with st.expander(f"Event {ctx['event_date']} — {ctx['event_type']}"):
-                st.write(f"**C-square:** {ctx['csq']}")
-                st.write(f"**Known fishing ground:** {'Yes' if ctx['is_known_ground'] else 'No'}")
-                st.write(f"**Fishing days reported:** {ctx['fishing_days']:,.0f}")
-                if ctx["top_species"]:
-                    st.write(f"**Top species in area:** {', '.join(ctx['top_species'])}")
+            ev_date = str(ctx.get("event_date", ""))[:10]
+            fisheries_rows.append({
+                "Date": ev_date,
+                "Event": ctx.get("event_type", ""),
+                "C-square": ctx.get("csq", ""),
+                "Fishing ground": "Yes" if ctx.get("is_known_ground") else "No",
+                "Fishing days": f"{ctx.get('fishing_days', 0):,.0f}",
+                "Top species": ", ".join(ctx.get("top_species", []) or []) or "-",
+            })
+        fisheries_df = pd.DataFrame(fisheries_rows)
+        st.dataframe(fisheries_df, use_container_width=True, hide_index=True)
+        st.caption(
+            f"Per-event FDI context across {len(fisheries_rows)} event(s). "
+            "Fishing ground = c-square has reported EU fleet activity in the FDI dataset."
+        )
     else:
         st.info("No FDI fisheries context available for this vessel's events.")
 

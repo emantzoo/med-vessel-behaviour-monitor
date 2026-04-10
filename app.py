@@ -352,6 +352,11 @@ with col1:
         )
         st.markdown(f'<div style="font-size:13px;line-height:2.0">{legend_md}</div>', unsafe_allow_html=True)
 
+        st.caption(
+            "Click a marker for event details. The clicked vessel is also set "
+            "as the default in the **Vessel Investigation** tab."
+        )
+
         # Event detail card on click
         clicked = map_data.get("last_object_clicked") if map_data else None
         if clicked:
@@ -361,6 +366,13 @@ with col1:
                 nearest_idx = dist.idxmin()
                 if dist[nearest_idx] < 0.01:
                     ev = df_filtered.loc[nearest_idx]
+                    # Sync clicked vessel to the Vessel Investigation selector.
+                    # We write to a dedicated key (not the selectbox's own key)
+                    # to avoid Streamlit's "can't modify widget state" rule;
+                    # the selectbox reads it on next render.
+                    clicked_vname = ev.get("vessel_name")
+                    if pd.notna(clicked_vname) and clicked_vname:
+                        st.session_state["map_clicked_vessel"] = clicked_vname
                     is_ofac_ev = ev.get("ofac_sanctioned", False)
                     is_iuu_ev = ev.get("iuu_matched", False)
                     is_iccat_ev = ev.get("iccat_authorized", False)
