@@ -1250,6 +1250,11 @@ def render_reference():
     with st.expander("ICCAT framing note", expanded=False):
         st.markdown(content["iccat_framing_note"])
 
+    # 5b. Sanctions authority note (IUU list coverage, EU vs OFAC, authority tagging)
+    if "sanctions_authority_note" in content:
+        with st.expander("Sanctions and IUU-list authority note", expanded=False):
+            st.markdown(content["sanctions_authority_note"])
+
     # 6. Data source provenance
     with st.expander("Data source provenance", expanded=False):
         prov_df = pd.DataFrame(content["data_source_provenance"])

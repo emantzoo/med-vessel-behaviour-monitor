@@ -1,7 +1,6 @@
 # Reference & Methodology tab content
 # Prose is authored deliberately; tables and multipliers are rendered
-# dynamically from config.py at runtime. Edit this file to change
-# framing and descriptive text without touching code.
+# dynamically from config.py at runtime.
 
 intro: |
   This tab documents the analytical framework, risk scoring methodology,
@@ -23,9 +22,20 @@ risk_formula_explanation: |
 
   The exponent on duration (0.75) is a heuristic chosen to prevent linear
   dominance of long gaps while preserving monotonicity. It is not
-  empirically calibrated against enforcement outcomes; calibration would
-  require longer observation windows and proxy outcomes such as RFMO IUU
-  list additions or port state denials.
+  empirically calibrated against enforcement outcomes.
+
+  The current implementation covers AIS gaps, encounters, and loitering
+  because these are the event types provided by the Global Fishing Watch
+  Events API. AIS spoofing — which Kpler identifies as the single
+  strongest predictive signal, with approximately 80% of spoofing vessels
+  sanctioned within 12 months concentrated in months 3 to 9 after the
+  first incident — is not currently modelled because detection requires
+  satellite cross-reference verification rather than AIS inference alone.
+  Adding a spoofing detection layer would require integrating satellite
+  imagery sources and is named as future work. The distinction matters
+  analytically: AIS gaps can result from equipment failure or signal
+  occlusion, whereas deliberate spoofing is a signal of intent, which is
+  why Kpler weights it as the highest-priority behavioural indicator.
 
 iccat_framing_note: |
   ICCAT authorisation is treated as an opportunity indicator, not an
@@ -37,98 +47,125 @@ iccat_framing_note: |
   vessels warrant elevated scrutiny. An ICCAT-authorised vessel with no
   suspicious behaviour receives no risk score at all.
 
+sanctions_authority_note: |
+  Formal fisheries enforcement coverage comes primarily through the
+  TMT Combined IUU Vessel List, which aggregates listings from 13 RFMOs
+  and mirrors the EU IUU vessel list maintained under Article 30 of
+  Council Regulation (EC) No 1005/2008. Vessels IUU-listed anywhere
+  globally — including those mirrored from the EU IUU list into the RFMO
+  network — appear in this integrated source. GFCM-listed vessels carry
+  the highest multiplier (3.0x) because GFCM is the Mediterranean-specific
+  RFMO; other RFMO listings carry 2.0x.
+
+  The current implementation does not tag listings by issuing authority.
+  Adding authority-level filtering — RFMO, EU IUU, GFCM-specific — would
+  match the filtering model used in Kpler's Risk and Compliance product,
+  which lets users distinguish listings by OFAC, OFSI, FCDO, UN, and EU
+  authorities. This is named as a natural next integration step.
+
+  OFAC SDN is integrated as baseline sanctions screening per industry
+  practice, but it is less directly relevant for Mediterranean fisheries
+  than for oil tanker compliance. The primary sanctions authority
+  operating on Med-flagged fishing vessels is the EU, through the EU
+  consolidated sanctions list. Adding EU consolidated sanctions as a
+  distinct data source is named as the natural next priority for broader
+  shadow fleet and dual-use concerns in the Mediterranean.
+
 data_source_provenance:
   - source: "GFW Events API"
-    content: "AIS gap, encounter, and loitering events with duration, position, and event-specific metadata"
+    content: "AIS gap, encounter, and loitering events"
     status: "Event-level inference from AIS"
-    coverage: "Mediterranean polygon, requires API token, rate-limited to 5000 events per query"
-    notes: "Methodology aligned with Miller et al. 2018 transshipment detection. Events are inferences from AIS behaviour, not direct observations."
+    coverage: "Mediterranean polygon, up to 5000 events per query"
+    notes: "Methodology aligned with Miller et al. 2018 transshipment detection. AIS spoofing is not in the feed and would require separate satellite verification integration."
 
   - source: "EU JRC FDI spatial data"
-    content: "Fishing effort (days at sea) and landings (weight and value) by 0.5 degree c-square, quarter, gear, and species"
+    content: "Fishing effort and landings by 0.5 degree c-square"
     status: "Aggregate statistical estimate from logbooks and sampling"
-    coverage: "Mediterranean only (supra_region MBS), 2017 to 2024, EU member state vessels only"
-    notes: "No coverage for non-EU waters (Libya, Tunisia, eastern Mediterranean, North Africa). C-squares with fewer than three vessels are suppressed for confidentiality. Much coarser spatial resolution than AIS data."
+    coverage: "Mediterranean only, 2017-2024, EU member state vessels only"
+    notes: "No coverage for Libya, Tunisia, eastern Mediterranean, North Africa. C-squares with fewer than three vessels suppressed for confidentiality."
 
   - source: "TMT Combined IUU Vessel List"
-    content: "369 vessels listed by 13 Regional Fisheries Management Organisations for IUU activity"
-    status: "Enforcement action — formal RFMO listing"
-    coverage: "Global. 64 vessels with MMSI, 168 with IMO. Two-tier alerting — GFCM-listed (3.0x multiplier) versus other RFMO (2.0x)."
-    notes: "GFCM listings carry the highest multiplier because they are the most Mediterranean-relevant and represent a direct regional enforcement signal."
+    content: "369 vessels from 13 RFMOs, mirrors EU IUU list under Article 30 of Reg 1005/2008"
+    status: "Enforcement action — RFMO and EU IUU listing"
+    coverage: "64 vessels with MMSI, 168 with IMO. GFCM-listed 3.0x, other RFMO 2.0x"
+    notes: "Matching priority MMSI, IMO, name exact, name fuzzy. Authority-level tagging is future work."
 
   - source: "ICCAT Record of Vessels"
-    content: "9,203 vessels authorised to fish in the Mediterranean for swordfish, albacore, bluefin tuna, or to operate as carriers"
+    content: "9,203 vessels Med-authorised for SWO, ALB, BFT, or carrier operation"
     status: "Authorisation — opportunity indicator, not risk in isolation"
-    coverage: "Mediterranean-authorised vessels, 786 with IMO"
-    notes: "Treated as an opportunity indicator applied conditionally on behavioural signal. See ICCAT framing note above."
+    coverage: "786 vessels with IMO"
+    notes: "Applied conditionally on behavioural signal. See ICCAT framing note."
 
   - source: "OFAC SDN list"
-    content: "US Treasury specially designated nationals, vessel-specific entries"
-    status: "Formal sanctions listing"
-    coverage: "Global. Matching priority — MMSI exact, then IMO exact, then vessel name exact. No fuzzy matching — false positives have legal consequences."
-    notes: "Applied at the event level with a 2.5x multiplier. Sanctions screening discipline follows standard industry practice."
+    content: "US Treasury specially designated nationals"
+    status: "Formal sanctions listing (US authority)"
+    coverage: "Global, but less directly relevant for Med fisheries than EU sanctions"
+    notes: "No fuzzy matching — false positives have legal consequences. EU consolidated sanctions list is named as the next integration priority."
 
 epistemological_separation: |
   Each data source answers a different question and is kept separate at
   the data layer. GFW provides AIS-inferred behavioural events; FDI
   provides aggregate statistical estimates; TMT provides enforcement
-  actions; ICCAT provides authorisation as an opportunity indicator;
-  OFAC provides formal sanctions listings. The sources are synthesised
-  at the scoring layer — by multiplying lookup-based multipliers into
-  already-computed behavioural scores — with provenance preserved in
-  the UI so the viewer can always see which source contributed to a
-  given vessel's risk.
+  actions from both RFMO and EU sources; ICCAT provides authorisation as
+  an opportunity indicator; OFAC provides formal US sanctions listings.
+  The sources are synthesised at the scoring layer with provenance
+  preserved in the UI.
 
 methodology_references:
   - title: Global Fishing Watch transshipment detection methodology
     citation: Miller et al. 2018
-    relevance: Defines encounter criteria (under 500m, at least 2 hours, under 2 knots, at least 10km from shore) and distinguishes likely from potential transshipment events. Directly implemented in compute_risk_score.
+    relevance: Defines encounter criteria implemented in compute_risk_score.
 
-  - title: Deceptive Shipping Practices — Quantifying risk for non-sanctioned vessels through common patterns
+  - title: Deceptive Shipping Practices
     citation: Kpler, October 2025 (Ampatzidis, Li, Kotsias)
-    relevance: Introduces the compounding behavioural risk model and exposure vector framing that Med Vessel Monitor mirrors. Reports 80.1% of eventually-sanctioned spoofing vessels were designated within 12 months of their first incident.
+    relevance: Compounding behavioural risk model. Reports 80.1% of sanctioned spoofing vessels designated within 12 months.
 
-  - title: The Turning Tides — Maritime Risk and Compliance Insights 2025 to 2026
+  - title: The Turning Tides — Maritime Risk and Compliance Insights 2025-2026
     citation: Kpler, December 2025 (Subasic, Ampatzidis, Li)
-    relevance: Introduces the Low to Critical risk band vocabulary and validates the October predictive cohort (302 flagged, 42 sanctioned by December — 14% confirmation in two months). Frames 2026 as the shift from reactive to predictive compliance.
+    relevance: Introduces Low-to-Critical risk band vocabulary. Validates October predictive cohort (302 flagged, 42 sanctioned by December — 14% confirmation).
 
-  - title: How to build a risk tree to assess shadow fleet exposure in your network
+  - title: How to build a risk tree to assess shadow fleet exposure
     citation: Kpler blog, April 2026
-    relevance: Source for the risk tree framework structure adapted in this project's Med IUU Risk Tree methodology.
+    relevance: Source for the risk tree framework structure adapted in this project.
+
+  - title: Council Regulation (EC) No 1005/2008 — EU IUU Regulation
+    citation: EU 2008, amended by Regulation (EU) 2023/2842 (in force 9 January 2024)
+    relevance: Establishes the EU IUU vessel list (Article 30), catch certification, yellow/red card system. The 2024 amendment mandates risk-based control targeting and beneficial ownership obligations — regulatory demand for scoring tools of this kind.
 
 scope_and_limitations: |
-  Geographic scope. Analysis is limited to the Mediterranean polygon
-  defined in config.py. FDI statistical data covers only EU member state
-  fleets — non-EU Mediterranean waters (Libya, Tunisia, much of the
-  eastern Mediterranean and North Africa) have no FDI coverage. This is
-  a dataset limitation, not an analytical choice, and the app displays
-  coverage gaps rather than hiding them.
+  Geographic. Mediterranean polygon only. FDI covers EU member state
+  fleets only — no coverage for Libya, Tunisia, eastern Mediterranean,
+  North Africa.
 
-  Temporal scope. FDI data is reliable from 2017 onwards. Earlier years
-  have lower completeness. Live mode pulls current GFW events subject to
-  API rate limits; static mode uses a fixed 86-event demo dataset.
+  Temporal. FDI reliable from 2017 onwards. Live mode pulls current GFW
+  events subject to API rate limits; static mode uses a fixed 86-event
+  demo dataset.
 
-  Spatial resolution. GFW events are point-level (AIS-derived). FDI is
-  aggregated to 0.5 degree c-squares. When the two are joined, AIS events
-  are aggregated up to the FDI grid resolution, losing precision.
+  Spatial resolution. GFW events are point-level; FDI is aggregated to
+  0.5 degree c-squares. Joining loses precision.
 
   Confidentiality suppression. FDI c-squares with fewer than three
-  vessels are suppressed by Eurostat for confidentiality. This creates
-  visible gaps in the spatial coverage.
+  vessels are suppressed by Eurostat.
+
+  Detection substrate. The model relies on AIS-inferred events from GFW.
+  Kpler's detection stack combines AIS with analyst-verified satellite
+  imagery, which provides ground-truth confirmation for dark port calls
+  and direct detection of AIS spoofing — neither of which are available
+  from AIS inference alone. This is a legitimate substrate difference
+  and a named area for future integration.
 
   Validation. Risk scores are methodology-driven, not empirically
-  calibrated against IUU enforcement outcomes. Validation would require
-  longer observation windows and proxy outcomes such as RFMO IUU list
-  additions, port state denials, or STECF expert flagging. This is named
-  explicitly as future work.
+  calibrated against enforcement outcomes. Validation would require
+  proxy outcomes such as RFMO IUU list additions or port state denials.
 
-  Identity matching. The MMSI to IMO to name matching chain is subject
-  to false positives on common vessel names. Minimum name length is set
-  to four characters and all name matches require exact string match.
-  OFAC matching uses no fuzzy logic because false positives have legal
-  consequences.
+  Identity matching. Subject to false positives on common vessel names.
+  Minimum name length four characters; all name matches require exact
+  string match. OFAC uses no fuzzy matching.
 
-  Scoring is descriptive, not predictive. The app assigns risk given
-  observed behaviour; it does not forecast future enforcement. Kpler's
-  predictive claims are based on a large retrospective designation
-  dataset that does not yet exist for fisheries IUU at comparable scale.
+  Authority tagging. TMT aggregates RFMO and EU IUU listings but does
+  not tag by issuing authority. Authority-level filtering is future work.
+
+  Descriptive not predictive. The app assigns risk given observed
+  behaviour; it does not forecast future enforcement. Kpler's predictive
+  claims are based on a designation dataset that does not yet exist for
+  fisheries IUU at comparable scale.
