@@ -439,30 +439,84 @@ if not df_filtered.empty and "iuu_matched" in df_filtered.columns:
             )
 
 # ========================= TABS =========================
-tab_names = [
-    "Daily Trend", "Flag Breakdown", "Event Types", "Duration Analysis",
-    "Geographic Risk", "Risk Heatmap", "Repeat Offenders", "Gap Behaviour",
-    "Encounter Analysis", "Top Vessels", "Vessel Summary",
-    "Vessel Investigation", "Fisheries Context", "AI Analyst",
-]
-(tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10,
- tab11, tab12, tab13, tab14) = st.tabs(tab_names)
+# Consolidated to 6 top-level tabs per tab_consolidation_spec.md.
+# Secondary diagnostic charts live inside collapsed expanders within
+# their parent tab, keeping navigation clean for a 30-minute demo.
+tab_map, tab_vessels, tab_fisheries, tab_investigation, tab_risktree, tab_ai = st.tabs([
+    "Map & Overview",
+    "Vessel Summary",
+    "Fisheries Context",
+    "Vessel Investigation",
+    "Risk Tree Framework",
+    "AI Analyst",
+])
 
-with tab1:  render_daily_trend(df_filtered)
-with tab2:  render_flag_breakdown(df_filtered)
-with tab3:  render_event_types(df_filtered)
-with tab4:  render_duration_analysis(df_filtered)
-with tab5:  render_geographic_risk(df_filtered)
-with tab6:  render_risk_heatmap(df_filtered)
-with tab7:  render_repeat_offenders(df_filtered)
-with tab8:  render_gap_behaviour(df_filtered)
-with tab9:  render_encounter_analysis(df_filtered)
-with tab10: render_top_vessels(df_filtered)
-with tab11: render_vessel_summary(df_filtered)
-with tab12: render_vessel_investigation(df_filtered, iuu_vessels, iccat_vessels, ofac_vessels, fdi_effort, fdi_landings)
-with tab13: render_fisheries_context(df_filtered, fdi_effort, fdi_landings)
+with tab_map:
+    render_risk_heatmap(df_filtered)
+    render_daily_trend(df_filtered)
 
-with tab14: render_ai_analyst(df_filtered, fdi_effort, fdi_landings, knowledge_base, "", iuu_vessels, iccat_vessels, ofac_vessels)
+    with st.expander("Flag breakdown"):
+        render_flag_breakdown(df_filtered)
+
+    with st.expander("Event type distribution"):
+        render_event_types(df_filtered)
+
+    with st.expander("Event duration distribution"):
+        render_duration_analysis(df_filtered)
+
+with tab_vessels:
+    render_vessel_summary(df_filtered)
+
+    with st.expander("Top vessels (legacy view)"):
+        render_top_vessels(df_filtered)
+
+    with st.expander("Repeat offenders -- IUU and ICCAT detail"):
+        render_repeat_offenders(df_filtered)
+
+    with st.expander("Encounter analysis -- carrier alerts"):
+        render_encounter_analysis(df_filtered)
+
+    with st.expander("AIS gap behaviour"):
+        render_gap_behaviour(df_filtered)
+
+with tab_fisheries:
+    render_fisheries_context(df_filtered, fdi_effort, fdi_landings)
+
+    with st.expander("Geographic risk breakdown"):
+        render_geographic_risk(df_filtered)
+
+with tab_investigation:
+    render_vessel_investigation(
+        df_filtered, iuu_vessels, iccat_vessels, ofac_vessels,
+        fdi_effort, fdi_landings,
+    )
+
+with tab_risktree:
+    from risk_tree import load_framework, render_framework_tree
+    try:
+        framework = load_framework()
+        st.subheader("Mediterranean IUU Risk Tree Framework")
+        st.markdown(f"**{framework['name']}** -- version {framework['version']}")
+        st.markdown(framework["description"])
+        st.graphviz_chart(render_framework_tree())
+        st.markdown("### Tier Outcomes")
+        for tier in framework["tier_outcomes"]:
+            st.markdown(f"- **{tier['tier']}** -- {tier['description']}")
+        st.markdown("### Compound Logic Rules")
+        for rule in framework["tier_assignment_rules"]["rules"]:
+            st.markdown(f"- {rule}")
+        st.caption(
+            "Adapted from Kpler's April 2026 blog post on shadow fleet risk trees, "
+            "applied to Mediterranean IUU fishing."
+        )
+    except Exception as e:
+        st.error(f"Could not load risk tree framework: {e}")
+
+with tab_ai:
+    render_ai_analyst(
+        df_filtered, fdi_effort, fdi_landings, knowledge_base, "",
+        iuu_vessels, iccat_vessels, ofac_vessels,
+    )
 
 # ========================= SIDEBAR METHODOLOGY =========================
 with st.sidebar.expander("Methodology & About"):
