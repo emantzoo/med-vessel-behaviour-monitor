@@ -2,287 +2,190 @@
 
 ![Med Vessel Behaviour Monitor](https://raw.githubusercontent.com/emantzoo/emantzoo.github.io/master/images/med-vessel.jpg)
 
+Mediterranean vessel behaviour risk intelligence dashboard. Ingests AIS events from Global Fishing Watch, cross-references against EU fisheries data, IUU vessel lists, ICCAT authorised vessels, and OFAC SDN sanctions, and produces compounding behavioural risk scores for individual vessels operating in the Mediterranean.
 
-**Behavioral risk intelligence dashboard for the Mediterranean Sea.**
+Built as a portfolio demonstration of IUU fishing risk analysis methodology, aligned with Global Fishing Watch transshipment detection (Miller et al. 2018) and Kpler's six-layer Risk & Compliance framework applied to fisheries.
 
 Live app: [med-vessel-behaviour-monitor.streamlit.app](https://med-vessel-behaviour-monitor-ysq4ipavn5jwnuragca3by.streamlit.app/)
 
+---
+
 ## What it does
 
-Ingests AIS gap, encounter and loitering events from the [Global Fishing Watch Events API](https://globalfishingwatch.org/our-apis/) and scores each event using a risk model aligned with GFW's published transshipment detection methodology.
+- Pulls AIS gap, encounter, and loitering events from the Global Fishing Watch Events API
+- Scores each event with a multiplicative risk formula weighted by duration, event type, flag state, shore distance, and event-specific factors (proximity, speed, vessel type)
+- Cross-references vessels against five independent reference sources with distinct epistemological status:
+  - GFW Events API (observed AIS behavioural inference)
+  - EU JRC FDI spatial data (statistical fishing effort estimates by c-square)
+  - TMT Combined IUU Vessel List (enforcement actions from 13 RFMOs)
+  - ICCAT Record of Vessels (Med-authorised vessels)
+  - OFAC SDN list (US Treasury sanctions screening)
+- Applies compounding multipliers at the event level: IUU listing, ICCAT authorisation (as opportunity indicator), OFAC sanctions, flag risk
+- Classifies final scores into Kpler-aligned risk bands: Low, Emerging, Elevated, Severe, Critical
+- Aggregates events to vessel level with base vs compounded score decomposition
+- Visualises results across six tabs including a structured vessel investigation report and an LLM-based analyst interface
 
-Events are spatially linked to the EU JRC Fisheries Dependent Information (FDI) spatial dataset, providing fisheries context for each event — whether it occurred in a known fishing ground, what species are typically caught there, and what effort levels are normal.
+---
 
-Vessels are cross-referenced against the Combined IUU Vessel List (13 RFMOs), with two-tier alerting for vessels listed by GFCM for Mediterranean IUU activity versus those listed by other RFMOs operating in the Med. ICCAT-authorized vessels (Med swordfish, albacore, bluefin tuna, carriers) are also flagged — authorization provides access, cover, and infrastructure that makes suspicious behaviour more operationally plausible.
+## Risk scoring model
 
-This cross-referencing of observed vessel behaviour against officially compiled fisheries data, regulatory IUU records, and ICCAT authorization lists is the core analytical value of the tool — turning raw AIS events into contextualised maritime intelligence.
-
-13 analytical tabs expose patterns from daily risk trends to encounter proximity analysis, gap speed profiling, vessel-level aggregation, and fisheries context mapping. An embedded AI Maritime Analyst (Gemini 2.5 Flash) answers natural-language questions with executable code across all data sources.
-
-### Risk bands and vessel-level aggregation
-
-The final compounded risk score for each event is classified into named bands aligned with Kpler R&C's *"Turning Tides: Maritime Risk and Compliance Insights 2025-2026"* (Dec 2025) whitepaper: **Low** (<50), **Emerging** (50-60), **Elevated** (60-80), **Severe** (80-100), **Critical** (≥100). The band labels make output instantly legible to anyone familiar with Kpler's Risk & Compliance product.
-
-A dedicated **Vessel Summary** tab aggregates events per vessel — event count, base behavioural score, final compounded score, compound multiplier, band, and IUU/ICCAT/OFAC flags — mirroring the per-vessel presentation style used in Kpler's whitepapers (302 high-risk vessels, 71 critical in the October 2025 cohort). The base behavioural score is preserved separately from the compounded score so readers can see how much of a vessel's risk comes from behaviour versus structural amplifiers (flag, authorisation, listings, sanctions).
-
-## Data Sources
-
-### GFW Events API (vessel behaviour)
-
-Near real-time AIS-derived behavioural events filtered to the Mediterranean via GeoJSON polygon:
-
-- **GAP** events — AIS disabling (vessel goes dark)
-- **ENCOUNTER** events — vessel-to-vessel meetings (potential transshipment)
-- **LOITERING** events — carrier vessels waiting (potential staging)
-
-Rich nested fields extracted: encounter proximity/speed, gap speed profiles, shore/port distances, EEZ, vessel identity.
-
-### EU JRC FDI Spatial Data (fisheries baseline)
-
-Officially compiled fishing effort and landings from EU Member States under the Data Collection Framework (DCF), reviewed by STECF Expert Working Groups:
-
-- **Effort**: fishing days per 0.5x0.5 degree c-square, by quarter, gear type, vessel length, and metier
-- **Landings**: weight (tonnes) and value (euros) per c-square, by species
-- Coverage: Mediterranean, 2017–2024
-- Source: JRC Data Catalogue ([2025 FDI spatial data](https://data.jrc.ec.europa.eu/dataset/f847528b-1734-4bb8-8361-f4877ba395ed))
-
-### Combined IUU Vessel List (regulatory records)
-
-Consolidated list of vessels identified as engaged in IUU fishing, maintained by TMT and merging lists from all 13 Regional Fisheries Management Organisations:
-
-- 369 vessels (213 currently listed, 156 delisted)
-- 150 vessels with GFCM listings (Mediterranean-specific IUU activity)
-- 64 vessels with MMSI numbers for direct AIS matching
-- Fields: vessel name (including previous names), IMO, MMSI, flag, vessel type, owner/operator, listing reason per RFMO
-- Source: [Combined IUU Vessel List](https://iuu-vessels.org/) (TMT / iuu-vessels.org)
-
-### ICCAT Record of Vessels (authorization records)
-
-The ICCAT Record of Vessels lists all vessels authorized to fish ICCAT-managed species. Med-relevant authorizations filtered from the full registry:
-
-- 9,203 vessels authorized for Mediterranean fisheries
-- Authorization types: SWO-Med (swordfish), ALB-Med (albacore), BFT-Catching (bluefin tuna), BFT-Other (support vessels), Carrier (transshipment)
-- 786 vessels with IMO numbers for identity matching
-- Source: [ICCAT Record of Vessels](https://www.iccat.int/en/vesselsrecord.asp)
-
-### Data source complementarity
-
-Neither source is ground truth. GFW infers fishing activity from vessel movement patterns. FDI provides statistically processed estimates compiled from logbooks, sales notes, and sampling programmes. The IUU vessel list reflects regulatory enforcement actions. The ICCAT authorization list identifies vessels with legitimate access to high-value fisheries. Discrepancies between these independent sources are where the analytical value lies — they may indicate unreported fishing, misreported catches, identity manipulation, unauthorized fishing, or data gaps.
-
-## GFW Methodology Alignment
-
-The risk scoring replicates the criteria from Global Fishing Watch's transshipment detection research (Miller et al. 2018, *The Global View of Transshipment*):
-
-| GFW Criterion | How We Apply It |
-|---------------|-----------------|
-| Encounter: two vessels < 500m | Proximity factor: < 500m = 1.8x risk weight |
-| Duration >= 2 hours | Default filter at 2h (configurable via sidebar slider) |
-| Median speed < 2 knots | Speed factor: < 2kn = 1.5x (encounters), 1.4x (loitering) |
-| >= 10km from anchorage | Shore distance factor: > 10km = 1.2x, > 20nm = 1.5x |
-| Likely transshipment = reefer + fishing vessel | Vessel type factor: carrier/tanker = 1.4x in encounters |
-| Potential transshipment = reefer loiters alone | Carrier/tanker loitering = 1.6x (AIS-off fishing vessel indicator) |
-| AIS gaps near encounters | Gap speed-change factor: large delta = evasion indicator |
-
-### Risk Score Formula
+The base behavioural score is computed per event:
 
 ```
-risk = (duration_h ^ 0.75) x event_weight x flag_multiplier x shore_factor x event_factors x iuu_multiplier x iccat_multiplier
+base = (duration_h ^ 0.75) x event_weight x flag_multiplier x shore_factor
+     x event_specific_factors
 ```
 
-- **Event weights**: ENCOUNTER=5.0, GAP=3.2, LOITERING=2.0
-- **Flag multipliers**: RUS=2.8, IRN=2.4, PRK=3.0, SYR=2.0, FOC flags=1.2-1.3
-- **Shore distance**: >20nm=1.5x, >10km=1.2x, <10km=0.8x
-- **Encounter factors**: proximity + speed + vessel type
-- **Loitering factors**: vessel type + average speed
-- **Gap factors**: speed change before/after AIS disabling
-- **IUU multiplier**: GFCM-listed=3.0x, other RFMO-listed=2.0x
-- **ICCAT multiplier**: Carrier=1.4x, BFT-Catching/Other=1.3x, SWO-Med/ALB-Med=1.2x
+Event-specific factors depend on event type:
+- **Encounters**: proximity (median distance), speed, transshipment vessel type
+- **Loitering**: transshipment vessel type, average speed
+- **Gaps**: speed change across the gap (evasion proxy)
 
-## FDI Integration
+After base scoring, three lookup-based multipliers apply at the event level:
 
-Each GFW event is mapped to its 0.5x0.5 degree c-square cell, enabling a spatial join to the FDI baseline. This provides fisheries context for every behavioural event:
+```
+final_score = base x iuu_multiplier x iccat_multiplier x ofac_multiplier
+```
 
-| Context Layer | What It Shows |
-|---------------|---------------|
-| Known fishing ground | Whether the c-square has historically reported fishing effort |
-| Effort baseline | Total fishing days by gear type and quarter |
-| Species composition | What species are typically landed in that area |
-| Economic value | Landings value in euros — high-value areas increase transshipment risk |
-| Seasonal patterns | Whether events align with normal fishing seasons |
+**Critical design principle**: all lookup multipliers amplify existing behavioural signal; they never substitute for it. A vessel with no suspicious behaviour carries no score regardless of authorisation or listing status. ICCAT authorisation indicates *opportunity* (access to high-value species or transshipment capability), not exoneration, and only modifies risk when behavioural signal is already present.
 
-The FDI data is a historical baseline (latest: 2024), not a real-time feed. It contextualises live events rather than providing direct compliance verification.
+Final scores are classified into bands aligned with Kpler's R&C vocabulary (*Turning Tides: Maritime Risk and Compliance Insights 2025-2026*, Dec 2025):
 
-## IUU Vessel List Cross-Reference
-
-GFW event vessels are matched against the Combined IUU Vessel List using three methods in priority order:
-
-| Match Method | Reliability | Coverage |
+| Band | Score range | Meaning |
 |---|---|---|
-| MMSI exact match | High — direct AIS identifier | 64 IUU vessels have MMSI |
-| IMO exact match | High — permanent hull identifier | 168 IUU vessels have IMO |
-| Vessel name exact match | Medium — names can change | All 369 vessels |
-| Vessel name substring match | Lower — risk of false positives | All known previous names |
+| Low | <50 | Sparse risk signals |
+| Emerging | 50-59 | First risk flags |
+| Elevated | 60-79 | Multiple risk indicators |
+| Severe | 80-99 | Compounding risk |
+| Critical | >=100 | Threshold breach |
 
-Two-tier alerting:
+The `base_risk_score` column preserves the pre-multiplier behavioural score, enabling explicit decomposition of how much of a vessel's risk comes from behaviour versus structural amplifiers.
 
-- **Tier 1 — GFCM (Med)**: vessel confirmed to have carried out IUU fishing in Mediterranean/Black Sea waters. Risk multiplier: 3.0x
-- **Tier 2 — Other RFMO**: vessel IUU-listed by another RFMO (ICCAT, IOTC, etc.) detected operating in Mediterranean waters. Risk multiplier: 2.0x
+Methodology aligned with GFW transshipment detection (Miller et al. 2018): encounters defined as <500m, >=2h, <2kn, >=10km from shore.
 
-IUU-matched events are highlighted with distinct markers on the map and surfaced in a prominent alert section.
+---
 
-## ICCAT Authorized Vessel Cross-Reference
+## Architecture
 
-GFW event vessels are matched against the ICCAT Record of Vessels authorized for Mediterranean fisheries. Authorization is an **opportunity indicator** — the vessel has means, access, and motive:
+Eight-module Streamlit application:
 
-| Authorization | Multiplier | Rationale |
+| Module | Responsibility |
+|---|---|
+| `app.py` | Orchestrator. Loads data, applies filters, runs scoring pipeline, renders Folium map, dispatches to six tabs. |
+| `config.py` | Constants (event weights, flag risks, IUU/ICCAT/OFAC multipliers, risk bands, species names, sandbox forbidden code list) and pure utility functions (`classify_med_zone`, `assign_csquare`, `classify_risk_band`). |
+| `data_loading.py` | All data loaders with `@st.cache_data`: static CSV, GFW Events API (async), FDI effort/landings, IUU vessels, ICCAT vessels, OFAC SDN, GFW Vessels API (IMO lookup). |
+| `risk_model.py` | `compute_risk_score()`, `get_fdi_context()`, IUU matching, ICCAT matching, OFAC matching. |
+| `tabs.py` | Render functions for each top-level tab and expander section, including `render_vessel_summary` (Kpler-vocabulary aggregation) and `render_daily_trend` (daily + monthly multi-behaviour trend). |
+| `ai_analyst.py` | Google Gemini 2.5 Flash integration with RAG knowledge base, sandboxed pandas/plotly code execution, system prompt builder. |
+| `investigation.py` | Deterministic rule-based vessel investigation (no LLM) -- structured multi-section report used by the Vessel Investigation tab. |
+| `risk_tree.py` | Med IUU Risk Tree framework loaded from `data/risk_tree_framework.yaml` and rendered as a Graphviz diagram. |
+
+## Data pipeline
+
+```
+1. Load data         load_live_data() or load_static_data()
+2. Load reference    load_fdi_*, load_iuu_vessels, load_iccat_vessels, load_ofac_sdn
+3. Filter            duration >= min_duration slider
+4. Score             compute_risk_score() -> risk_score
+5. Preserve base     base_risk_score = risk_score.copy()
+6. Spatialise        assign_csquare() -> csq_lon, csq_lat
+7. Resolve identity  lookup_vessel_imos() -> imo (live mode only)
+8. IUU match         match_iuu_vessels() -> iuu_* columns, risk *= iuu_multiplier
+9. ICCAT match       match_iccat_vessels() -> iccat_* columns, risk *= iccat_multiplier
+10. OFAC match       match_ofac_vessels() -> ofac_* columns, risk *= ofac_multiplier
+11. Classify         risk_band = classify_risk_band(risk_score)
+12. Render           Folium map + 6 tabs (with expanders) + AI analyst
+```
+
+## Tab structure
+
+Six top-level tabs, organised for a tight 30-minute demo:
+
+1. **Map & Overview** -- Folium map, risk heatmap, daily and monthly event-type trend. Secondary charts (flag breakdown, event types pie, duration distribution) in collapsed expanders.
+2. **Vessel Summary** -- vessel-level aggregation table with risk bands and base vs compounded score decomposition. The Kpler-vocabulary tab. Secondary views (top vessels legacy, repeat offenders, encounter/carrier alerts, AIS gap behaviour) in collapsed expanders.
+3. **Fisheries Context** -- FDI overlay, c-square context, species landings. Geographic risk breakdown in an expander.
+4. **Vessel Investigation** -- three-layer deep dive: framework methodology, structured narrative from `investigation.py`, per-vessel coloured risk tree path.
+5. **Risk Tree Framework** -- methodology visualisation from `data/risk_tree_framework.yaml`. Direct conceptual link to Kpler's April 2026 shadow fleet risk tree blog post.
+6. **AI Analyst** -- Google Gemini 2.5 Flash interface with RAG knowledge base and sandboxed pandas/plotly code execution.
+
+Secondary diagnostic charts live inside collapsed `st.expander` blocks within their parent tabs, keeping the main navigation clean while preserving full analytical depth for follow-up questions.
+
+---
+
+## Data sources
+
+| Source | Content | Scale |
 |---|---|---|
-| Carrier | 1.4x | Authorized transshipment vessel in a suspicious event — core catch laundering scenario |
-| BFT-Catching | 1.3x | Highest-value Med species, tightly quota-managed, strong incentive for evasion |
-| BFT-Other | 1.3x | Support vessels for BFT operations — towing, transport |
-| SWO-Med | 1.2x | Swordfish longliner — seasonal closures create incentive to fish outside authorized periods |
-| ALB-Med | 1.2x | Albacore — lower value but still quota-managed |
+| GFW Events API | AIS gap, encounter, loitering events | Med polygon, up to 5000/query |
+| EU JRC FDI | Fishing effort (days) and landings by 0.5 deg c-square | 82.8K effort rows, 212K landings rows, 1,008 unique c-squares, 2017-2024 |
+| TMT Combined IUU List | 13 RFMOs, IUU-listed vessels | 369 vessels (213 currently listed, 150 GFCM-listed) |
+| ICCAT Record of Vessels | Med-authorised vessels | 9,203 vessels, 786 with IMO |
+| OFAC SDN | Sanctioned vessels (filtered demo snapshot) | 2 demo vessels (SABITI, ADRIAN DARYA 1); full SDN list supported via matching logic |
 
-Matching priority: IMO exact (where available via GFW Vessels API lookup) → vessel name exact (minimum 4 characters).
+**Epistemological separation**: each data source answers a different question and is kept separate at the data layer. GFW provides AIS-inferred behavioural events; FDI provides aggregate statistical estimates from logbooks and sales notes; TMT provides enforcement actions; ICCAT provides authorisation as an opportunity indicator; OFAC provides formal sanctions listings. Sources are synthesised at the scoring layer with provenance preserved in the UI.
 
-Key signals:
-- ENCOUNTER + Carrier = highest concern (core transshipment scenario, verify Regional Observer Programme coverage under Rec. 24-05)
-- GAP + BFT-Catching = high concern (quota evasion)
-- A vessel that is BOTH IUU-listed and ICCAT-authorized is the highest-priority signal
+---
 
-ICCAT-authorized events are marked with blue markers on the map.
+## Running the app
 
-## Vessel Identity Resolution
-
-In live mode, the app queries the GFW Vessels API to resolve MMSI → IMO numbers for each unique vessel in the event dataset. IMO numbers are permanent hull identifiers that persist across name changes, flag changes, and ownership transfers. This enables stronger matching against both the IUU vessel list (168 vessels with IMO) and ICCAT authorized list (786 vessels with IMO).
-
-In static/demo mode, IMO numbers are pre-populated for known demo vessels. Matching falls back to MMSI and vessel name.
-
-## Dashboard Tabs
-
-| Tab | Analysis |
-|-----|----------|
-| Daily Trend | Risk score aggregated by date |
-| Flag Breakdown | Total risk per flag state |
-| Event Types | Risk contribution by event type |
-| Duration Analysis | Duration histogram by event type |
-| Geographic Risk | Risk bubble map, Med zone breakdown, EEZ analysis, port proximity |
-| Risk Heatmap | Flag state vs event type matrix |
-| Repeat Offenders | Vessels with multiple events, IUU and ICCAT status |
-| Gap Behaviour | Speed before/after AIS disabling, gap distance vs duration |
-| Encounter Analysis | Proximity vs duration, partner flag analysis, ICCAT carrier alerts |
-| Top Vessels | Riskiest vessels, vessel type breakdown, IUU and ICCAT status |
-| AI Analyst | Natural-language Q&A with Gemini 2.5 Flash + RAG knowledge base |
-| Fisheries Context | FDI effort map, event context table, seasonal patterns, species breakdown |
-
-## AI Maritime Analyst
-
-The AI tab uses Google Gemini 2.5 Flash with a RAG (Retrieval-Augmented Generation) approach:
-
-- 5 domain knowledge files (IUU context, flag risks, Med geography, methodology, FDI context)
-- Live dataframe schema injected into system prompt (GFW events + FDI baseline + IUU vessel list + ICCAT authorized vessels)
-- Sandboxed code execution (pandas/plotly) with safety checks
-- Cross-source queries supported (e.g., "show IUU-listed vessels in c-squares with high swordfish landings")
-- Example questions via dropdown
-
-## Project Structure
-
-```
-med_ves_mntr/
-├── app.py                  # Orchestrator
-├── config.py               # Constants, weights, spatial helpers
-├── data_loading.py         # Static, live, FDI, IUU, ICCAT data loaders
-├── risk_model.py           # Risk scoring, FDI context, IUU + ICCAT matching
-├── tabs.py                 # All 12 tab render functions
-├── ai_analyst.py           # RAG, Gemini, sandboxed code execution
-├── data/
-│   ├── med_events_static.csv       # 86-row static fallback
-│   ├── fdi_effort_med.csv          # Med fishing effort by c-square (JRC)
-│   ├── fdi_landings_med.csv        # Med landings by c-square/species (JRC)
-│   ├── iuu_vessels.csv             # Combined IUU vessel list (TMT)
-│   ├── iccat_med_vessels.csv       # ICCAT Med-authorized vessels
-│   ├── prepare_fdi.py              # One-time FDI preprocessing
-│   ├── prepare_iuu.py              # One-time IUU list preprocessing
-│   └── prepare_iccat.py            # One-time ICCAT preprocessing
-├── knowledge/
-│   ├── flags.md                    # Flag state risk context
-│   ├── iuu_context.md              # IUU fishing context + IUU list docs
-│   ├── med_geography.md            # Med zones, chokepoints, contested EEZs
-│   ├── methodology.md              # GFW-aligned risk score formula
-│   └── fdi_context.md              # FDI spatial data context
-├── requirements.txt
-├── .streamlit/
-│   └── config.toml
-└── README.md
-```
-
-## Stack
-
-Python, Streamlit, Pandas, NumPy, Plotly, Folium, GFW Events API (async), Google Gemini, RAG
-
-## Setup
+Requires Python 3.10+.
 
 ```bash
 pip install -r requirements.txt
 streamlit run app.py
 ```
 
-Add API keys in `.streamlit/secrets.toml`:
+Static demo mode (88 pre-generated events including IUU, ICCAT and OFAC demo vessels) runs without any API credentials. Live mode requires a GFW API JWT token, which can be placed in `.streamlit/secrets.toml` or entered via the sidebar.
+
+### Optional credentials
+
 ```toml
-gfw_token = "your_gfw_jwt_token"
-gemini_key = "your_gemini_api_key"
+# .streamlit/secrets.toml
+gfw_token = "your GFW JWT"
+gemini_key = "your Google Gemini API key (for AI Analyst tab)"
 ```
 
-### FDI Data Setup
+Both have sidebar text-input fallbacks if the secrets file is missing.
 
-The pre-filtered Mediterranean FDI data is bundled in `data/`. To regenerate from raw JRC data:
+---
 
-1. Download the FDI spatial ZIP from [JRC Data Catalogue](https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/FAD/fdi/2025_FDI_spatial_data.zip)
-2. Place raw CSVs in `data/raw/`
-3. Run `python data/prepare_fdi.py`
-4. Outputs: `data/fdi_effort_med.csv`, `data/fdi_landings_med.csv`
+## Key numerical values
 
-### IUU Vessel List Setup
+- 7 multiplicative factors in the base risk formula
+- 4 lookup-based amplifiers applied post-scoring (IUU, ICCAT, OFAC, flag)
+- 5 risk bands (Low, Emerging, Elevated, Severe, Critical)
+- 6 top-level tabs
+- 369 IUU vessels, 9,203 ICCAT Med-authorised vessels, 1,008 FDI c-squares
+- 88 static demo events including 3 IUU, 3 ICCAT and 2 OFAC demo vessels
+- Med polygon: `[[-6, 30], [36.5, 30], [36.5, 46], [-6, 46]]`
+- FDI c-square grid: 0.5 deg x 0.5 deg
 
-The cleaned IUU vessel list is bundled in `data/`. To regenerate from the latest download:
+---
 
-1. Download the Combined IUU Vessel List from [iuu-vessels.org/Home/Download](https://iuu-vessels.org/Home/Download)
-2. Place the Excel file in `data/raw/`
-3. Run `python data/prepare_iuu.py`
-4. Output: `data/iuu_vessels.csv`
-
-### ICCAT Vessel List Setup
-
-The cleaned ICCAT Med-authorized vessel list is bundled in `data/`. To regenerate from the latest download:
-
-1. Export the active vessel list from [ICCAT Record of Vessels](https://www.iccat.int/en/vesselsrecord.asp)
-2. Place the CSV in `data/raw/`
-3. Run `python data/prepare_iccat.py --raw data/raw/<filename>.csv`
-4. Output: `data/iccat_med_vessels.csv`
-
-## Live API Field Extraction
-
-When connected to the GFW Events API, the app extracts nested fields from the JSON response for full risk model support:
-
-- `event_info` → encounter median distance/speed, gap distances/speeds, loitering distance/speed
-- `distances` → shore distance (km), port distance (km), nearest port name
-- `regions` → EEZ and Mediterranean zone classification
-- `vessel` → vessel name, type, flag state
-
-## Planned Enhancements
-
-- **GFCM stock assessment overlay** — stock status (F/Fmsy) by GSA and species to prioritise events in areas with critically overfished stocks
-- **EU sanctions vessel lists** — OFAC/EU sanctions cross-referencing for Russian/Iranian shadow fleet detection
-- **Port state control inspection data** — Paris MoU / Med MoU detention history for vessel risk profiling
-
-## References
+## Methodology references
 
 - Miller, N.A. et al. (2018). *Identifying Global Patterns of Transshipment Behavior.* Frontiers in Marine Science.
 - Global Fishing Watch. (2017). *The Global View of Transshipment: Revised Preliminary Findings.*
-- Global Fishing Watch. [Vessel encounter events documentation.](https://globalfishingwatch.org/faqs/what-is-a-vessel-encounter/)
+- Kpler. (October 2025). *Deceptive Shipping Practices* -- compounding behavioural risk scoring.
+- Kpler. (December 2025). *The Turning Tides: Maritime Risk and Compliance Insights 2025-2026* -- predictive risk bands and vessel-level aggregation.
+- Kpler. (April 2026). *How to build a risk tree to assess shadow fleet exposure* -- risk tree framework.
 - European Commission, Joint Research Centre (2026). *2025 - Fisheries landings & effort: data by c-square. Data up to 2024.* [doi:10.2905/f847528b-1734-4bb8-8361-f4877ba395ed](https://data.jrc.ec.europa.eu/dataset/f847528b-1734-4bb8-8361-f4877ba395ed)
-- Maina, I. et al. (2026). *tools4MCDA: An R-Package to estimate spatial fishing effort.* Ecological Modelling 516, 111541. [doi:10.1016/j.ecolmodel.2026.111541](https://doi.org/10.1016/j.ecolmodel.2026.111541)
 - Combined IUU Vessel List. TMT. [iuu-vessels.org](https://iuu-vessels.org/)
-- EU IUU Regulation: Council Regulation (EC) No 1005/2008.
-- GFCM Recommendation GFCM/33/2009/8 on IUU vessel lists.
 - ICCAT Record of Vessels. [iccat.int/en/vesselsrecord.asp](https://www.iccat.int/en/vesselsrecord.asp)
 - ICCAT Recommendation 24-05 on bluefin tuna in the eastern Atlantic and Mediterranean.
+
+Conceptual alignment: the Med Vessel Monitor implements four of Kpler's six risk layers (formal listing, behavioural signals, geographic exposure, cargo-equivalent species weighting) in a fisheries context. The two layers not implemented -- associative risk and ownership opacity -- are future work that would require fleet-network and beneficial ownership data beyond the current open-source stack.
+
+---
+
+## Status
+
+Portfolio demonstration project. Risk scores are methodology-driven, not empirically calibrated against IUU enforcement outcomes. Validation against RFMO listings or port state denials as proxy outcomes is named as future work.
+
+Static demo renders without API credentials; live mode requires GFW API access.
+
+---
+
+## Author
+
+Irene Mantzouni -- Fisheries Ecology PhD (Copenhagen), STECF expert, data analyst at QUANTOS S.A.

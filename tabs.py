@@ -5,7 +5,19 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 
-from config import EVENT_COLORS, SPECIES_NAMES, FLAG_RISKS, RISK_BAND_COLORS, classify_risk_band
+from pathlib import Path
+
+from config import (
+    EVENT_COLORS,
+    FLAG_RISKS,
+    ICCAT_MULTIPLIERS,
+    IUU_MULTIPLIERS,
+    OFAC_MULTIPLIER,
+    RISK_BAND_COLORS,
+    RISK_BANDS,
+    SPECIES_NAMES,
+    classify_risk_band,
+)
 from risk_model import get_fdi_context
 
 
@@ -833,50 +845,27 @@ def render_fisheries_context(df, fdi_effort, fdi_landings):
 def render_vessel_investigation(df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_landings):
     """Deterministic vessel investigation tab."""
     from investigation import investigate_vessel
-    from risk_tree import render_framework_tree, load_framework
 
     st.subheader("Vessel Investigation")
-
-    # Risk Assessment Framework section
-    with st.expander("Risk Assessment Framework (methodology)", expanded=False):
-        try:
-            framework = load_framework()
-            st.markdown(f"**{framework['name']}** -- version {framework['version']}")
-            st.markdown(framework["description"])
-
-            st.markdown("### Framework Diagram")
-            dot = render_framework_tree()
-            st.graphviz_chart(dot)
-
-            st.markdown("### Tier Outcomes")
-            for tier in framework["tier_outcomes"]:
-                st.markdown(f"- **{tier['tier']}** -- {tier['description']}")
-
-            st.markdown("### Compound Logic Rules")
-            for rule in framework["tier_assignment_rules"]["rules"]:
-                st.markdown(f"- {rule}")
-
-            st.markdown(
-                "*This framework is adapted from Kpler's April 2026 blog post on "
-                "shadow fleet risk trees, applied to Mediterranean IUU fishing. "
-                "The investigation below applies these rules to a specific vessel.*"
-            )
-        except Exception as e:
-            st.warning(f"Framework render error: {e}")
-
-    st.markdown("---")
-    st.markdown("### Per-Vessel Investigation")
     st.markdown(
-        "Run a structured 10-step investigation on any vessel in the current "
-        "dataset. Rule-based analysis -- no LLM required, instant results."
+        "Structured rule-based investigation of any vessel in the current "
+        "dataset. The view opens on the highest-risk vessel; pick another "
+        "from the selector to re-run instantly."
     )
 
     if df.empty:
         st.info("No vessel data available.")
         return
 
-    # Vessel selector — default to highest risk
-    vessel_options = df.sort_values("risk_score", ascending=False)["vessel_name"].dropna().unique().tolist()
+    # Vessel selector — order by per-vessel total risk_score so the default is
+    # the highest-risk vessel (the most meaningful opening example).
+    vessel_totals = (
+        df.dropna(subset=["vessel_name"])
+          .groupby("vessel_name")["risk_score"]
+          .sum()
+          .sort_values(ascending=False)
+    )
+    vessel_options = vessel_totals.index.tolist()
     if not vessel_options:
         st.info("No vessels with names available.")
         return
@@ -887,9 +876,6 @@ def render_vessel_investigation(df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_l
         index=0,
         help="Vessels are ordered by total risk score (highest first).",
     )
-
-    if not st.button("Run Investigation", type="primary"):
-        return
 
     report = investigate_vessel(selected, df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_landings)
 
@@ -1093,3 +1079,162 @@ def render_vessel_investigation(df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_l
                     use_container_width=True,
                     hide_index=True,
                 )
+
+
+# ============================================================================
+# Reference & Methodology tab
+# ============================================================================
+
+@st.cache_data
+def _load_reference_content():
+    """Load the prose YAML backing the Reference & Methodology tab."""
+    import yaml
+
+    path = Path(__file__).parent / "data" / "reference_content.yaml"
+    with open(path, "r", encoding="utf-8") as f:
+        return yaml.safe_load(f)
+
+
+def render_reference():
+    """Reference & Methodology tab.
+
+    Pure rendering: prose from data/reference_content.yaml, numerical tables
+    from config.py, framework diagram from risk_tree.render_framework_tree.
+    """
+    from risk_tree import load_framework, render_framework_tree
+
+    content = _load_reference_content()
+
+    st.subheader("Reference & Methodology")
+
+    # 1. Intro
+    st.markdown(content["intro"])
+
+    # 2. Framework diagram (collapsible, open by default)
+    with st.expander("Mediterranean IUU Risk Tree Framework", expanded=True):
+        try:
+            framework = load_framework()
+            st.markdown(f"**{framework['name']}** -- version {framework['version']}")
+            st.markdown(framework["description"])
+            st.graphviz_chart(render_framework_tree())
+        except Exception as e:
+            st.warning(f"Could not render framework diagram: {e}")
+
+    # 3. Risk formula
+    st.markdown("### Risk Formula")
+    st.markdown(content["risk_formula_explanation"])
+    st.code(
+        "base = (duration_h ^ 0.75)\n"
+        "     x event_weight\n"
+        "     x flag_multiplier\n"
+        "     x shore_factor\n"
+        "     x event_specific_factors\n"
+        "\n"
+        "final_score = base\n"
+        "     x iuu_multiplier\n"
+        "     x iccat_multiplier\n"
+        "     x ofac_multiplier",
+        language="text",
+    )
+
+    bands_df = pd.DataFrame(
+        [
+            {
+                "Band": label,
+                "Lower bound": low,
+                "Upper bound": ("infinity" if high == float("inf") else high),
+                "Meaning": desc,
+            }
+            for low, high, label, desc in RISK_BANDS
+        ]
+    )
+    st.markdown("**Kpler-aligned risk bands (applied to final compounded score)**")
+    st.dataframe(bands_df, use_container_width=True, hide_index=True)
+
+    # 4. Multiplier tables (collapsed)
+    with st.expander("Multiplier tables (from config.py)", expanded=False):
+        st.markdown("**Flag risk multipliers** — applied to every event on the flag")
+        flag_df = (
+            pd.DataFrame(
+                [{"Flag (ISO3)": k, "Multiplier": v} for k, v in FLAG_RISKS.items()]
+            )
+            .sort_values("Multiplier", ascending=False)
+            .reset_index(drop=True)
+        )
+        st.dataframe(flag_df, use_container_width=True, hide_index=True)
+        st.caption("Flags not listed carry a 1.0x multiplier (neutral).")
+
+        st.markdown("**IUU listing multipliers** — applied on IUU vessel match")
+        iuu_df = pd.DataFrame(
+            [
+                {
+                    "Listing tier": "GFCM (Mediterranean)"
+                    if k == "GFCM"
+                    else "Other RFMO",
+                    "Key": k,
+                    "Multiplier": v,
+                }
+                for k, v in IUU_MULTIPLIERS.items()
+            ]
+        )
+        st.dataframe(iuu_df, use_container_width=True, hide_index=True)
+
+        st.markdown(
+            "**ICCAT authorisation multipliers** — applied conditionally on "
+            "behavioural signal"
+        )
+        _ICCAT_LABELS = {
+            "carrier": "Carrier (transshipment-capable)",
+            "bft_catching": "Bluefin tuna — catching vessel",
+            "bft_other": "Bluefin tuna — support/other",
+            "swo_med": "Mediterranean swordfish",
+            "alb_med": "Mediterranean albacore",
+        }
+        iccat_df = pd.DataFrame(
+            [
+                {
+                    "Authorisation": _ICCAT_LABELS.get(k, k),
+                    "Key": k,
+                    "Multiplier": v,
+                }
+                for k, v in ICCAT_MULTIPLIERS.items()
+            ]
+        ).sort_values("Multiplier", ascending=False).reset_index(drop=True)
+        st.dataframe(iccat_df, use_container_width=True, hide_index=True)
+
+        st.markdown("**OFAC sanctions multiplier** — applied on OFAC SDN match")
+        ofac_df = pd.DataFrame(
+            [
+                {
+                    "Listing": "OFAC SDN (Specially Designated Nationals)",
+                    "Multiplier": OFAC_MULTIPLIER,
+                }
+            ]
+        )
+        st.dataframe(ofac_df, use_container_width=True, hide_index=True)
+
+    # 5. ICCAT framing note
+    with st.expander("ICCAT framing note", expanded=False):
+        st.markdown(content["iccat_framing_note"])
+
+    # 6. Data source provenance
+    with st.expander("Data source provenance", expanded=False):
+        prov_df = pd.DataFrame(content["data_source_provenance"])
+        prov_df.columns = [c.capitalize() for c in prov_df.columns]
+        st.dataframe(prov_df, use_container_width=True, hide_index=True)
+
+    # 7. Epistemological separation
+    with st.expander("Epistemological separation", expanded=False):
+        st.markdown(content["epistemological_separation"])
+
+    # 8. Methodology references
+    with st.expander("Methodology references", expanded=False):
+        for ref in content["methodology_references"]:
+            st.markdown(
+                f"- **{ref['title']}** -- {ref['citation']}  \n"
+                f"  {ref['relevance']}"
+            )
+
+    # 9. Scope and limitations
+    with st.expander("Scope and limitations", expanded=False):
+        st.markdown(content["scope_and_limitations"])

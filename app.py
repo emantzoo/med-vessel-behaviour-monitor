@@ -23,7 +23,7 @@ from tabs import (
     render_duration_analysis, render_geographic_risk, render_risk_heatmap,
     render_repeat_offenders, render_gap_behaviour, render_encounter_analysis,
     render_top_vessels, render_vessel_summary, render_vessel_investigation,
-    render_fisheries_context,
+    render_fisheries_context, render_reference,
 )
 from ai_analyst import render_ai_analyst
 
@@ -173,14 +173,20 @@ with col1:
     st.subheader("Behavioral Risk Map")
     if not df_filtered.empty:
         m = folium.Map(location=[37.0, 18.0], zoom_start=5, tiles="CartoDB positron")
-        color_map = {"GAP": "red", "LOITERING": "orange", "ENCOUNTER": "purple"}
 
-        # Create toggleable layer groups
-        fg_gap = folium.FeatureGroup(name="AIS Gap", show=True)
-        fg_loiter = folium.FeatureGroup(name="Loitering", show=True)
-        fg_encounter = folium.FeatureGroup(name="Encounter", show=True)
-        fg_iuu = folium.FeatureGroup(name="IUU-Listed", show=True)
+        # Dual visual encoding:
+        #   shape = behaviour (GAP=circle, LOITERING=square, ENCOUNTER=triangle)
+        #   fill colour = listing status (OFAC > IUU > ICCAT > clean-by-risk-band)
+        #   size = Kpler risk band (Low..Critical)
+        # Layer toggles are organised by listing status so the user can isolate,
+        # e.g., all ICCAT-authorised events regardless of behaviour type.
+        from config import RISK_BAND_COLORS
+
+        band_size_px = {"Low": 14, "Emerging": 17, "Elevated": 20, "Severe": 24, "Critical": 28}
+
+        fg_clean = folium.FeatureGroup(name="Clean (no listing)", show=True)
         fg_iccat = folium.FeatureGroup(name="ICCAT Authorized", show=True)
+        fg_iuu = folium.FeatureGroup(name="IUU-Listed", show=True)
         fg_ofac = folium.FeatureGroup(name="OFAC Sanctioned", show=True)
         fg_fdi = folium.FeatureGroup(name="FDI Fishing Effort", show=show_fdi_layer)
 
@@ -227,53 +233,77 @@ with col1:
             for csq_lon, csq_lat in df_filtered[["csq_lon", "csq_lat"]].drop_duplicates().values:
                 fdi_cache[(csq_lon, csq_lat)] = get_fdi_context(csq_lon, csq_lat, fdi_effort, fdi_landings)
 
+        def _svg_shape(event_type, fill, size, stroke="#222", stroke_w=1.5):
+            """Return an inline SVG shape for a Folium DivIcon.
+
+            Circle = GAP, square = LOITERING, triangle = ENCOUNTER.
+            """
+            s = size
+            half = s / 2
+            if event_type == "LOITERING":
+                body = f'<rect x="1" y="1" width="{s-2}" height="{s-2}" fill="{fill}" stroke="{stroke}" stroke-width="{stroke_w}"/>'
+            elif event_type == "ENCOUNTER":
+                pts = f"{half},1 {s-1},{s-1} 1,{s-1}"
+                body = f'<polygon points="{pts}" fill="{fill}" stroke="{stroke}" stroke-width="{stroke_w}"/>'
+            else:  # GAP or unknown -> circle
+                r = half - 1
+                body = f'<circle cx="{half}" cy="{half}" r="{r}" fill="{fill}" stroke="{stroke}" stroke-width="{stroke_w}"/>'
+            return f'<svg width="{s}" height="{s}" xmlns="http://www.w3.org/2000/svg">{body}</svg>'
+
         for _, row in df_filtered.iterrows():
             is_ofac = row.get("ofac_sanctioned", False)
             is_iuu = row.get("iuu_matched", False)
             is_iccat = row.get("iccat_authorized", False)
             vname = row.get("vessel_name", "")
-            tooltip = f"{vname} | {row['event_type']} | {row['flag']}" if pd.notna(vname) else f"{row['event_type']} | {row['flag']}"
+            band = row.get("risk_band", "Low")
+            size = band_size_px.get(band, 14)
 
+            # Listing status sets fill colour (priority OFAC > IUU > ICCAT > clean-by-band)
             if is_ofac:
-                marker_color = "#8B0000"
-                marker_radius = 14
+                fill = "#8B0000"
+                target = fg_ofac
             elif is_iuu:
-                marker_color = "black"
-                marker_radius = 12
+                fill = "#000000"
+                target = fg_iuu
             elif is_iccat:
-                marker_color = "blue"
-                marker_radius = 10
+                fill = "#1f77b4"
+                target = fg_iccat
             else:
-                marker_color = color_map.get(row["event_type"], "blue")
-                marker_radius = 8
+                fill = RISK_BAND_COLORS.get(band, "#2ecc71")
+                target = fg_clean
 
-            marker = folium.CircleMarker(
-                location=[row["lat"], row["lon"]],
-                radius=marker_radius,
-                color=marker_color,
-                tooltip=tooltip,
-                fill=True,
+            listings = []
+            if is_ofac:
+                listings.append("OFAC")
+            if is_iuu:
+                listings.append("IUU")
+            if is_iccat:
+                listings.append("ICCAT")
+            listing_txt = ", ".join(listings) if listings else "clean"
+            tooltip_parts = [
+                vname if pd.notna(vname) and vname else "(unknown)",
+                f"{row['event_type']}",
+                f"flag {row['flag']}",
+                f"risk {row['risk_score']:.1f} ({band})",
+                listing_txt,
+            ]
+            tooltip = " | ".join(tooltip_parts)
+
+            svg = _svg_shape(row["event_type"], fill, size)
+            icon = folium.DivIcon(
+                html=f'<div style="width:{size}px;height:{size}px">{svg}</div>',
+                icon_size=(size, size),
+                icon_anchor=(size // 2, size // 2),
             )
-
-            # Add marker to appropriate layer group
-            if is_ofac:
-                marker.add_to(fg_ofac)
-            elif is_iuu:
-                marker.add_to(fg_iuu)
-            elif is_iccat:
-                marker.add_to(fg_iccat)
-            elif row["event_type"] == "GAP":
-                marker.add_to(fg_gap)
-            elif row["event_type"] == "LOITERING":
-                marker.add_to(fg_loiter)
-            else:
-                marker.add_to(fg_encounter)
+            folium.Marker(
+                location=[row["lat"], row["lon"]],
+                icon=icon,
+                tooltip=tooltip,
+            ).add_to(target)
 
         # Add all layer groups to map (FDI first so it renders behind markers)
         fg_fdi.add_to(m)
-        fg_gap.add_to(m)
-        fg_loiter.add_to(m)
-        fg_encounter.add_to(m)
+        fg_clean.add_to(m)
         fg_iccat.add_to(m)
         fg_iuu.add_to(m)
         fg_ofac.add_to(m)
@@ -281,22 +311,46 @@ with col1:
 
         map_data = st_folium(m, width=700, height=500)
 
-        # Color legend below map
-        dot = '<span style="display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:4px;vertical-align:middle;background:{c}"></span>'
-        sq = '<span style="display:inline-block;width:11px;height:11px;margin-right:4px;vertical-align:middle;background:{c};border:1px solid #ccc"></span>'
+        # Dual-encoding legend: shape = behaviour, fill = listing, size = risk band
+        def _legend_svg(shape, fill="#888", size=14):
+            s = size
+            half = s / 2
+            if shape == "square":
+                body = f'<rect x="1" y="1" width="{s-2}" height="{s-2}" fill="{fill}" stroke="#222" stroke-width="1.2"/>'
+            elif shape == "triangle":
+                pts = f"{half},1 {s-1},{s-1} 1,{s-1}"
+                body = f'<polygon points="{pts}" fill="{fill}" stroke="#222" stroke-width="1.2"/>'
+            else:
+                body = f'<circle cx="{half}" cy="{half}" r="{half-1}" fill="{fill}" stroke="#222" stroke-width="1.2"/>'
+            return (
+                f'<span style="display:inline-block;vertical-align:middle;margin-right:4px">'
+                f'<svg width="{s}" height="{s}">{body}</svg></span>'
+            )
+
+        from config import RISK_BAND_COLORS as _RBC
         legend_md = (
-            f'{dot.format(c="red")} AIS Gap&ensp;'
-            f'{dot.format(c="orange")} Loitering&ensp;'
-            f'{dot.format(c="purple")} Encounter&ensp;'
-            f'{dot.format(c="blue")} ICCAT&ensp;'
-            f'{dot.format(c="black")} IUU&ensp;'
-            f'{dot.format(c="#8B0000")} OFAC&ensp;&ensp;'
-            f'{sq.format(c="#ffffb2")} <small>&lt;50d</small>&ensp;'
-            f'{sq.format(c="#fecc5c")} <small>50-500d</small>&ensp;'
-            f'{sq.format(c="#fd8d3c")} <small>500-2kd</small>&ensp;'
-            f'{sq.format(c="#e31a1c")} <small>&gt;2kd</small>'
+            '<b>Behaviour</b> (shape):&ensp;'
+            f'{_legend_svg("circle")} AIS Gap&ensp;'
+            f'{_legend_svg("square")} Loitering&ensp;'
+            f'{_legend_svg("triangle")} Encounter&emsp;'
+            '<b>Listing</b> (fill):&ensp;'
+            f'{_legend_svg("circle", fill=_RBC["Low"])} Clean&ensp;'
+            f'{_legend_svg("circle", fill="#1f77b4")} ICCAT&ensp;'
+            f'{_legend_svg("circle", fill="#000000")} IUU&ensp;'
+            f'{_legend_svg("circle", fill="#8B0000")} OFAC<br/>'
+            '<b>Risk band</b> (size + clean fill):&ensp;'
+            f'{_legend_svg("circle", fill=_RBC["Low"], size=14)} Low&ensp;'
+            f'{_legend_svg("circle", fill=_RBC["Emerging"], size=17)} Emerging&ensp;'
+            f'{_legend_svg("circle", fill=_RBC["Elevated"], size=20)} Elevated&ensp;'
+            f'{_legend_svg("circle", fill=_RBC["Severe"], size=24)} Severe&ensp;'
+            f'{_legend_svg("circle", fill=_RBC["Critical"], size=28)} Critical&emsp;'
+            '<b>FDI effort</b>:&ensp;'
+            '<span style="display:inline-block;width:11px;height:11px;background:#ffffb2;border:1px solid #ccc;margin-right:3px"></span><small>&lt;50d</small>&ensp;'
+            '<span style="display:inline-block;width:11px;height:11px;background:#fecc5c;border:1px solid #ccc;margin-right:3px"></span><small>50-500d</small>&ensp;'
+            '<span style="display:inline-block;width:11px;height:11px;background:#fd8d3c;border:1px solid #ccc;margin-right:3px"></span><small>500-2kd</small>&ensp;'
+            '<span style="display:inline-block;width:11px;height:11px;background:#e31a1c;border:1px solid #ccc;margin-right:3px"></span><small>&gt;2kd</small>'
         )
-        st.markdown(f'<div style="font-size:13px;line-height:1.8">{legend_md}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div style="font-size:13px;line-height:2.0">{legend_md}</div>', unsafe_allow_html=True)
 
         # Event detail card on click
         clicked = map_data.get("last_object_clicked") if map_data else None
@@ -442,12 +496,12 @@ if not df_filtered.empty and "iuu_matched" in df_filtered.columns:
 # Consolidated to 6 top-level tabs per tab_consolidation_spec.md.
 # Secondary diagnostic charts live inside collapsed expanders within
 # their parent tab, keeping navigation clean for a 30-minute demo.
-tab_map, tab_vessels, tab_fisheries, tab_investigation, tab_risktree, tab_ai = st.tabs([
+tab_investigation, tab_map, tab_vessels, tab_fisheries, tab_reference, tab_ai = st.tabs([
+    "Vessel Investigation",
     "Map & Overview",
     "Vessel Summary",
     "Fisheries Context",
-    "Vessel Investigation",
-    "Risk Tree Framework",
+    "Reference & Methodology",
     "AI Analyst",
 ])
 
@@ -490,27 +544,11 @@ with tab_investigation:
         df_filtered, iuu_vessels, iccat_vessels, ofac_vessels,
         fdi_effort, fdi_landings,
     )
+    st.caption("See **Reference & Methodology** tab for the generic framework and multiplier tables.")
 
-with tab_risktree:
-    from risk_tree import load_framework, render_framework_tree
-    try:
-        framework = load_framework()
-        st.subheader("Mediterranean IUU Risk Tree Framework")
-        st.markdown(f"**{framework['name']}** -- version {framework['version']}")
-        st.markdown(framework["description"])
-        st.graphviz_chart(render_framework_tree())
-        st.markdown("### Tier Outcomes")
-        for tier in framework["tier_outcomes"]:
-            st.markdown(f"- **{tier['tier']}** -- {tier['description']}")
-        st.markdown("### Compound Logic Rules")
-        for rule in framework["tier_assignment_rules"]["rules"]:
-            st.markdown(f"- {rule}")
-        st.caption(
-            "Adapted from Kpler's April 2026 blog post on shadow fleet risk trees, "
-            "applied to Mediterranean IUU fishing."
-        )
-    except Exception as e:
-        st.error(f"Could not load risk tree framework: {e}")
+with tab_reference:
+    render_reference()
+    st.caption("See **Vessel Investigation** tab for an applied per-vessel example.")
 
 with tab_ai:
     render_ai_analyst(

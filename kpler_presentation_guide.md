@@ -1,0 +1,443 @@
+# Presenting the Med Vessel Behaviour Monitor at Kpler
+
+## The 30-Second Pitch
+
+"I built a multi-source maritime intelligence dashboard that cross-references AIS vessel behaviour from Global Fishing Watch against four independent regulatory data sources — EU fisheries records, IUU vessel blacklists, ICCAT authorization registries, and OFAC sanctions lists — to contextualise suspicious events in the Mediterranean. It turns raw AIS alerts into actionable intelligence by answering not just 'what happened' but 'does this make sense given what we know about fishing in this area, who this vessel is, and whether anyone should be doing business with it.'"
+
+## Know Your Audience
+
+Kpler is a commercial maritime data intelligence company. They sell to commodity traders, compliance teams, and government agencies. Their IUU Fishing Analyst role is about helping clients detect and assess illegal fishing risk using vessel tracking and regulatory data.
+
+They care about: multi-source data integration, analytical reasoning, regulatory knowledge, scalable tooling, and the ability to communicate findings to non-technical stakeholders.
+
+They do NOT care about: academic fisheries science, R packages, MCDA methodology, or theoretical frameworks. Keep it operational and practical.
+
+## Tab Structure
+
+The app is organised into six top-level tabs sized for a 30-minute demo:
+
+1. **Map & Overview** — Folium map, risk heatmap, daily and monthly trend. Secondary charts (flag breakdown, event types pie, duration distribution) in collapsed expanders.
+
+2. **Vessel Summary** — vessel-level aggregation table with risk bands and compounding multipliers. Primary Kpler-vocabulary tab. Secondary views (top vessels legacy, repeat offenders, encounter analysis / carrier alerts, AIS gap behaviour) in collapsed expanders.
+
+3. **Fisheries Context** — FDI overlay, c-square context, species landings. Geographic risk breakdown in an expander.
+
+4. **Vessel Investigation** — three-layer view: framework methodology, structured narrative, per-vessel coloured risk tree. The AQUARIS-style deep dive.
+
+5. **Risk Tree Framework** — methodology visualisation from `risk_tree_framework.yaml`. Direct conceptual link to Kpler's April 2026 shadow fleet risk tree blog post.
+
+6. **AI Analyst** — Gemini 2.5 Flash interface with RAG knowledge base and sandboxed code execution. Conceptual parallel to Kpler's MCP beta.
+
+Secondary diagnostic charts live inside collapsed expanders within their parent tabs, keeping the main navigation clean while preserving the full analytical depth for follow-up questions.
+
+## Suggested demo walkthrough (30 minutes)
+
+1. **Map & Overview** — open on the Folium map. The visual hook. Show monthly event-type trend as a direct analogue to Kpler's Graph 4 in the *Turning Tides* whitepaper.
+
+2. **Vessel Summary** — the Kpler-vocabulary moment. Point out risk bands (Low / Emerging / Elevated / Severe / Critical >=100), the base vs compounded score decomposition, and the worst actors ranked by total risk.
+
+3. **Vessel Investigation** — drill into one high-risk vessel. Walk through the three-layer view. This is the AQUARIS-style narrative in fisheries.
+
+4. **Risk Tree Framework** — step back to the methodology. Name the direct link to Kpler's April 2026 shadow fleet risk tree blog post.
+
+5. **Fisheries Context** — show the FDI overlay. This is the differentiator vs Kpler's oil and gas focus. Point out that no Kpler whitepaper covers fisheries as a product area.
+
+6. **AI Analyst** — close with a live query. Frame it as the conceptual parallel to Kpler's MCP beta: LLM layered over structured risk data.
+
+## Detailed click-throughs (use inside the walkthrough above)
+
+### Open with the map (30 seconds)
+
+Open the live app. Let the map load with the static dataset. Point out the color-coded markers: "Red is AIS gaps — vessels going dark. Orange is loitering. Purple is encounters between vessels. The black markers are vessels matched against the IUU vessel blacklist. Blue markers are ICCAT-authorized vessels doing something suspicious. The dark red markers are OFAC-sanctioned vessels — the highest compliance priority."
+
+Don't explain every marker. Let them absorb the visual, then move to specifics.
+
+### Show an OFAC-sanctioned vessel (60 seconds)
+
+Click on a dark red marker (SABITI or ADRIAN DARYA 1). "These are real OFAC-sanctioned Iranian tankers. SABITI is on the SDN list under the Iran sanctions program. Any commercial entity transacting with this vessel faces secondary sanctions exposure. The risk model applies a 2.5x multiplier on top of the Iranian flag multiplier and any behavioural factors. This is the kind of vessel where Kpler's compliance clients would want an immediate alert — not a fisheries case, but a sanctions case where the maritime intelligence framework still applies."
+
+This demonstrates: understanding that the same risk model framework works across compliance use cases — sanctions, IUU fishing, regulatory authorization. The architecture is general; the data layers determine the use case.
+
+### Show an IUU match (60 seconds)
+
+Click on a black marker (KOOSHA 4). Walk through the popup: "This is KOOSHA 4, Iranian-flagged, GFCM-listed for IUU fishing in the Mediterranean. It matched via MMSI — the strongest identity match. Its risk score is multiplied by 3x because it has a confirmed IUU history in these waters. The FDI baseline below shows this c-square has 200 fishing days of trawl activity and high-value hake landings — so this is an active fishing ground where an IUU vessel showing up is operationally concerning."
+
+This demonstrates: multi-source cross-referencing, identity matching, risk compounding, fisheries context — all in one popup.
+
+### Show an ICCAT-authorized vessel (60 seconds)
+
+Click on a blue marker (FRIO NARUTO). "This vessel is ICCAT-authorized as a carrier — meaning it's legally permitted to transship tuna in the Med. It appeared in an encounter event. The risk model gives it a 1.4x multiplier because authorized carriers have the infrastructure and cover to launder unauthorized catch through legitimate channels. The question an analyst should ask is: was this transshipment under ICCAT Regional Observer Programme coverage? If not, why not?"
+
+This demonstrates: understanding that authorization is an opportunity indicator, not exoneration. This is a nuanced analytical point that shows domain depth.
+
+### Show the Fisheries Context tab (60 seconds)
+
+Switch to the **Fisheries Context** tab. "This tab overlays GFW events against the EU's official fisheries data. Each event is mapped to a c-square — a 0.5 degree grid cell used by STECF for fisheries reporting. I can see whether an event occurred in a known fishing ground, what species are typically caught there, and what the economic value is. High-value c-squares — swordfish, bluefin tuna areas — are where transshipment risk is highest because the incentive to launder unauthorized catch is strongest."
+
+This demonstrates: spatial analysis capability, understanding of EU fisheries data infrastructure, economic reasoning about IUU incentives.
+
+### Show the Vessel Investigation tab (90 seconds — the methodology + the case file)
+
+Switch to the **Vessel Investigation** tab. Open the "Risk Assessment Framework (methodology)" expander at the top.
+
+The graphviz diagram renders showing the full Mediterranean IUU risk tree — seven branches (identity, flag risk, regulatory status, authorization, behavioural history, spatial context, network exposure) feeding into five tier outcomes (Critical, High, Elevated, Moderate, Low). Walk through it briefly:
+
+"I read your April blog post on building risk trees for shadow fleet exposure. The methodology transfers cleanly to IUU fishing — same playbook, weak flags, dark vessels, opaque ownership, suspicious encounters. I built the Mediterranean IUU equivalent. The structure has three branch types: gating branches like identity verification and sanctions status that override everything else, additive branches like flag risk and behavioural history that contribute cumulatively, and contextual branches like fishing authorization that don't fit either category cleanly."
+
+"The compound logic matters. A flag of convenience alone tells you nothing. A flag of convenience plus an AIS gap plus an encounter with a reefer near the Libyan EEZ tells you a lot. The framework encodes those combinations explicitly rather than flattening them into a multiplicative score."
+
+Collapse the framework expander. Then select KOOSHA 4 from the dropdown, click Run Investigation.
+
+The 10-step structured report renders instantly: identity confirmation, IUU listing status (red error box), ICCAT check, OFAC check, fisheries context, behavioural pattern, risk decomposition, hypothesis, external links, threat assessment.
+
+"This is the framework applied to a specific vessel. The methodology document above shows how an analyst would think about IUU risk. The investigation below executes that same logic against the data — rule-based, deterministic, no LLM. Two views of the same intelligence: the framework, and the case file."
+
+This demonstrates: structured analytical thinking, the ability to encode domain expertise as rules, direct extension of Kpler's published methodology into an adjacent domain, and awareness that LLMs aren't always the right tool for the job.
+
+### Show the AI Analyst (90 seconds — take your time here)
+
+This is the feature that separates your project from every other "I made a dashboard." Kpler launched their own MCP for maritime intelligence in early 2026. Showing you've built a working conversational analytics layer on top of maritime data is directly aligned with where their product is heading.
+
+**First query — cross-source intelligence:**
+
+Switch to the AI Analyst tab. Ask: "Show me IUU-listed vessels in c-squares with high swordfish landings."
+
+Wait for Gemini to generate and execute the code. While it runs, explain: "The AI has access to all five dataframes — GFW events, FDI fisheries data, IUU vessel list, ICCAT authorized vessels, and OFAC sanctions. It can join across them, filter, aggregate, and produce charts. The code it writes runs in a sandboxed environment — only pandas, numpy, and plotly are available, no filesystem or network access."
+
+**Second query — full vessel investigation (the closer):**
+
+Type: "Investigate KOOSHA 4."
+
+The AI follows the investigation template loaded via the RAG knowledge base. It walks through ten structured steps: identity confirmation, IUU listing history, ICCAT authorization status, OFAC sanctions check, fisheries context for the event location, behavioural pattern analysis, risk score decomposition, hypothesis generation, external lookup links, and a summary threat assessment.
+
+Explain while it runs: "This is what an analyst would do manually — cross-reference five data sources, build a vessel profile, generate hypotheses, decide what to escalate. The AI does it in one query, with the investigation methodology codified in the knowledge base. The output includes MarineTraffic and VesselFinder links so the analyst can verify current position and ownership directly without leaving the workflow."
+
+**What to say about the architecture:**
+
+"The RAG approach means the AI doesn't hallucinate about maritime concepts — it has specific, curated knowledge about IUU indicators, GFCM regulations, ICCAT observer programmes, OFAC sanctions programs, and the investigation workflow itself. The live dataframe schema is injected into the system prompt so the AI knows exactly what columns are available and what's queryable."
+
+"The sandbox is important — generated code can only read the data and produce visualisations. It can't modify the source dataframes, access the filesystem, or make network calls. That matters when you're executing AI-generated code against compliance-sensitive data."
+
+**The MCP framing (use this if they bring up Kpler MCP, or proactively if the conversation goes there):**
+
+"This is conceptually the same pattern as Kpler's MCP — natural language in, structured maritime intelligence out. The user asks a question, the LLM translates it into executable analysis against the underlying data, the results come back as narrative plus visualisation. I built this because I thought it was where the industry was heading. Glad to see Kpler is already there — the MCP product is exactly the architecture I'd want to work on."
+
+**If they ask about limitations:**
+
+"Each question is independent — there's no multi-turn memory yet, so you can't say 'now filter that to 2024.' That's a deliberate simplification for the portfolio version. In production you'd maintain conversation history. The AI also can't currently make external lookups — it generates clickable links instead. With Claude's API and web search enabled, the investigation could include live external data pulls during the analysis itself."
+
+This demonstrates: LLM integration in a production-style app, RAG with domain-specific knowledge AND structured analytical workflows, sandboxed code execution, cross-source data querying, and understanding of where maritime intelligence products are heading. The investigation walkthrough is the moment that turns the dashboard into an intelligence tool.
+
+### Close with the risk formula (30 seconds)
+
+Open the methodology sidebar. "The risk scoring replicates GFW's published transshipment detection criteria from Miller et al. 2018. Duration, proximity, speed, vessel type, flag state, shore distance — all compound multiplicatively. IUU, ICCAT, and OFAC multipliers stack on top. So the riskiest event in the dataset is one involving an IUU-listed, ICCAT-authorized, OFAC-sanctioned carrier vessel in an encounter far from shore with an Iranian flag."
+
+## Questions They Might Ask (and how to answer)
+
+### "How would you scale this to cover all oceans, not just the Med?"
+
+"The architecture is region-agnostic. The GFW API covers the entire globe. The c-square grid system works anywhere. The IUU vessel list is already global — 13 RFMOs. The only Med-specific component is the FDI data, which covers EU waters. For non-EU regions, you'd substitute equivalent fisheries data — FAO regional catch statistics, or national logbook data where available. The risk model and matching logic don't change."
+
+### "The GFW Events API only gives you suspicious events. How would you get a complete picture?"
+
+"You're right — GFW events are pre-filtered for suspicious behaviour. For a complete operational picture, you'd need continuous AIS position data (which Kpler already has) and run your own fishing activity detection algorithms. My app demonstrates the analytical framework — multi-source cross-referencing, identity resolution, risk scoring — on top of GFW's event feed. The same framework would apply on top of Kpler's own AIS data pipeline."
+
+### "How reliable is vessel name matching?"
+
+"It's the weakest link. IUU vessels change names deliberately. Name matching has three tiers in the app: MMSI exact (highest confidence), IMO exact (high — permanent hull identifier resolved via GFW Vessels API), and name matching (medium to low). I display the match type and confidence level in the UI so analysts can assess reliability. The proper long-term solution is a vessel identity graph that tracks name/flag/ownership changes over time — which is essentially what Kpler's vessel database does."
+
+### "Why did you treat ICCAT authorization as a risk multiplier rather than a mitigating factor?"
+
+"Authorization provides access, cover, and infrastructure. An authorized carrier in an encounter event isn't necessarily doing something wrong — but it has the means to do so more effectively than an unauthorized vessel. The multiplier is modest (1.2-1.4x) precisely because authorization alone doesn't indicate wrongdoing. It's an opportunity indicator, not an accusation. The highest-priority signal in the entire system is a vessel that is both IUU-listed and ICCAT-authorized — confirmed history plus current access."
+
+### "What data sources would you add next?"
+
+"Three priorities. First, GFCM stock assessment data — stock status by area and species, so events in critically overfished zones get prioritised. Second, EU sanctions vessel lists beyond OFAC for full coverage. Third, port state control inspection data from the Paris and Med MoU — vessels with detention history appearing in suspicious events are higher priority targets. All three are publicly available."
+
+### "What features would you add next?"
+
+"The risk tree framework I showed you is the methodology layer. The natural next step is to make it dynamic — per-vessel tree visualisation where the diagram highlights the specific path a vessel took through the framework. The static framework I built is the document. The interactive version would be the runtime. I scoped that out as a deliberate choice — the framework spec is where the analytical thinking lives, and the investigation tab already executes the same logic per-vessel. Building the interactive tree would be a presentation enhancement, not new analysis."
+
+"Beyond that — an ownership network graph. Most IUU operations involve multiple vessels under common beneficial ownership, and visualising those relationships would expose patterns that single-vessel risk scores miss. Kpler's vessel ownership API would be the natural data source. That's where the existing framework would extend most naturally."
+
+### "How does this compare to what Kpler already offers?"
+
+Don't pretend your portfolio project competes with a commercial platform. But show you've done your homework: "I reviewed Kpler's Compliance API schema. The risk categories map directly — AIS gaps, dark STS events, flag risks, sanctions screening all have equivalents in my risk model. The architecture is similar: compound multiple risk signals into a consolidated vessel risk indicator, which is what Kpler launched in March 2026.
+
+Where my tool adds a dimension Kpler's compliance product doesn't currently cover is the fisheries-specific layer — linking vessel behaviour to officially reported catches and effort via FDI spatial data, and cross-referencing against ICCAT fishing authorization records. That's the IUU fishing intelligence layer on top of the general maritime compliance framework. For an IUU Fishing Analyst role, that's the relevant gap — Kpler has world-class AIS and sanctions data, but fisheries context is what turns a compliance alert into an IUU intelligence product."
+
+### The four-of-six framework line (memorise this)
+
+From Kpler's "How Deception Detection Works" brief:
+
+"What was once a binary question — is the vessel sanctioned or not? — has evolved into layered risk assessment across six dimensions."
+
+The six Kpler risk layers are: formal sanctions status, behavioural indicators, associative risk, geographic risk, cargo risk, ownership opacity.
+
+Med Vessel Monitor implements four of these six layers:
+
+1. **Formal sanctions status** — TMT Combined IUU List, ICCAT IUU list, OFAC SDN screening
+2. **Behavioural indicators** — GFW gap, encounter, loitering events, aligned with Miller et al. 2018 methodology
+3. **Geographic risk** — GSA-based hotspot weighting, shore distance factor
+4. **Cargo risk** — ICCAT species multipliers (BFT 1.3x, SWO/ALB 1.2x, carrier 1.4x) as the fisheries-cargo equivalent
+
+The two gaps are **associative risk** (fleet and network propagation) and **ownership opacity** (beneficial ownership unwinding). These are the layers where Kpler's Maritime 2.0 ownership graph and fleet-association data add value over an open-source stack. Naming the gaps honestly in Kpler's own vocabulary is a pitch strength, not a weakness.
+
+### Kpler Compliance API Alignment (know this for technical conversations)
+
+Their API has four risk categories. Here's how your app maps:
+
+```
+KPLER                                    YOUR APP
+-----                                    --------
+OperationalRisks.aisGaps                 GAP events + speed change analysis
+OperationalRisks.darkStsEvents           ENCOUNTER events (vessel meetings)
+OperationalRisks.stsEvents               ENCOUNTER + ICCAT carrier matching
+SanctionRisks.sanctionedVessels          OFAC SDN cross-reference (2.5x multiplier)
+SanctionRisks.sanctionedFlag             Flag multipliers + OFAC program data
+FlagRisks.flagOfConvenience              FOC flag multipliers (PAN, LBR, MHL)
+FlagRisks.flagRankings (MoU lists)       FLAG_RISKS dict
+ManagementRisks.portStateControl         Planned enhancement
+AisSpoof (spoofing detection)            Not in your app
+FleetStatusCounters                      KPI metrics (events, IUU/OFAC counts, risk)
+```
+
+What you have that their Compliance API doesn't:
+- FDI fisheries baseline (catch/effort per c-square)
+- ICCAT authorization cross-reference
+- Species-level economic context
+- AI natural language querying across all sources
+
+What they have that you don't:
+- AIS spoofing detection
+- Ownership layer analysis (beneficial owner, operator, ISM, P&I)
+- Cargo-level sanctions (commodities, HS codes)
+- Port state control (inspections, detentions)
+
+If asked "what would you build first at Kpler?": "The fisheries context layer. Kpler already has best-in-class AIS, sanctions, and ownership data. What's missing for IUU-specific intelligence is the fisheries dimension — what's being caught where, who's authorized to catch it, and whether vessel behaviour aligns with legitimate fishing patterns. That's what I'd integrate."
+
+### "Tell me about the FDI data — what are its limitations?"
+
+"FDI is compiled annually by EU Member States and reviewed by STECF. It's not raw declarations — it's statistically processed estimates raised from logbooks, sales notes, and sampling. The spatial data uses 0.5 degree c-squares, which is much coarser than AIS resolution, so I aggregate GFW events up to that grid. Mediterranean spatial data is only reliable from 2017 onwards, and there's no coverage for non-EU waters — Libya, eastern Med, North Africa. Confidentiality suppression means some c-squares with fewer than 3 vessels are omitted. I display these coverage gaps in the app rather than hiding them."
+
+## Vocabulary notes
+
+- Use "grey fleet" and "shadow fleet" as near-synonyms. The March 2025 paper is titled *Grey Fleet*; the December 2025 flagship report uses *shadow fleet* as the primary umbrella term. Let Amanda lead on which one she uses first.
+
+- "Dark activities" is an action, not a fleet. A vessel conducts dark activities; it is not a dark vessel.
+
+- "Deceptive shipping practices" (DSP) is the Kpler-preferred umbrella for the behavioural category.
+
+- Say "compounding risk", "score band", "threshold breach", "behavioural signal", "structural amplifier". These are Kpler's exact words from the December 2025 report.
+
+- Reframe "AIS gap detection" as "dark activity detection" where natural — same code, Kpler's language.
+
+## Key Kpler numbers to cite (from Turning Tides, Dec 2025)
+
+- **302 high-risk vessels predicted in October 2025; 42 sanctioned by December 2025** — 14% confirmation rate in approximately two months. This is the single strongest data point in Kpler's 2025 material.
+
+- **686 newly designated vessels in 2025** — the most active enforcement year on record.
+
+- **Shadow fleet approximately 3,300 vessels by December 2025**, moving approximately 3,733 million barrels of oil — 6 to 7% of global crude flows.
+
+- **Dark STS activity up 129% year-on-year**; AIS spoofing up 18.3%.
+
+- **Over USD 100 billion** of crude moved through shadow and sanctioned shipping networks in 2025.
+
+- **80.1% of eventually-sanctioned spoofing vessels** were designated within 12 months of their first spoofing incident (descriptive, not predictive — distinction matters if probed).
+
+- **Case study: AQUARIS (IMO 9251822)**, Iran-linked tanker, OFAC-sanctioned 20 November 2025 after a textbook behavioural arc of Iranian port calls, AIS spoofing, dark STS in Iranian zones, and detention in Dalian. Kpler frames this as proof that behavioural signals predict designation.
+
+- **VCLL Skipper seizure (10 December 2025)** — sanctioned tanker carrying Venezuelan crude intercepted at sea by US forces. Signals enforcement expansion beyond designation into physical interdiction.
+
+- **Kpler closing tagline from Turning Tides:** "In 2026, Kpler Risk and Compliance won't chase risk, it will predict it."
+
+- **Kpler score bands** (mirror in your own vocabulary): Low, Emerging, Elevated, Severe, Critical at score >=100.
+
+## What NOT to Say
+
+- Don't call it "real-time monitoring" — it's a snapshot, not a live feed
+- Don't claim the risk scores are validated — they're a demonstration of methodology, not operationally verified
+- Don't overstate the matching reliability — be upfront about name matching limitations
+- Don't try to explain the MCDA methodology from the tools4MCDA paper — it's not relevant to the role
+- Don't apologise for it being a portfolio project — own it as a demonstration of analytical capability
+- Don't compare it unfavourably to Kpler's products — frame it as complementary thinking
+
+## Architecture Cheatsheet
+
+Know this cold. If they ask "walk me through the code" or "how is it structured," you can answer confidently.
+
+### File Map
+
+```
+app.py              → Orchestrator. Loads data, runs filters, applies risk
+                      scoring, renders Folium map, dispatches to the 6
+                      top-level tabs. This is the entry point — everything
+                      flows through here.
+
+config.py           → Constants and pure functions. Event weights, flag risk
+                      multipliers, IUU multipliers (GFCM=3.0x, other=2.0x),
+                      ICCAT multipliers (carrier=1.4x, BFT=1.3x, SWO=1.2x),
+                      OFAC multiplier (2.5x), RISK_BANDS definitions
+                      (Low / Emerging / Elevated / Severe / Critical),
+                      species name lookup, forbidden code list for sandbox.
+                      Two spatial helpers: classify_med_zone() (longitude
+                      bands) and assign_csquare() (maps point to 0.5dd grid).
+                      classify_risk_band() assigns the final band label.
+
+data_loading.py     → All data ingestion. Loaders, all @st.cache_data:
+                      - load_static_data() → 88-row CSV or synthetic gen
+                      - load_live_data() → GFW Events API (async, 3 datasets)
+                      - load_fdi_effort() → ~83K rows, Med fishing days
+                      - load_fdi_landings() → ~212K rows, Med catch/value
+                      - load_iuu_vessels() → 369 IUU-listed vessels
+                      - load_iccat_vessels() → 9,203 Med-authorized vessels
+                      - load_ofac_vessels() → OFAC SDN sanctioned vessels
+                      - lookup_vessel_imos() → GFW Vessels API, MMSI→IMO
+
+risk_model.py       → All scoring and matching logic:
+                      - compute_risk_score() → base behavioural risk per event
+                      - get_fdi_context() → FDI baseline for a c-square
+                      - check_iuu_match() → MMSI→IMO→name priority chain
+                      - match_iuu_vessels() → applies IUU to all rows
+                      - check_iccat_match() → IMO→name priority chain
+                      - match_iccat_vessels() → applies ICCAT to all rows
+                      - check_ofac_match() → MMSI→IMO→name (no fuzzy)
+                      - match_ofac_vessels() → applies OFAC to all rows
+
+investigation.py    → Deterministic vessel investigation (rule-based, no LLM):
+                      - investigate_vessel() → 10-step structured report
+                      - Reads all 5 dataframes, applies rule-based logic
+                      - Returns structured dict for UI rendering
+                      - No API calls, no LLM, instant results
+                      - Used by Vessel Investigation tab as a reliable
+                        fallback to the LLM-based AI analyst
+
+risk_tree.py        → Med IUU Risk Tree framework rendering:
+                      - load_framework() → reads risk_tree_framework.yaml
+                      - render_framework_tree() → graphviz diagram, with
+                        optional per-vessel severity colouring and tier
+                        highlighting
+                      - Adapted from Kpler's April 2026 shadow fleet
+                        risk tree blog post
+
+data/risk_tree_framework.yaml → Analytical framework specification:
+                      - 7 branches (gate / additive / contextual types)
+                      - Compound logic rules for tier assignment
+                      - 5 tier outcomes (Critical → Low)
+                      - Documented methodology, not executable code
+
+tabs.py             → Render functions invoked from the 6 top-level tabs
+                      and their expanders. Each receives df_filtered +
+                      supplementary data. Render functions are preserved
+                      even when moved into expanders.
+
+                      Top-level tabs (defined in app.py):
+                      1. Map & Overview — risk heatmap + daily/monthly
+                         trends (primary); flag breakdown, event types,
+                         duration distribution in expanders
+                      2. Vessel Summary — vessel-level aggregation with
+                         risk bands (primary); legacy top vessels, repeat
+                         offenders, encounter analysis, gap behaviour in
+                         expanders
+                      3. Fisheries Context — FDI overlay (primary);
+                         geographic risk breakdown in expander
+                      4. Vessel Investigation — deterministic 10-step
+                         report + per-vessel coloured risk tree
+                      5. Risk Tree Framework — methodology diagram
+                      6. AI Analyst — Gemini 2.5 Flash sandboxed interface
+
+ai_analyst.py       → Gemini 2.5 Flash integration:
+                      - build_system_prompt() → schema + RAG knowledge
+                      - is_safe_code() → sandbox check vs FORBIDDEN_CODE
+                      - render_ai_analyst() → UI + API call + exec()
+                      - exec namespace: df, fdi_effort, fdi_landings,
+                        iuu_vessels, iccat_vessels, ofac_vessels, pd, np,
+                        px, go
+```
+
+### Data Pipeline (execution order in app.py)
+
+```
+1.  Load data         load_live_data() or load_static_data()
+2.  Load reference    load_fdi_*(), load_iuu_vessels(), load_iccat_vessels(), load_ofac_vessels()
+3.  Filter            duration >= min_duration slider
+4.  Score             compute_risk_score() → base risk_score column
+5.  Spatialise        assign_csquare() → csq_lon, csq_lat columns
+6.  Resolve identity  lookup_vessel_imos() → imo column (live only)
+7.  Preserve base     base_risk_score = risk_score snapshot (pre-multiplier)
+8.  IUU match         match_iuu_vessels() → iuu_* columns, risk *= iuu_multiplier
+9.  ICCAT match       match_iccat_vessels() → iccat_* columns, risk *= iccat_multiplier
+10. OFAC match        match_ofac_vessels() → ofac_* columns, risk *= ofac_multiplier
+11. Classify band     classify_risk_band() → risk_band column (Low..Critical)
+12. Render map        Folium markers (priority: OFAC > IUU > ICCAT > event type)
+13. Render tabs       6 top-level tabs dispatched with df_filtered + reference data
+14. AI analyst        Gemini with RAG + sandboxed code execution + investigation template
+```
+
+### Identity Matching Chain
+
+```
+IUU matching:    MMSI exact (high) → IMO exact (high) → name exact (medium) → name fuzzy (low)
+ICCAT matching:  IMO exact (high) → name exact (medium, min 4 chars)
+OFAC matching:   MMSI exact (high) → IMO exact (high) → name exact (no fuzzy — legal risk)
+```
+
+### Risk Score Composition
+
+```
+base = (duration_h ^ 0.75) x event_weight x flag_multiplier x shore_factor
+     x encounter_factors  (proximity + speed + vessel_type)
+     x loitering_factors  (vessel_type + avg_speed)
+     x gap_factors        (speed_change)
+
+final = base x iuu_multiplier x iccat_multiplier x ofac_multiplier
+
+All multipliers compound. A worst-case event:
+  IRN flag (2.4) x GFCM IUU (3.0) x OFAC sanctions (2.5) x ICCAT carrier (1.4)
+  x encounter proximity (1.8) x speed (1.5) x vessel type (1.4)
+  x shore >20nm (1.5) = 95x base score
+```
+
+All lookup-based multipliers (IUU, ICCAT, OFAC) apply at the event level, multiplying already-computed behavioural risk scores. A vessel with no suspicious AIS behaviour carries no risk score regardless of authorisation or listing status. ICCAT authorisation, flag risk, and sanctions listings therefore amplify behavioural signal rather than substituting for it. This is deliberate: ICCAT authorisation indicates *opportunity* (access to high-value species or transshipment capability), not *exoneration*, and only modifies risk when behavioural signal is already present.
+
+After all multipliers are applied, the final compounded `risk_score` is classified into Kpler-aligned bands:
+
+```
+Low       (<50)       sparse risk signals
+Emerging  (50-59)     first risk flags
+Elevated  (60-80)     multiple risk indicators
+Severe    (81-99)     compounding risk
+Critical  (>=100)     threshold breach
+```
+
+The `base_risk_score` column preserves the pre-multiplier behavioural score, enabling explicit decomposition of how much of a vessel's risk comes from behaviour versus structural amplifiers.
+
+### Map Marker Color Key
+
+```
+Dark red = OFAC-sanctioned vessel (highest priority, overrides all)
+Black    = IUU-listed vessel (overrides event color)
+Blue     = ICCAT-authorized vessel
+Red      = AIS GAP event
+Orange   = LOITERING event
+Purple   = ENCOUNTER event
+```
+
+## Key Numbers to Know
+
+- 5 data sources cross-referenced (GFW, FDI, IUU, ICCAT, OFAC)
+- 88 demo events across 6 top-level tabs (secondary charts in expanders)
+- 369 IUU vessels (213 currently listed, 150 GFCM-listed)
+- 9,203 ICCAT Med-authorized vessels
+- ~1,000 FDI c-squares covering EU Med waters
+- ~83K effort rows, ~212K landings rows
+- 3-level identity matching: MMSI → IMO → vessel name
+- Risk formula: 8 multiplicative factors compounding independently, then classified into 5 Kpler-aligned bands
+- GFW methodology aligned with Miller et al. 2018
+- 10-step structured investigation workflow — both deterministic (rule-based) and LLM-powered (RAG)
+- Risk tree framework with 7 branches and 5 tier outcomes — adapted from Kpler's April 2026 shadow fleet methodology
+
+## The One Thing to Communicate
+
+You don't just monitor vessels — you contextualise their behaviour against multiple independent evidence streams. That's what separates a dashboard from an intelligence tool, and it's what Kpler sells.
