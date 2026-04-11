@@ -292,3 +292,11 @@ scope_and_limitations: |
   predictive model would require a historical designation dataset
   tied to fisheries IUU outcomes at comparable scale, which does not
   yet exist.
+
+  Base score composition. The base_risk_score now includes the MPA
+  intersection factor alongside the event-specific behavioural
+  factors. The base is no longer "behaviour only" but "observation
+  about the event itself, including spatial regulatory context".
+  This preserves the base-vs-compound decomposition: base captures
+  what was observed about the event; compound captures what was
+  looked up about the vessel.

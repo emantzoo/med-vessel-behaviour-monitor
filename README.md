@@ -13,9 +13,10 @@ Live app: [med-vessel-behaviour-monitor.streamlit.app](https://med-vessel-behavi
 ## What it does
 
 - Pulls AIS gap, encounter, and loitering events from the Global Fishing Watch Events API
-- Scores each event with a multiplicative risk formula weighted by duration, event type, flag state, shore distance, and event-specific factors (proximity, speed, vessel type)
+- Pulls a separate stream of CNN-classified fishing events from GFW (`public-global-fishing-events`, Kroodsma et al. 2018), kept out of the scored dataframe and surfaced only as a per-vessel fishing-in-MPA flag
+- Scores each event with a multiplicative risk formula weighted by duration, event type, flag state, shore distance, **MPA intersection tier** (from GFW `regions.mpa`), and event-specific factors (proximity, speed, vessel type)
 - Cross-references vessels against five independent reference sources with distinct epistemological status:
-  - GFW Events API (observed AIS behavioural inference)
+  - GFW Events API (observed AIS behavioural inference) — includes WDPA point-in-polygon (`regions.mpa`) and a separate fishing-events feed (Kroodsma 2018 CNN)
   - EU JRC FDI spatial data (statistical fishing effort estimates by c-square)
   - TMT Combined IUU Vessel List (enforcement actions from 13 RFMOs)
   - ICCAT Record of Vessels (Med-authorised vessels)
@@ -34,13 +35,15 @@ The base behavioural score is computed per event:
 
 ```
 base = (duration_h ^ 0.75) x event_weight x flag_multiplier x shore_factor
-     x event_specific_factors
+     x mpa_multiplier x event_specific_factors
 ```
 
 Event-specific factors depend on event type:
 - **Encounters**: proximity (median distance), speed, transshipment vessel type
 - **Loitering**: transshipment vessel type, average speed
 - **Gaps**: speed change across the gap (evasion proxy)
+
+The MPA factor is applied per event using GFW's `regions.mpa` field, which returns a pre-computed point-in-polygon intersection against the World Database on Protected Areas (WDPA). MPA matches are classified into three regulatory tiers — GFCM Fisheries Restricted Area (`gfcm_fra`, 2.0x, legally binding under Council Regulation (EC) 1967/2006), EU-designated marine site (`eu_site`, 1.5x, includes Natura 2000 marine and Pelagos Sanctuary), and general WDPA entry (`general`, 1.2x). Tier classification is by config-driven substring match on the MPA name. Empirical anchoring: Seguin et al. 2025 (*Science*) found industrial fishing in 47% of coastal MPAs, justifying MPA intersection as a high-tier risk factor; Raynor et al. 2025 (*Science*) found 9× fewer fishing vessels in fully protected MPAs, anchoring the GFCM-FRA tier as the strictest enforcement category. McDonald et al. 2024 (*Nature*) bounds the AIS-only approach as a lower-bound indicator: roughly 90% of fishing vessels inside MPAs do not broadcast AIS.
 
 After base scoring, three lookup-based multipliers apply at the event level:
 
@@ -130,6 +133,8 @@ Secondary diagnostic charts live inside collapsed `st.expander` blocks within th
 | Source | Content | Scale |
 |---|---|---|
 | GFW Events API | AIS gap, encounter, loitering events | Med polygon, up to 5000/query |
+| GFW `regions.mpa` | WDPA point-in-polygon, returned in event metadata | Global; tiered into `gfcm_fra` / `eu_site` / `general` by config substring match |
+| GFW `public-global-fishing-events` | Kroodsma et al. 2018 CNN-classified fishing activity | Same Med polygon, separate dataframe; never merged into scored events. Surfaced display-only as fishing-in-MPA flag |
 | EU JRC FDI | Fishing effort (days) and landings by 0.5 deg c-square | 82.8K effort rows, 212K landings rows, 1,008 unique c-squares, 2017-2024 |
 | TMT Combined IUU List | 13 RFMOs, IUU-listed vessels | 369 vessels (213 currently listed, 150 GFCM-listed) |
 | ICCAT Record of Vessels | Med-authorised vessels | 9,203 vessels, 786 with IMO |
@@ -179,6 +184,11 @@ Both have sidebar text-input fallbacks if the secrets file is missing.
 ## Methodology references
 
 - Miller, N.A. et al. (2018). *Identifying Global Patterns of Transshipment Behavior.* Frontiers in Marine Science.
+- Kroodsma, D.A. et al. (2018). *Tracking the global footprint of fisheries.* Science 359(6378), 904–908. [doi:10.1126/science.aao5646](https://doi.org/10.1126/science.aao5646) -- CNN-based fishing classification underlying GFW's `public-global-fishing-events` feed and the fishing-in-MPA flag.
+- Seguin, R. et al. (2025). *Global patterns and drivers of untracked industrial fishing in coastal marine protected areas.* Science 389, 396–401. [doi:10.1126/science.ado9468](https://doi.org/10.1126/science.ado9468) -- 47% of coastal MPAs show industrial fishing; methodological backbone for MPA intersection.
+- Raynor, J. et al. (2025). *Little-to-no industrial fishing occurs in fully and highly protected marine areas.* Science 389, 392–395. [doi:10.1126/science.adt9009](https://doi.org/10.1126/science.adt9009) -- 9× fewer fishing vessels in fully protected MPAs; anchors GFCM-FRA tier as the strictest enforcement category.
+- McDonald, G.G. et al. (2024). *Satellite mapping reveals extensive industrial activity at sea.* Nature 625, 85–91. [doi:10.1038/s41586-023-06825-8](https://doi.org/10.1038/s41586-023-06825-8) -- ~75% of fishing vessels at sea and ~90% inside MPAs do not broadcast AIS; bounds AIS-based MPA intersection as a lower-bound indicator.
+- Council Regulation (EC) No 1967/2006 -- Mediterranean management measures. Legal basis for GFCM Fisheries Restricted Area enforcement, underpinning the 2.0x `gfcm_fra` regulatory tier.
 - Global Fishing Watch. (2017). *The Global View of Transshipment: Revised Preliminary Findings.*
 - Kpler. (October 2025). *Deceptive Shipping Practices* -- compounding behavioural risk scoring.
 - Kpler. (December 2025). *The Turning Tides: Maritime Risk and Compliance Insights 2025-2026* -- predictive risk bands and vessel-level aggregation.

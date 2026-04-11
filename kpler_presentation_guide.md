@@ -130,7 +130,9 @@ This demonstrates: LLM integration in a production-style app, RAG with domain-sp
 
 ### Close with the risk formula (30 seconds)
 
-Open the methodology sidebar. "The risk scoring replicates GFW's published transshipment detection criteria from Miller et al. 2018. Duration, proximity, speed, vessel type, flag state, shore distance — all compound multiplicatively. IUU, ICCAT, and OFAC multipliers stack on top. So the riskiest event in the dataset is one involving an IUU-listed, ICCAT-authorized, OFAC-sanctioned carrier vessel in an encounter far from shore with an Iranian flag."
+Open the methodology sidebar. "The risk scoring replicates GFW's published transshipment detection criteria from Miller et al. 2018. Duration, proximity, speed, vessel type, flag state, shore distance, MPA intersection — all compound multiplicatively into the base score. IUU, ICCAT, and OFAC multipliers stack on top. So the riskiest event in the dataset is one involving an IUU-listed, ICCAT-authorized, OFAC-sanctioned carrier vessel in an encounter far from shore with an Iranian flag inside a GFCM Fisheries Restricted Area."
+
+The MPA factor is applied at the event level from the GFW `regions.mpa` field, which returns a pre-computed point-in-polygon intersection against WDPA. MPAs are classified into three regulatory tiers: GFCM FRA (`gfcm_fra` 2.0x, legally binding under Council Regulation 1967/2006), EU-designated marine site (`eu_site` 1.5x, includes Natura 2000 and Pelagos Sanctuary), general WDPA entry (`general` 1.2x). Welch et al. 2025 (Science) is the methodological backbone; McDonald et al. 2024 (Nature) bounds the approach as a lower-bound indicator (~90% of fishing vessels inside MPAs do not broadcast AIS).
 
 ## Questions They Might Ask (and how to answer)
 
@@ -253,6 +255,10 @@ If asked "what would you build first at Kpler?": "The fisheries context layer. K
 - **Kpler closing tagline from Turning Tides:** "In 2026, Kpler Risk and Compliance won't chase risk, it will predict it."
 
 - **Kpler score bands** (mirror in your own vocabulary): Low, Emerging, Elevated, Severe, Critical at score >=100.
+
+- **MPA non-compliance base rate** (Seguin et al. 2025, *Science*): industrial fishing detected in **47% of coastal MPAs** studied -- AIS-based MPA intersection reliably surfaces a non-compliant tail that is broader than commonly assumed. Raynor et al. 2025 (Science) finds **9x fewer fishing vessels** in fully and highly protected MPAs vs unprotected coastal waters, anchoring GFCM-FRA as the strictest enforcement category.
+
+- **AIS coverage gap inside MPAs** (McDonald et al. 2024, *Nature*): approximately **90% of fishing vessels inside MPAs do not broadcast AIS**, making AIS-based intersection a lower-bound indicator. The MPA factor in the app is anchored on broadcasting vessels only, complementary to the AIS-gap evasion signal rather than a replacement for SAR verification.
 
 ## What NOT to Say
 
@@ -386,7 +392,7 @@ OFAC matching:   MMSI exact (high) → IMO exact (high) → name exact (no fuzzy
 ### Risk Score Composition
 
 ```
-base = (duration_h ^ 0.75) x event_weight x flag_multiplier x shore_factor
+base = (duration_h ^ 0.75) x event_weight x flag_multiplier x shore_factor x mpa_multiplier
      x encounter_factors  (proximity + speed + vessel_type)
      x loitering_factors  (vessel_type + avg_speed)
      x gap_factors        (speed_change)
@@ -396,7 +402,12 @@ final = base x iuu_multiplier x iccat_multiplier x ofac_multiplier
 All multipliers compound. A worst-case event:
   IRN flag (2.4) x GFCM IUU (3.0) x OFAC sanctions (2.5) x ICCAT carrier (1.4)
   x encounter proximity (1.8) x speed (1.5) x vessel type (1.4)
-  x shore >20nm (1.5) = 95x base score
+  x shore >20nm (1.5) x MPA gfcm_fra (2.0) = 190x base score
+
+MPA intersection factor (all event types, from GFW regions.mpa):
+  gfcm_fra: 2.0  -- GFCM Fisheries Restricted Area, legally binding under Reg 1967/2006
+  eu_site:  1.5  -- Natura 2000 marine, Pelagos Sanctuary, national MPAs
+  general:  1.2  -- other WDPA entries, contextual signal only
 ```
 
 All lookup-based multipliers (IUU, ICCAT, OFAC) apply at the event level, multiplying already-computed behavioural risk scores. A vessel with no suspicious AIS behaviour carries no risk score regardless of authorisation or listing status. ICCAT authorisation, flag risk, and sanctions listings therefore amplify behavioural signal rather than substituting for it. This is deliberate: ICCAT authorisation indicates *opportunity* (access to high-value species or transshipment capability), not *exoneration*, and only modifies risk when behavioural signal is already present.
@@ -426,7 +437,7 @@ Purple   = ENCOUNTER event
 
 ## Key Numbers to Know
 
-- 5 data sources cross-referenced (GFW, FDI, IUU, ICCAT, OFAC)
+- 5 data sources cross-referenced (GFW, FDI, IUU, ICCAT, OFAC), with GFW providing three distinct feeds (Events API, `regions.mpa` WDPA intersection, `public-global-fishing-events` CNN classifier)
 - 88 demo events across 6 top-level tabs (secondary charts in expanders)
 - 369 IUU vessels (213 currently listed, 150 GFCM-listed)
 - 9,203 ICCAT Med-authorized vessels
