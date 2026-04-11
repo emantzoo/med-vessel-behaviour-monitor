@@ -23,7 +23,7 @@ from tabs import (
     render_daily_trend, render_flag_breakdown, render_event_types,
     render_duration_analysis, render_geographic_risk, render_risk_heatmap,
     render_repeat_offenders, render_gap_behaviour, render_encounter_analysis,
-    render_top_vessels, render_vessel_summary, render_vessel_investigation,
+    render_vessel_summary, render_vessel_investigation,
     render_fisheries_context, render_reference,
 )
 from ai_analyst import render_ai_analyst
@@ -600,67 +600,71 @@ if not df_filtered.empty and "iuu_matched" in df_filtered.columns:
             )
 
 # ========================= TABS =========================
-# Consolidated to 6 top-level tabs per tab_consolidation_spec.md.
-# Secondary diagnostic charts live inside collapsed expanders within
-# their parent tab, keeping navigation clean for a 30-minute demo.
-tab_investigation, tab_map, tab_vessels, tab_fisheries, tab_ai, tab_reference = st.tabs([
-    "Vessel Investigation",
-    "Map & Overview",
-    "Vessel Summary",
-    "Fisheries Context",
-    "AI Analyst",
+# Four top-level tabs ordered drill -> zoom out -> explain -> ask.
+# Vessel Watch groups Vessel Summary + Vessel Investigation (drill flow).
+# Fleet Overview groups Map & Overview + Fisheries Context (aggregate
+# fleet views). The remaining two are generic / interactive.
+tab_watch, tab_overview, tab_reference, tab_ai = st.tabs([
+    "Vessel Watch",
+    "Fleet Overview",
     "Reference & Methodology",
+    "AI Analyst",
 ])
 
-with tab_map:
-    render_risk_heatmap(df_filtered)
-    render_daily_trend(df_filtered)
+with tab_watch:
+    sub_summary, sub_investigation = st.tabs([
+        "Vessel Summary", "Vessel Investigation",
+    ])
 
-    with st.expander("Flag breakdown"):
-        render_flag_breakdown(df_filtered)
+    with sub_summary:
+        render_vessel_summary(df_filtered)
 
-    with st.expander("Event type distribution"):
-        render_event_types(df_filtered)
+        with st.expander("Repeat offenders -- IUU and ICCAT detail"):
+            render_repeat_offenders(df_filtered)
 
-    with st.expander("Event duration distribution"):
-        render_duration_analysis(df_filtered)
+        with st.expander("Encounter analysis -- carrier alerts"):
+            render_encounter_analysis(df_filtered)
 
-with tab_vessels:
-    render_vessel_summary(df_filtered)
+        with st.expander("AIS gap behaviour"):
+            render_gap_behaviour(df_filtered)
 
-    with st.expander("Top vessels (legacy view)"):
-        render_top_vessels(df_filtered)
+    with sub_investigation:
+        render_vessel_investigation(
+            df_filtered, iuu_vessels, iccat_vessels, ofac_vessels,
+            fdi_effort, fdi_landings, fishing_df=fishing_df,
+        )
+        st.caption("See **Reference & Methodology** tab for the generic framework and multiplier tables.")
 
-    with st.expander("Repeat offenders -- IUU and ICCAT detail"):
-        render_repeat_offenders(df_filtered)
+with tab_overview:
+    sub_map, sub_fisheries = st.tabs(["Map & Overview", "Fisheries Context"])
 
-    with st.expander("Encounter analysis -- carrier alerts"):
-        render_encounter_analysis(df_filtered)
+    with sub_map:
+        render_risk_heatmap(df_filtered)
+        render_daily_trend(df_filtered)
 
-    with st.expander("AIS gap behaviour"):
-        render_gap_behaviour(df_filtered)
+        with st.expander("Flag breakdown"):
+            render_flag_breakdown(df_filtered)
 
-with tab_fisheries:
-    render_fisheries_context(df_filtered, fdi_effort, fdi_landings)
+        with st.expander("Event type distribution"):
+            render_event_types(df_filtered)
 
-    with st.expander("Geographic risk breakdown"):
-        render_geographic_risk(df_filtered)
+        with st.expander("Event duration distribution"):
+            render_duration_analysis(df_filtered)
 
-with tab_investigation:
-    render_vessel_investigation(
-        df_filtered, iuu_vessels, iccat_vessels, ofac_vessels,
-        fdi_effort, fdi_landings, fishing_df=fishing_df,
-    )
-    st.caption("See **Reference & Methodology** tab for the generic framework and multiplier tables.")
+    with sub_fisheries:
+        render_fisheries_context(df_filtered, fdi_effort, fdi_landings)
+
+        with st.expander("Geographic risk breakdown"):
+            render_geographic_risk(df_filtered)
 
 with tab_reference:
     render_reference()
-    st.caption("See **Vessel Investigation** tab for an applied per-vessel example.")
+    st.caption("See **Vessel Watch -> Vessel Investigation** for an applied per-vessel example.")
 
 with tab_ai:
     render_ai_analyst(
         df_filtered, fdi_effort, fdi_landings, knowledge_base, "",
-        iuu_vessels, iccat_vessels, ofac_vessels,
+        iuu_vessels, iccat_vessels, ofac_vessels, fishing_df=fishing_df,
     )
 
 # ========================= SIDEBAR METHODOLOGY =========================

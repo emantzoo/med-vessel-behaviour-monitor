@@ -46,8 +46,16 @@ def _cross_ref_summary(df):
     return "\n".join(lines)
 
 
-def build_system_prompt(df, knowledge_base, fdi_effort=None, fdi_landings=None, iuu_vessels=None, iccat_vessels=None, ofac_vessels=None):
+def build_system_prompt(df, knowledge_base, fdi_effort=None, fdi_landings=None, iuu_vessels=None, iccat_vessels=None, ofac_vessels=None, fishing_df=None):
     """Build system prompt with dataframe context and domain knowledge."""
+    # New vessel-intelligence columns the LLM must know about
+    new_cols_present = [c for c in [
+        "in_mpa", "mpa_tier", "mpa_name", "rfmo_name",
+        "is_industrial", "length_m", "tonnage_gt",
+        "multi_behaviour_flag", "dark_port_call_candidate", "repeat_offender_90d",
+        "fishing_in_mpa_count", "base_risk_score", "risk_band",
+    ] if c in df.columns]
+
     schema = f"""DATAFRAME SCHEMA (variable name: df)
 Columns: {list(df.columns)}
 Dtypes:
@@ -66,6 +74,9 @@ Basic stats:
 - duration_h: mean={df['duration_h'].mean():.1f}, min={df['duration_h'].min()}, max={df['duration_h'].max()}
 - risk_score: mean={df['risk_score'].mean():.1f}, total={df['risk_score'].sum():.0f}
 - date range: {df['date'].min()} to {df['date'].max()}
+
+VESSEL INTELLIGENCE COLUMNS (present on df, see knowledge base for full vocabulary):
+{', '.join(new_cols_present) if new_cols_present else '(none detected)'}
 
 CROSS-REFERENCE STATUS (ground truth — use these values, do NOT guess):
 {_cross_ref_summary(df)}
@@ -106,6 +117,35 @@ CODE:
 # Available libraries: pandas (pd), numpy (np), plotly.express (px),
 #   plotly.graph_objects (go)
 ```
+
+VESSEL INTELLIGENCE LAYERS (canonical column reference -- use these names verbatim):
+
+MPA intersection (on df, also on fishing_df):
+- in_mpa (bool), mpa_name (str, semicolon-joined), mpa_tier (str: "gfcm_fra" | "eu_site" | "general" | "")
+- mpa_tier multiplier is ALREADY baked into base_risk_score (2.0x gfcm_fra, 1.5x eu_site, 1.2x general). Do NOT re-multiply.
+- For MPA queries always state the McDonald et al. 2024 caveat: AIS-based MPA intersection is a lower bound -- ~90% of fishing vessels in MPAs are dark to AIS.
+
+Score decomposition (on df):
+- base_risk_score = behavioural-only score (includes shore, flag, event factors, MPA tier).
+- risk_score = base_risk_score x iuu_multiplier x iccat_multiplier x ofac_multiplier (the final compounded score).
+- Vessel-level: compound_multiplier = sum(risk_score) / sum(base_risk_score). High compound = mostly structural (lookup-driven). Near 1 = mostly behavioural.
+- risk_band: Low (<50), Emerging (50-60), Elevated (60-80), Severe (80-100), Critical (>=100). Always derived from FINAL risk_score.
+
+Vessel-level Kpler-aligned flags (on df, propagated per vessel):
+- is_industrial (bool): length_m >= 24 OR tonnage_gt >= 100 (ICCAT industrial / EU Reg 1224/2009 threshold).
+- multi_behaviour_flag (bool): vessel shows two or more distinct event types.
+- dark_port_call_candidate (bool, per event): loitering within 10 km of shore (AIS-inferred candidate).
+- repeat_offender_90d (bool): two or more events within any 90-day window.
+- Supporting metadata: length_m, tonnage_gt, shiptypes (from GFW Vessels API).
+- CRITICAL: these four flags are DISPLAY-ONLY. Never multiply or add them into risk_score. They are parallel indicators, not score amplifiers.
+
+Fishing events (separate dataframe: fishing_df):
+- fishing_df is a SEPARATE dataframe of GFW FISHING events (Kroodsma 2018 CNN classification). It is NOT part of df. Join on mmsi if you need to cross-reference.
+- Fishing events are display-only context and are NOT scored. Do NOT sum their hours into the risk_score column. Do NOT concatenate fishing_df with df.
+- ACTUAL columns on fishing_df: date, vessel_name, mmsi, flag, lat, lon, fishing_hours, mpa, mpa_tier, in_mpa.
+- IMPORTANT: the MPA name column on fishing_df is `mpa` (NOT `mpa_name`). The hours column is `fishing_hours` (NOT `duration_h`). Use these names verbatim.
+- Vessel-level rollup on df: fishing_in_mpa_count (count of fishing events the vessel had inside any MPA -- the strongest publicly available IUU-in-MPA signal).
+- Typical query: fishing_df[fishing_df["mpa_tier"] == "gfcm_fra"] for fishing inside legally binding GFCM Fisheries Restricted Areas.
 
 RULES:
 - Always generate executable code -- no pseudocode
@@ -250,6 +290,38 @@ When discussing vessels with an IMO number, include external lookup links:
 The ofac_vessels DataFrame is available for analysis.
 """
 
+    if fishing_df is not None and not fishing_df.empty:
+        fishing_in_mpa = int(fishing_df["in_mpa"].fillna(False).astype(bool).sum()) if "in_mpa" in fishing_df.columns else 0
+        # Detect real column names so the LLM uses them verbatim (the
+        # knowledge file documents an idealised schema; the real static
+        # feed uses `mpa` and `fishing_hours`).
+        mpa_col = "mpa" if "mpa" in fishing_df.columns else ("mpa_name" if "mpa_name" in fishing_df.columns else None)
+        hours_col = "fishing_hours" if "fishing_hours" in fishing_df.columns else ("duration_h" if "duration_h" in fishing_df.columns else None)
+        prompt += f"""
+
+GFW FISHING EVENTS (variable name: fishing_df)
+fishing_df is a SEPARATE dataframe of GFW FISHING events. It is NOT part of df.
+Join on mmsi if you need to cross-reference.
+Fishing events are display-only context and are not scored.
+Do NOT sum their hours into the risk_score column.
+Do NOT concatenate fishing_df with df.
+
+fishing_df shape: {fishing_df.shape}
+Fishing events inside MPAs: {fishing_in_mpa}
+ACTUAL columns (use these names verbatim): {list(fishing_df.columns)}
+
+CRITICAL column-name notes:
+- The MPA name column on fishing_df is `{mpa_col}` (NOT `mpa_name`).
+- The fishing-hours column on fishing_df is `{hours_col}` (NOT `duration_h`).
+- Do NOT assume any column called `mpa_name` or `duration_h` exists on fishing_df.
+
+Typical patterns:
+- fishing_df[fishing_df["in_mpa"]] -- all fishing inside any MPA
+- fishing_df[fishing_df["mpa_tier"] == "gfcm_fra"] -- fishing inside GFCM Fisheries Restricted Areas
+- fishing_df[fishing_df["mpa_tier"] == "gfcm_fra"][["vessel_name","flag","{mpa_col}","{hours_col}"]] -- with FRA name and hours
+- fishing_df.merge(df[["mmsi","vessel_name","flag","base_risk_score","risk_score"]].drop_duplicates("mmsi"), on="mmsi", how="left") -- attach scored-vessel context
+"""
+
     return prompt
 
 
@@ -262,7 +334,7 @@ def is_safe_code(code):
     return True
 
 
-def render_ai_analyst(df_filtered, fdi_effort, fdi_landings, knowledge_base, gemini_key, iuu_vessels=None, iccat_vessels=None, ofac_vessels=None):
+def render_ai_analyst(df_filtered, fdi_effort, fdi_landings, knowledge_base, gemini_key, iuu_vessels=None, iccat_vessels=None, ofac_vessels=None, fishing_df=None):
     """Render the AI Maritime Analyst tab."""
     st.subheader("AI Maritime Analyst")
     st.markdown(
@@ -286,6 +358,9 @@ def render_ai_analyst(df_filtered, fdi_effort, fdi_landings, knowledge_base, gem
         "",
         # Investigation walkthrough — the hero question
         "Investigate KOOSHA 4",
+        # New vessel-intelligence layer questions (MPA + flags + base/compound)
+        "Which vessels had fishing activity inside a GFCM Fisheries Restricted Area? Show their flag, their base vs compounded risk scores, and the FRA name.",
+        "How many industrial-class vessels (is_industrial=True) had multi-behaviour flags, and what's their flag state distribution?",
         # Cross-source intelligence (the differentiator)
         "Show me IUU-listed vessels in c-squares with high swordfish landings",
         "Which OFAC-sanctioned vessels appear in the data and what's their pattern?",
@@ -335,7 +410,7 @@ def render_ai_analyst(df_filtered, fdi_effort, fdi_landings, knowledge_base, gem
 
                 client_ai = genai.Client(api_key=gemini_key)
                 system_ctx = build_system_prompt(
-                    df_filtered, knowledge_base, fdi_effort, fdi_landings, iuu_vessels, iccat_vessels, ofac_vessels
+                    df_filtered, knowledge_base, fdi_effort, fdi_landings, iuu_vessels, iccat_vessels, ofac_vessels, fishing_df
                 )
 
                 contents = []
@@ -393,6 +468,7 @@ def render_ai_analyst(df_filtered, fdi_effort, fdi_landings, knowledge_base, gem
                                 "iuu_vessels": iuu_vessels.copy() if iuu_vessels is not None and not iuu_vessels.empty else pd.DataFrame(),
                                 "iccat_vessels": iccat_vessels.copy() if iccat_vessels is not None and not iccat_vessels.empty else pd.DataFrame(),
                                 "ofac_vessels": ofac_vessels.copy() if ofac_vessels is not None and not ofac_vessels.empty else pd.DataFrame(),
+                                "fishing_df": fishing_df.copy() if fishing_df is not None and not fishing_df.empty else pd.DataFrame(),
                             }
                             exec(code, exec_ns)
 

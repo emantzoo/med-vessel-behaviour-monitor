@@ -1,7 +1,7 @@
 event_type,mmsi,flag,vessel_name,vessel_type,duration_h,lat,lon,date,distance_from_shore_km,distance_from_port_km,nearest_port,eez,gap_distance_km,speed_before_gap,speed_after_gap,encounter_vessel_name,encounter_vessel_flag,encounter_median_distance_km,encounter_median_speed_knots,loitering_total_distance_km,loitering_avg_speed_knots,med_zone,imo,mpa,mpa_tier,length_m,tonnage_gt,shiptypes
-GAP,602505896,RUS,STELLA MARIS,SUPPORT,57.1,33.08,32.33,2026-03-17,56.0,76.5,Barcelona,Italy,83.7,11.5,0.7,,,,,,,Eastern Med / Near East,,,,45.0,600.0,supply
+GAP,602505896,RUS,STELLA MARIS,SUPPORT,57.1,33.08,32.33,2026-03-17,56.0,76.5,Barcelona,Italy,83.7,11.5,0.7,,,,,,,Eastern Med / Near East,7901001.0,,,45.0,600.0,supply
 GAP,749808811,RUS,NUEVO AMANECER,TANKER,35.0,36.15,19.44,2026-03-02,147.9,335.1,Marseille,Greece,33.2,4.8,13.9,,,,,,,Ionian / Adriatic,,,,95.0,4500.0,tanker
-GAP,712514379,RUS,SANTA LUCIA,CARRIER,62.7,37.63,12.0,2026-03-15,80.6,157.7,Barcelona,Spain,77.7,11.3,8.4,,,,,,,Tyrrhenian / Central,,,,78.0,2400.0,carrier
+GAP,712514379,RUS,SANTA LUCIA,CARRIER,62.7,37.63,12.0,2026-03-15,80.6,157.7,Barcelona,Spain,77.7,11.3,8.4,,,,,,,Tyrrhenian / Central,7901002.0,,,78.0,2400.0,carrier
 GAP,488546256,RUS,NUEVO AMANECER (RUS-2),SUPPORT,52.0,38.12,11.29,2026-03-06,10.9,21.5,Piraeus,Tunisia,460.2,8.6,2.2,,,,,,,Western Med,,,,45.0,600.0,supply
 GAP,662174106,RUS,MARE NOSTRUM II,TANKER,12.2,37.56,11.03,2026-03-27,105.8,212.2,Algeciras,Turkey,14.5,3.4,12.6,,,,,,,Western Med,,,,95.0,4500.0,tanker
 GAP,397016722,RUS,NUEVO AMANECER (RUS-3),FISHING,70.4,34.49,23.8,2026-03-08,119.6,256.5,Genoa,Spain,102.3,6.1,12.4,,,,,,,Aegean,,,,17.5,42.0,fishing
@@ -20,7 +20,7 @@ GAP,579750577,IRN,STELLA MARIS (IRN-2),CARRIER,10.2,38.98,5.31,2026-03-16,91.4,2
 GAP,243480247,IRN,SANTA LUCIA (IRN-3),SUPPORT,60.6,33.28,32.78,2026-03-27,129.2,195.2,Izmir,Italy,429.2,2.2,3.9,,,,,,,Eastern Med / Near East,,,,45.0,600.0,supply
 GAP,372893368,IRN,SANTA LUCIA (IRN-4),CARGO,47.7,31.5,15.5,2026-03-04,184.7,322.9,Mersin,Italy,134.6,2.4,8.7,,,,,,,Tyrrhenian / Central,,,,62.0,1100.0,cargo
 GAP,306031379,PAN,BOSPHORUS REIS (PAN-2),CARRIER,56.0,32.99,30.9,2026-03-03,221.8,398.6,Alexandria,Turkey,460.2,9.9,8.0,,,,,,,Levantine,,,,78.0,2400.0,carrier
-GAP,640935897,PAN,VIRGEN DEL CARMEN,CARRIER,29.4,38.99,6.22,2026-03-26,230.4,266.7,Marseille,Italy,232.7,2.8,5.8,,,,,,,Western Med,,,,78.0,2400.0,carrier
+GAP,640935897,PAN,VIRGEN DEL CARMEN,CARRIER,29.4,38.99,6.22,2026-03-26,230.4,266.7,Marseille,Italy,232.7,2.8,5.8,,,,,,,Western Med,7901003.0,,,78.0,2400.0,carrier
 GAP,221088303,PAN,SANTA LUCIA (PAN-5),CARRIER,70.1,32.5,18.0,2026-03-04,126.9,202.8,Alexandria,International Waters,305.7,7.3,9.6,,,,,,,Ionian / Adriatic,,,,78.0,2400.0,carrier
 GAP,321442755,PAN,PESCA AZZURRA (PAN-2),CARGO,64.9,36.07,19.41,2026-03-02,131.0,311.3,Alexandria,Italy,492.5,13.9,10.3,,,,,,,Ionian / Adriatic,,,,62.0,1100.0,cargo
 GAP,558467021,PAN,ALBACORE HUNTER,TANKER,57.4,32.5,17.5,2026-03-13,200.4,390.0,Genoa,Libya,187.2,0.6,8.2,,,,,,,Ionian / Adriatic,,,,95.0,4500.0,tanker
@@ -91,5 +91,5 @@ LOITERING,422734000,IRN,KOOSHA 4,FISHING,14.8,36.1,25.6,2026-04-09,45.0,55.0,Pir
 LOITERING,770000300,BHS,FRIO NARUTO,CARRIER,9.2,36.0,14.5,2026-04-27,6.5,20.0,Valletta,International Waters,,,,,,,,2.1,0.9,Ionian / Adriatic,9063665.0,,,88.0,3200.0,carrier
 ENCOUNTER,770000400,ITA,LEONARDO PADRE,FISHING,5.6,39.3,12.8,2026-04-24,72.0,82.0,Genoa,Italy,,,,UNKNOWN REEFER,PAN,0.3,1.6,,,Tyrrhenian / Central,,,,14.5,32.0,fishing
 LOITERING,256007000,IRN,SABITI,TANKER,11.4,34.5,29.0,2026-04-09,8.7,20.0,Haifa,International Waters,,,,,,,,3.2,1.1,Levantine,9283760.0,,,183.0,28000.0,tanker
-LOITERING,602505896,RUS,STELLA MARIS,SUPPORT,7.8,33.4,32.8,2026-03-22,5.1,20.0,Barcelona,Italy,,,,,,,,1.8,0.8,Eastern Med / Near East,,,,45.0,600.0,supply
+LOITERING,602505896,RUS,STELLA MARIS,SUPPORT,7.8,33.4,32.8,2026-03-22,5.1,20.0,Barcelona,Italy,,,,,,,,1.8,0.8,Eastern Med / Near East,7901001.0,,,45.0,600.0,supply
 GAP,770000200,HND,ACROS NO. 2,FISHING,28.5,33.8,31.8,2026-03-30,102.0,112.0,Alexandria,International Waters,42.1,10.5,1.2,,,,,,,Levantine,7379345.0,,,38.0,310.0,fishing

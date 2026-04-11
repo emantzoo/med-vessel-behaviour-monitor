@@ -511,92 +511,6 @@ def render_encounter_analysis(df):
         st.info("No encounter events in filtered data.")
 
 
-def render_top_vessels(df):
-    st.subheader("Top 10 Riskiest Vessels")
-    if df.empty:
-        st.info("No data.")
-        return
-    group_cols = ["mmsi", "flag"]
-    if "vessel_name" in df.columns:
-        group_cols.append("vessel_name")
-    if "vessel_type" in df.columns:
-        group_cols.append("vessel_type")
-
-    agg_dict = {"risk": ("risk_score", "sum"), "events": ("mmsi", "count")}
-    if "base_risk_score" in df.columns:
-        agg_dict["base_risk"] = ("base_risk_score", "sum")
-    vessel_risk = (df.groupby(group_cols)
-                   .agg(**agg_dict)
-                   .reset_index().sort_values("risk", ascending=False).head(10))
-
-    # Score decomposition: base behaviour vs structural amplifiers
-    if "base_risk" in vessel_risk.columns:
-        vessel_risk["compound_mult"] = (
-            vessel_risk["risk"] / vessel_risk["base_risk"].replace(0, pd.NA)
-        ).round(2)
-        vessel_risk["risk_band"] = vessel_risk["risk"].apply(classify_risk_band)
-
-    # Add IUU info if available
-    if "iuu_matched" in df.columns:
-        iuu_map = (df[df["iuu_matched"] == True]
-                   .drop_duplicates("mmsi").set_index("mmsi")["iuu_listing_rfmos"])
-        if not iuu_map.empty:
-            vessel_risk["IUU Listed"] = vessel_risk["mmsi"].map(iuu_map).fillna("")
-
-    # Add ICCAT info if available
-    if "iccat_authorized" in df.columns:
-        iccat_map = (df[df["iccat_authorized"] == True]
-                     .drop_duplicates("mmsi").set_index("mmsi")["iccat_authorizations"])
-        if not iccat_map.empty:
-            vessel_risk["ICCAT Authorized"] = vessel_risk["mmsi"].map(iccat_map).fillna("")
-
-    # Add OFAC info if available
-    if "ofac_sanctioned" in df.columns:
-        ofac_map = (df[df["ofac_sanctioned"] == True]
-                    .drop_duplicates("mmsi").set_index("mmsi")["ofac_sanctions_program"])
-        if not ofac_map.empty:
-            vessel_risk["OFAC Sanctioned"] = vessel_risk["mmsi"].map(ofac_map).fillna("")
-
-    fmt = {"risk": "{:.1f}"}
-    if "base_risk" in vessel_risk.columns:
-        fmt["base_risk"] = "{:.1f}"
-        fmt["compound_mult"] = "{:.2f}x"
-    styled = vessel_risk.style.format(fmt)
-    if "risk_band" in vessel_risk.columns:
-        def _band_bg(val):
-            return f"background-color: {RISK_BAND_COLORS.get(val, '')}; color: white" if val in RISK_BAND_COLORS else ""
-        styled = styled.map(_band_bg, subset=["risk_band"])
-    st.dataframe(styled)
-
-    # Risk decomposition for #1 vessel
-    if not vessel_risk.empty:
-        top = vessel_risk.iloc[0]
-        top_mmsi = top["mmsi"]
-        top_events = df[df["mmsi"] == top_mmsi]
-        st.markdown(f"**#1 Riskiest Vessel Breakdown:**")
-        st.markdown(
-            f"- {top_events.shape[0]} events ({top_events['event_type'].value_counts().to_dict()})\n"
-            f"- Flag: {top.get('flag', 'N/A')} (multiplier: {FLAG_RISKS.get(top.get('flag', ''), 1.0)}x)\n"
-            f"- Avg duration: {top_events['duration_h'].mean():.1f}h\n"
-            f"- IUU listed: {'Yes' if top.get('IUU Listed', '') else 'No'}\n"
-            f"- ICCAT authorized: {'Yes' if top.get('ICCAT Authorized', '') else 'No'}\n"
-            f"- OFAC sanctioned: {'Yes (' + str(top.get('OFAC Sanctioned', '')) + ')' if top.get('OFAC Sanctioned', '') else 'No'}"
-        )
-
-    if "vessel_type" in df.columns and df["vessel_type"].notna().any():
-        st.subheader("Risk by Vessel Type")
-        type_risk = (
-            df.groupby("vessel_type")
-            .agg(total_risk=("risk_score", "sum"), events=("mmsi", "count"))
-            .reset_index().sort_values("total_risk", ascending=False)
-        )
-        fig = px.bar(type_risk, x="vessel_type", y="total_risk",
-                     color="events", color_continuous_scale="Viridis",
-                     title="Risk by Vessel Type",
-                     labels={"vessel_type": "Vessel Type", "total_risk": "Total Risk"})
-        st.plotly_chart(fig)
-
-
 def render_vessel_summary(df):
     st.subheader("Vessel Summary")
     st.caption(
@@ -729,11 +643,11 @@ def render_vessel_summary(df):
         if v in RISK_BAND_COLORS else "",
         subset=["risk_band"],
     )
-    # Single-row selection hands a vessel off to the Vessel Investigation tab.
-    # We write to the same sentinel key that the map click uses, so the
-    # Investigation selector picks it up on the next rerun.
+    # Single-row selection hands a vessel off to the Vessel Investigation
+    # subtab. We write to the same sentinel key that the map click uses, so
+    # the Investigation selector picks it up on the next rerun.
     st.caption(
-        "Click a row to pre-select that vessel in the **Vessel Investigation** tab."
+        "Click a row to pre-select that vessel in the **Vessel Investigation** subtab."
     )
     selection = st.dataframe(
         styled,
@@ -752,8 +666,8 @@ def render_vessel_summary(df):
             if picked_name:
                 st.session_state["map_clicked_vessel"] = picked_name
                 st.success(
-                    f"Pre-selected **{picked_name}** for the Vessel Investigation tab. "
-                    "Switch to that tab to see the full report."
+                    f"Pre-selected **{picked_name}** for the Vessel Investigation subtab. "
+                    "Switch to that subtab to see the full report."
                 )
 
     # Band summary under the table
@@ -998,7 +912,8 @@ def render_vessel_investigation(df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_l
         "Select vessel to investigate",
         options=vessel_options,
         help="Vessels are ordered by total risk score (highest first). "
-             "Click a marker on the Map & Overview tab to pre-select a vessel here.",
+             "Click a marker on the Fleet Overview -> Map & Overview subtab "
+             "or a row in the Vessel Summary subtab to pre-select a vessel here.",
         key="investigation_vessel",
     )
 
@@ -1025,7 +940,20 @@ def render_vessel_investigation(df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_l
     cols = st.columns(6)
     cols[0].metric("Vessel", report["identity"]["vessel_name"])
     cols[1].metric("MMSI", report["identity"]["mmsi"])
-    cols[2].metric("IMO", report["identity"]["imo"] or "Unknown")
+    # IMO is only mandatory for vessels >=100 GT (IMO Convention SOLAS Ch XI-1
+    # Reg 3). Below the threshold, an absent IMO is normal -- not a red flag.
+    _imo_val = report["identity"]["imo"]
+    _is_artisanal = (
+        not report["identity"].get("is_industrial")
+        and (report["identity"].get("length_m") or report["identity"].get("tonnage_gt"))
+    )
+    if _imo_val:
+        _imo_display = _imo_val
+    elif _is_artisanal:
+        _imo_display = "Not required"
+    else:
+        _imo_display = "Unknown"
+    cols[2].metric("IMO", _imo_display)
     cols[3].metric("Flag", report["identity"]["flag"])
     cols[4].metric("Events", report["identity"]["events_in_dataset"])
     # Profile: length / GT, with industrial badge if above the ICCAT threshold

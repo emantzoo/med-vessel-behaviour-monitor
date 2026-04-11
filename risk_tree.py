@@ -345,10 +345,10 @@ def render_scoring_pipeline_diagram():
     dot.edge("P", "R", style="dashed")
     dot.edge("Q", "R", style="dashed")
 
-    # --- Final convergence into the Vessel Summary tab ---
+    # --- Final convergence into the Vessel Summary subtab ---
     dot.node(
         "S",
-        "Vessel Summary tab",
+        "Vessel Summary subtab",
         fillcolor="#E3F2FD",
         fontsize="12",
     )

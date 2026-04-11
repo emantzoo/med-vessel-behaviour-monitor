@@ -124,7 +124,8 @@ fishing_in_mpa_note: |
   indicator: fishing-in-MPA. Fishing events that intersect WDPA
   polygons via GFW's regions.mpa field are aggregated per vessel into
   an event count and total fishing hours, displayed in the Vessel
-  Summary table and the Vessel Investigation tab.
+  Summary table and the Vessel Investigation subtab (both inside the
+  Vessel Watch top tab).
 
   Fishing-in-MPA is intentionally NOT multiplied into the risk score.
   It is the strongest publicly available signal for IUU fishing inside

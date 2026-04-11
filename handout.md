@@ -19,7 +19,7 @@ The same methodological move Kpler has made for sanctions (80% of *eventually-sa
 
 ## The scoring pipeline
 
-Three chains converge on the Vessel Summary tab: the per-event multiplicative chain, the vessel-level aggregation that produces a base-vs-compound decomposition, and the dashed side-chain of four vessel-level Kpler-aligned flags (one structural, three temporal/compound) that are *displayed alongside* the score but are **not** multiplied into it.
+Three chains converge on the Vessel Watch -> Vessel Summary subtab: the per-event multiplicative chain, the vessel-level aggregation that produces a base-vs-compound decomposition, and the dashed side-chain of four vessel-level Kpler-aligned flags (one structural, three temporal/compound) that are *displayed alongside* the score but are **not** multiplied into it.
 
 ```mermaid
 flowchart TD
@@ -47,7 +47,7 @@ flowchart TD
     P -.-> R
     Q -.-> R
 
-    M --> S[Vessel Summary tab]
+    M --> S[Vessel Summary subtab]
     L --> S
     R --> S
 
@@ -222,7 +222,7 @@ flowchart LR
 - `Identity unverifiable` AND any behavioural flag → **Elevated** minimum
 - Three or more additive flags → escalate one tier
 
-The risk-tree view is the **compound-logic** counterpart to the multiplicative score above: the score surfaces degree of exposure, the tree surfaces *why*. Both are rendered in the app — the scoring pipeline in the Reference & Methodology tab, the tree in the same tab plus per-vessel in the Investigation tab.
+The risk-tree view is the **compound-logic** counterpart to the multiplicative score above: the score surfaces degree of exposure, the tree surfaces *why*. Both are rendered in the app — the scoring pipeline in the Reference & Methodology tab, the tree in the same tab plus per-vessel in the Vessel Watch -> Vessel Investigation subtab.
 
 ---
 
