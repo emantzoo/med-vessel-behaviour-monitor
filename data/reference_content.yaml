@@ -123,21 +123,33 @@ epistemological_separation: |
   preserved in the UI.
 
 methodology_references:
-  - title: Global Fishing Watch transshipment detection methodology
-    citation: Miller et al. 2018
-    relevance: Defines encounter criteria implemented in compute_risk_score.
+  - title: Identifying global patterns of transshipment behavior
+    citation: "Miller, N. A., Roan, A., Hochberg, T., Amos, J., & Kroodsma, D. A. (2018). *Frontiers in Marine Science*, 5, 240. https://doi.org/10.3389/fmars.2018.00240"
+    relevance: Defines the encounter criteria (≤500 m, ≥2 h, <2 kn median speed, ≥10 km from shore) implemented in compute_risk_score, and the "likely vs potential transshipment" distinction used in loitering weighting.
 
-  - title: Compounding behavioural risk models for maritime sanctions screening
-    citation: Industry literature, 2025
-    relevance: Motivates the multiplicative compounding of IUU, authorisation, and sanctions multipliers on top of the base behavioural score.
+  - title: "Shadow Fleets: A Growing Challenge in Global Maritime Commerce"
+    citation: "Rodriguez-Diaz, E., Alcaide, J. I., & Endrina, N. (2025). *Applied Sciences*, 15(12), 6424. https://doi.org/10.3390/app15126424"
+    relevance: Dark/gray/light fleet taxonomy, six-indicator detection framework, and explicit treatment of fishing as a shadow fleet subcategory. Reference point for crosswalk between fisheries IUU and oil-tanker shadow fleet work.
 
-  - title: Low-to-Critical risk band vocabulary for maritime risk and compliance
-    citation: Industry literature, 2025
-    relevance: Basis for the Low / Emerging / Elevated / Severe / Critical band classification used throughout the app.
+  - title: "Turning Tides: Maritime Risk and Compliance Insights 2025–2026"
+    citation: Kpler (December 2025)
+    relevance: Source of the Low / Emerging / Elevated / Severe / Critical risk band vocabulary used throughout the app, and the AQUARIS (IMO 9251822) case study framing for pre-sanction predictive scoring.
 
-  - title: Risk tree methodology for shadow fleet exposure assessment
-    citation: Industry literature, 2026
-    relevance: Source for the hierarchical risk tree framework adapted for fisheries in this project.
+  - title: "AIS Spoofing: Fast Track to Sanctions"
+    citation: Kpler (November 2025)
+    relevance: Quantifies the 80% probability of formal sanction within 12 months of a confirmed spoofing event, concentrated in months 3–9. Motivates the pre-enforcement predictive framing of the scoring model.
+
+  - title: How Deception Detection Works
+    citation: Kpler (2025)
+    relevance: Formal six-layer risk framework — formal sanctions, behavioural indicators, associative risk, geographic risk, cargo risk, ownership opacity. Four of the six map directly to the current implementation.
+
+  - title: "The Grey Fleet: Shadow Operations in Global Oil Trade"
+    citation: "Kpler (March 2025). Authors: Ampatzidis, D., Stuart-Grumbar, A., Kinnee, K., Wright, M."
+    relevance: Multiplicative compounding of behavioural, flag, cargo, geographic, and ownership factors in commercial maritime compliance. Methodological template for the multiplicative structure of compute_risk_score.
+
+  - title: How to build a risk tree to assess shadow fleet exposure
+    citation: Kpler (April 2026)
+    relevance: Direct source for the hierarchical risk tree framework adapted in risk_tree_framework.yaml — gating, additive, and contextual branch typing; compound-logic tier assignment.
 
   - title: Council Regulation (EC) No 1005/2008 — EU IUU Regulation
     citation: EU 2008, amended by Regulation (EU) 2023/2842 (in force 9 January 2024)
