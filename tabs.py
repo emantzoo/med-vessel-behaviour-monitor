@@ -604,12 +604,16 @@ def render_vessel_summary(df):
         "behavioural events rather than per individual event."
     )
     st.caption(
-        "Three behavioural flags are shown alongside the risk band: "
+        "Four Kpler-aligned flags are shown alongside the risk band: "
+        "**industrial** (vessel >=24m LOA or >=100 GT, the ICCAT industrial / "
+        "EU 1224/2009 reporting threshold -- the only structural flag of the four), "
         "**multi-behaviour** (vessel shows two or more distinct event types), "
-        "**dark port call candidates** (loitering within 10 km of shore — AIS-inferred, "
+        "**dark port call candidates** (loitering within 10 km of shore -- AIS-inferred, "
         "not satellite-verified), and **repeat-offender** (two or more events within a "
         "90-day window, capturing exposure drift over time). These flags "
         "are display-only and are not multiplied into the risk score. "
+        "Length and tonnage come from the GFW Vessels API registry / self-reported "
+        "metadata in live mode and from the static profile in demo mode. "
         "An **MPA intersection** column is also shown: sourced from GFW's `regions.mpa` "
         "field (WDPA point-in-polygon, pre-computed server-side), tiered into "
         "GFCM-FRA / EU-site / general. Unlike the behavioural flags, MPA intersection "
@@ -663,12 +667,36 @@ def render_vessel_summary(df):
             if "fishing_in_mpa_hours" in g.columns and g["fishing_in_mpa_hours"].notna().any()
             else 0.0
         )
+        # Vessel size profile -- length_m and tonnage_gt are vessel-level
+        # (broadcast to every event row in app.py), so any non-null value is fine.
+        length_m_val = None
+        if "length_m" in g.columns:
+            l_series = pd.to_numeric(g["length_m"], errors="coerce").dropna()
+            if len(l_series):
+                length_m_val = float(l_series.iloc[0])
+        tonnage_val = None
+        if "tonnage_gt" in g.columns:
+            t_series = pd.to_numeric(g["tonnage_gt"], errors="coerce").dropna()
+            if len(t_series):
+                tonnage_val = float(t_series.iloc[0])
+        if length_m_val and tonnage_val:
+            profile_str = f"{length_m_val:.0f}m / {tonnage_val:.0f} GT"
+        elif length_m_val:
+            profile_str = f"{length_m_val:.0f}m"
+        elif tonnage_val:
+            profile_str = f"{tonnage_val:.0f} GT"
+        else:
+            profile_str = "—"
+
         rows.append({
             "mmsi": mmsi,
             "vessel_name": _first(g["vessel_name"]) if "vessel_name" in g.columns else "",
             "flag": _first(g["flag"]) if "flag" in g.columns else "",
             "event_count": int(len(g)),
             "event_types": ", ".join(sorted(g["event_type"].dropna().unique())),
+            "is_industrial": bool(g["is_industrial"].any()) if "is_industrial" in g.columns else False,
+            "length_m": length_m_val,
+            "profile": profile_str,
             "multi_behaviour": bool(g["multi_behaviour_flag"].any()) if "multi_behaviour_flag" in g.columns else False,
             "dark_port_candidates": int(g["dark_port_call_candidate"].sum()) if "dark_port_call_candidate" in g.columns else 0,
             "repeat_offender": bool(g["repeat_offender_90d"].any()) if "repeat_offender_90d" in g.columns else False,
@@ -994,12 +1022,32 @@ def render_vessel_investigation(df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_l
 
     # Step 1: Identity
     st.markdown("### 1. Identity Confirmation")
-    cols = st.columns(5)
+    cols = st.columns(6)
     cols[0].metric("Vessel", report["identity"]["vessel_name"])
     cols[1].metric("MMSI", report["identity"]["mmsi"])
     cols[2].metric("IMO", report["identity"]["imo"] or "Unknown")
     cols[3].metric("Flag", report["identity"]["flag"])
     cols[4].metric("Events", report["identity"]["events_in_dataset"])
+    # Profile: length / GT, with industrial badge if above the ICCAT threshold
+    _length = report["identity"].get("length_m")
+    _tonnage = report["identity"].get("tonnage_gt")
+    if _length and _tonnage:
+        _profile_str = f"{_length:.0f}m / {_tonnage:.0f} GT"
+    elif _length:
+        _profile_str = f"{_length:.0f}m"
+    elif _tonnage:
+        _profile_str = f"{_tonnage:.0f} GT"
+    else:
+        _profile_str = "Unknown"
+    _industrial_label = "Industrial" if report["identity"].get("is_industrial") else (
+        "Artisanal" if (_length or _tonnage) else ""
+    )
+    cols[5].metric(
+        "Profile",
+        _profile_str,
+        delta=_industrial_label or None,
+        delta_color="off",
+    )
 
     # Step 2: IUU
     st.markdown("### 2. IUU Listing Status")

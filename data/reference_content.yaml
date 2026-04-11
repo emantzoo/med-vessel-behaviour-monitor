@@ -36,18 +36,27 @@ risk_formula_explanation: |
   is a signal of intent, and is therefore the highest-priority behavioural
   indicator in the commercial literature.
 
-  In addition to the core scoring formula, three compound / temporal
-  behavioural flags are computed at the vessel level and displayed in
-  the Vessel Summary tab without modifying the risk score itself: a
-  multi-behaviour compound indicator (vessel shows two or more distinct
-  event types), a dark port call candidate flag (loitering within 10 km
-  of shore — not satellite-verified, hence "candidate"), and a
-  repeat-offender flag (two or more events within a 90-day window,
-  capturing exposure drift over time). These flags are displayed
-  separately from the risk score rather than multiplied into it, because
-  they are partly redundant with signals already captured in the
-  event-level scoring, and adding them as multipliers would risk
-  double-counting.
+  In addition to the core scoring formula, four behavioural and structural
+  flags are computed at the vessel level and displayed in the Vessel
+  Summary tab without modifying the risk score itself: an industrial
+  profile flag (vessel >=24m LOA or >=100 GT, the ICCAT industrial /
+  EU Control Regulation 1224/2009 reporting threshold — the only
+  structural flag of the four), a multi-behaviour compound indicator
+  (vessel shows two or more distinct event types), a dark port call
+  candidate flag (loitering within 10 km of shore — not satellite-verified,
+  hence "candidate"), and a repeat-offender flag (two or more events within
+  a 90-day window, capturing exposure drift over time). Length and tonnage
+  for the industrial flag come from the GFW Vessels API registry /
+  self-reported metadata in live mode and from the static profile in
+  demo mode — no new data source is introduced; the metadata is
+  harvested from the same MMSI-to-IMO enrichment call that already runs.
+  These flags are displayed separately from the risk score rather than
+  multiplied into it, because they are partly redundant with signals
+  already captured in the event-level scoring (and, for the industrial
+  flag, with the existing carrier/tanker event-specific multiplier), so
+  adding them as multipliers would risk double-counting. The flag fires
+  whenever EITHER threshold (length or tonnage) is met, so a vessel
+  with only one of the two metrics resolved still classifies correctly.
 
 iccat_framing_note: |
   ICCAT authorisation is treated as an opportunity indicator, not an

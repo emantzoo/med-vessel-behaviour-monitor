@@ -134,6 +134,23 @@ framework:
             repeated deceptive behaviours within a bounded time window.
             Vessels with clustered behavioural signals are weighted more
             heavily than those with isolated incidents.
+        - id: vessel_size_industrial
+          text: "Is the vessel an industrial-class fishing/transshipment vessel (>=24m LOA or >=100 GT)?"
+          weight: medium
+          note: >
+            Vessel characteristic modifier (the only structural flag among the
+            four Kpler-aligned display-only signals; the other three are
+            temporal/compound). The 24m / 100 GT threshold matches the ICCAT
+            industrial classification and the EU Control Regulation 1224/2009
+            reporting break -- vessels above this line operate under stricter
+            VMS, ERS, and observer obligations, so non-compliance is more
+            consequential. Length and tonnage come from the GFW Vessels API
+            registry / self-reported metadata, harvested during MMSI-to-IMO
+            enrichment -- no new data source. Display-only signal: never
+            multiplied into the score, surfaces in Vessel Summary alongside
+            the three other Kpler-aligned flags. Escalates to high severity
+            in tier_assignment_rules when combined with MPA intersection or
+            IUU listing.
 
     - id: spatial_context
       name: "Spatial / Contextual Risk"
@@ -205,6 +222,7 @@ framework:
       - "Identity unverifiable AND any behavioural flag -> Elevated minimum"
       - "Three or more additive flags raised -> escalate one tier"
       - "GFW-classified fishing inside an MPA -> Elevated minimum (GFW ground-truth signal, not inference)"
+      - "Industrial vessel profile (>=24m or >=100GT) AND (in_mpa OR iuu_listed) -> escalate one tier"
       - "No flags raised -> Low"
 
   notes:

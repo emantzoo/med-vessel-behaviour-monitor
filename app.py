@@ -15,7 +15,7 @@ from config import (
 from data_loading import (
     load_knowledge_base, load_static_data, load_live_data,
     load_fdi_effort, load_fdi_landings, load_iuu_vessels, load_iccat_vessels,
-    load_ofac_vessels, lookup_vessel_imos,
+    load_ofac_vessels, lookup_vessel_metadata,
     load_fishing_events_static, load_fishing_events_live, aggregate_fishing_in_mpa,
 )
 from risk_model import compute_risk_score, get_fdi_context, match_iuu_vessels, match_iccat_vessels, match_ofac_vessels, compute_vessel_flags
@@ -130,25 +130,35 @@ if not df_filtered.empty:
     df_filtered["csq_lon"] = csq.apply(lambda x: x[0])
     df_filtered["csq_lat"] = csq.apply(lambda x: x[1])
 
-# IMO enrichment via GFW Vessels API (live mode only)
+# Vessel metadata enrichment via GFW Vessels API (live mode only).
+# Returns dict[mmsi] -> {"imo", "length_m", "tonnage_gt", "shiptypes"}.
+# Each field is independently optional. Falls back gracefully on cache miss.
 if use_live and token and resolve_imos and not df_filtered.empty:
     unique_mmsis = df_filtered["mmsi"].dropna().unique().tolist()
-    cache_key = f"imo_map_{hash(tuple(sorted(str(m) for m in unique_mmsis)))}"
+    cache_key = f"vessel_meta_{hash(tuple(sorted(str(m) for m in unique_mmsis)))}"
     if cache_key in st.session_state:
-        imo_map = st.session_state[cache_key]
+        meta_map = st.session_state[cache_key]
     else:
-        progress_bar = st.progress(0, text="Resolving vessel IMOs via GFW API...")
+        progress_bar = st.progress(0, text="Resolving vessel metadata via GFW API...")
         def _update_progress(current, total):
-            progress_bar.progress(current / total, text=f"Resolving vessel IMOs... {current}/{total}")
-        imo_map = lookup_vessel_imos(unique_mmsis, token, progress_callback=_update_progress)
-        st.session_state[cache_key] = imo_map
+            progress_bar.progress(current / total, text=f"Resolving vessel metadata... {current}/{total}")
+        meta_map = lookup_vessel_metadata(unique_mmsis, token, progress_callback=_update_progress)
+        st.session_state[cache_key] = meta_map
         progress_bar.empty()
-    if imo_map:
-        df_filtered["imo"] = df_filtered["mmsi"].astype(str).map(imo_map).fillna("")
+    if meta_map:
+        mmsi_str = df_filtered["mmsi"].astype(str)
+        df_filtered["imo"] = mmsi_str.map(lambda m: (meta_map.get(m) or {}).get("imo") or "")
+        df_filtered["length_m"] = mmsi_str.map(lambda m: (meta_map.get(m) or {}).get("length_m"))
+        df_filtered["tonnage_gt"] = mmsi_str.map(lambda m: (meta_map.get(m) or {}).get("tonnage_gt"))
+        df_filtered["shiptypes"] = mmsi_str.map(lambda m: (meta_map.get(m) or {}).get("shiptypes") or "")
 
-# Ensure IMO column exists (static CSV may lack it)
+# Ensure metadata columns exist (static CSV pre-populates length_m / tonnage_gt /
+# shiptypes; live mode without enrichment skipped or no GFW match leaves them blank).
 if "imo" not in df_filtered.columns:
     df_filtered["imo"] = ""
+for _meta_col, _meta_default in [("length_m", None), ("tonnage_gt", None), ("shiptypes", "")]:
+    if _meta_col not in df_filtered.columns:
+        df_filtered[_meta_col] = _meta_default
 
 # Preserve base risk score before IUU/ICCAT multipliers
 df_filtered["base_risk_score"] = df_filtered["risk_score"].copy()

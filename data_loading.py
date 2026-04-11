@@ -408,10 +408,14 @@ def aggregate_fishing_in_mpa(fishing_df):
 
 # ========================= VESSEL IMO LOOKUP =========================
 
-def lookup_vessel_imos(mmsi_list, token, progress_callback=None):
-    """Query GFW Vessels API to retrieve IMO numbers for unique MMSIs.
+def lookup_vessel_metadata(mmsi_list, token, progress_callback=None):
+    """Query GFW Vessels API to retrieve registry metadata for unique MMSIs.
 
-    Returns dict of {mmsi_str: imo_str} where IMO is available.
+    Returns dict of {mmsi_str: {"imo", "length_m", "tonnage_gt", "shiptypes"}}.
+    Each field is independently optional -- a vessel may resolve IMO from
+    registry_info while length comes from self_reported_info, etc. Walks
+    both lists and takes the first non-null per field.
+
     Skips invalid MMSIs and handles errors per vessel gracefully.
     progress_callback(current, total) is called after each MMSI lookup.
     """
@@ -431,6 +435,39 @@ def lookup_vessel_imos(mmsi_list, token, progress_callback=None):
     result = {}
     total = len(unique_mmsis)
 
+    def _coerce_float(val):
+        try:
+            f = float(val)
+            return f if f > 0 else None
+        except (TypeError, ValueError):
+            return None
+
+    def _harvest(entries, meta):
+        """Update meta dict in-place with first non-null fields from a list of dicts."""
+        if not isinstance(entries, list):
+            return
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+            if meta.get("imo") in (None, "") and entry.get("imo"):
+                imo_str = str(entry["imo"])
+                if imo_str not in ("0", "None", "nan", ""):
+                    meta["imo"] = imo_str
+            if meta.get("length_m") is None:
+                length = _coerce_float(entry.get("lengthM") or entry.get("length_m"))
+                if length:
+                    meta["length_m"] = length
+            if meta.get("tonnage_gt") is None:
+                tonnage = _coerce_float(entry.get("tonnageGt") or entry.get("tonnage_gt"))
+                if tonnage:
+                    meta["tonnage_gt"] = tonnage
+            if not meta.get("shiptypes"):
+                st_val = entry.get("shiptypes") or entry.get("shiptype")
+                if isinstance(st_val, list) and st_val:
+                    meta["shiptypes"] = ",".join(str(s) for s in st_val if s)
+                elif isinstance(st_val, str) and st_val.strip():
+                    meta["shiptypes"] = st_val.strip()
+
     async def _lookup_all():
         for i, mmsi in enumerate(unique_mmsis):
             try:
@@ -443,32 +480,18 @@ def lookup_vessel_imos(mmsi_list, token, progress_callback=None):
                         progress_callback(i + 1, total)
                     continue
 
-                imo = None
-                # Preferred: registry_info
+                meta = {"imo": None, "length_m": None, "tonnage_gt": None, "shiptypes": None}
+                # Preferred: registry_info, then fall back to self_reported_info.
+                # Walk both lists for every field independently -- IMO and length
+                # may come from different entries on the same vessel.
                 for _, v in vessels.iterrows():
-                    reg = v.get("registry_info") or v.get("registryInfo")
-                    if isinstance(reg, list):
-                        for entry in reg:
-                            if isinstance(entry, dict) and entry.get("imo"):
-                                imo = str(entry["imo"])
-                                break
-                    if imo:
-                        break
+                    _harvest(v.get("registry_info") or v.get("registryInfo"), meta)
+                for _, v in vessels.iterrows():
+                    _harvest(v.get("self_reported_info") or v.get("selfReportedInfo"), meta)
 
-                # Fallback: self_reported_info
-                if not imo:
-                    for _, v in vessels.iterrows():
-                        sri = v.get("self_reported_info") or v.get("selfReportedInfo")
-                        if isinstance(sri, list):
-                            for entry in sri:
-                                if isinstance(entry, dict) and entry.get("imo"):
-                                    imo = str(entry["imo"])
-                                    break
-                        if imo:
-                            break
-
-                if imo and imo not in ("0", "None", "nan", ""):
-                    result[mmsi] = imo
+                # Only retain the row if at least one field resolved
+                if any(meta.get(k) for k in ("imo", "length_m", "tonnage_gt", "shiptypes")):
+                    result[mmsi] = meta
 
                 await asyncio.sleep(0.2)  # Rate limit courtesy
 
@@ -486,9 +509,19 @@ def lookup_vessel_imos(mmsi_list, token, progress_callback=None):
         nest_asyncio.apply()
         asyncio.run(_lookup_all())
     except Exception:
-        pass  # Fall back silently — name matching still works
+        pass  # Fall back silently -- name matching still works
 
     return result
+
+
+def lookup_vessel_imos(mmsi_list, token, progress_callback=None):
+    """Backwards-compatible shim returning {mmsi: imo_str} only.
+
+    Prefer lookup_vessel_metadata() for new callers -- this wrapper exists
+    so any external script that imported the original symbol keeps working.
+    """
+    meta = lookup_vessel_metadata(mmsi_list, token, progress_callback=progress_callback)
+    return {k: v["imo"] for k, v in meta.items() if v.get("imo")}
 
 
 # ========================= FDI DATA =========================

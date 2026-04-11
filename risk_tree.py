@@ -199,10 +199,12 @@ def render_scoring_pipeline_diagram():
     Mirrors the mental model a reviewer needs to audit the risk score:
     one AIS event -> base behavioural score -> compounding multipliers ->
     per-event score -> vessel-level aggregation -> risk band. A separate
-    dashed side-chain shows the three vessel-level compound/temporal
-    flags (multi-behaviour, dark port call candidate, repeat offender)
-    which are computed independently and fed to the Vessel Summary as
-    display-only signals (never multiplied into the score).
+    dashed side-chain shows the four vessel-level Kpler-aligned flags
+    (industrial profile, multi-behaviour, dark port call candidate,
+    repeat offender) which are computed independently and fed to the
+    Vessel Summary as display-only signals (never multiplied into the
+    score). Industrial profile is the only structural flag of the four;
+    the other three are temporal/compound.
     """
     dot = graphviz.Digraph(
         "scoring_pipeline",
@@ -324,6 +326,7 @@ def render_scoring_pipeline_diagram():
         "Vessel-level flags\\n(computed separately)",
         fillcolor="#F0F0F0",
     )
+    dot.node("N1", "is_industrial\\n(>=24m or >=100GT)", fillcolor="#FAFAFA")
     dot.node("O", "multi_behaviour_flag", fillcolor="#FAFAFA")
     dot.node("P", "dark_port_call_candidate", fillcolor="#FAFAFA")
     dot.node("Q", "repeat_offender_90d", fillcolor="#FAFAFA")
@@ -333,9 +336,11 @@ def render_scoring_pipeline_diagram():
         fillcolor="#F0F0F0",
     )
 
+    dot.edge("N", "N1", style="dashed")
     dot.edge("N", "O", style="dashed")
     dot.edge("N", "P", style="dashed")
     dot.edge("N", "Q", style="dashed")
+    dot.edge("N1", "R", style="dashed")
     dot.edge("O", "R", style="dashed")
     dot.edge("P", "R", style="dashed")
     dot.edge("Q", "R", style="dashed")

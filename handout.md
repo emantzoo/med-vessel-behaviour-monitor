@@ -19,7 +19,7 @@ The same methodological move Kpler has made for sanctions (80% of *eventually-sa
 
 ## The scoring pipeline
 
-Three chains converge on the Vessel Summary tab: the per-event multiplicative chain, the vessel-level aggregation that produces a base-vs-compound decomposition, and the dashed side-chain of three vessel-level behavioural flags that are *displayed alongside* the score but are **not** multiplied into it.
+Three chains converge on the Vessel Summary tab: the per-event multiplicative chain, the vessel-level aggregation that produces a base-vs-compound decomposition, and the dashed side-chain of four vessel-level Kpler-aligned flags (one structural, three temporal/compound) that are *displayed alongside* the score but are **not** multiplied into it.
 
 ```mermaid
 flowchart TD
@@ -38,10 +38,12 @@ flowchart TD
     K --> L
     J --> M["risk_band<br/><i>Low / Emerging / Elevated / Severe / Critical</i>"]
 
-    N["Vessel-level flags<br/>(computed separately)"] -.-> O[multi_behaviour_flag]
+    N["Vessel-level flags<br/>(computed separately)"] -.-> N1["is_industrial<br/>(>=24m or >=100GT)"]
+    N -.-> O[multi_behaviour_flag]
     N -.-> P[dark_port_call_candidate]
     N -.-> Q[repeat_offender_90d]
-    O -.-> R["Display-only<br/>Vessel Summary badges<br/>+ risk tree rules"]
+    N1 -.-> R["Display-only<br/>Vessel Summary badges<br/>+ risk tree rules"]
+    O -.-> R
     P -.-> R
     Q -.-> R
 
@@ -58,7 +60,7 @@ flowchart TD
     class D,E,F,G compliance
     class H,I,J,K,L agg
     class M,S band
-    class N,O,P,Q,R flag
+    class N,N1,O,P,Q,R flag
 ```
 
 **One line:** `risk = (duration_h^0.75) × event_weight × flag × shore × mpa × event_factors × iuu × iccat × ofac`
@@ -226,7 +228,7 @@ The risk-tree view is the **compound-logic** counterpart to the multiplicative s
 
 ## What's also in the app (not scored, shown as context)
 
-- **Three display-only behavioural flags**: multi-behaviour, dark-port-call candidate, repeat-offender 90d — mirrors three of the six inputs in Kpler's Oct 2025 Deceptive Shipping Practices model
+- **Four display-only Kpler-aligned vessel-level flags**: industrial profile (≥24m or ≥100 GT, the only structural flag of the four — the ICCAT industrial / EU Control Reg 1224/2009 reporting threshold), multi-behaviour, dark-port-call candidate, repeat-offender 90d. Length and tonnage harvested from the GFW Vessels API registry / self-reported metadata during MMSI-to-IMO enrichment — no new data source. Mirrors four of the six inputs in Kpler's Oct 2025 Deceptive Shipping Practices model
 - **FDI gear mix per c-square** (27 FAO gear codes, top-5 shown) — spatial context, feeds the planned gear-consistency check (does the vessel's movement match the local fleet profile?)
 - **AI Maritime Analyst** (Google Gemini 2.5 Flash) with RAG over 5 methodology/IUU context documents and sandboxed code execution — conceptually similar to Kpler's MCP beta (LLM layered over structured risk data), though mine is embedded in the app rather than exposed as an external server
 - **Per-vessel Investigation tab** with a coloured risk-tree path — structurally similar to the tiered Yellow/Orange/Red flag layout in Kpler's R&C product UI, but rendered as a continuous trace per vessel

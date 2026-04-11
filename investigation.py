@@ -325,6 +325,50 @@ def investigate_vessel(vessel_identifier, df, iuu_df, iccat_df, ofac_df, fdi_eff
         ),
     })
 
+    # Industrial vessel profile -- structural Kpler-aligned flag
+    is_industrial = bool(primary.get("is_industrial", False))
+    length_val = primary.get("length_m")
+    tonnage_val = primary.get("tonnage_gt")
+    try:
+        length_num = float(length_val) if pd.notna(length_val) else None
+    except (TypeError, ValueError):
+        length_num = None
+    try:
+        tonnage_num = float(tonnage_val) if pd.notna(tonnage_val) else None
+    except (TypeError, ValueError):
+        tonnage_num = None
+    if is_industrial:
+        parts = []
+        if length_num:
+            parts.append(f"{length_num:.0f}m LOA")
+        if tonnage_num:
+            parts.append(f"{tonnage_num:.0f} GT")
+        size_str = " / ".join(parts) if parts else "industrial profile"
+        size_note = f"Industrial-class vessel ({size_str}); above 24m / 100 GT threshold"
+    elif length_num or tonnage_num:
+        parts = []
+        if length_num:
+            parts.append(f"{length_num:.0f}m LOA")
+        if tonnage_num:
+            parts.append(f"{tonnage_num:.0f} GT")
+        size_str = " / ".join(parts)
+        size_note = f"Artisanal-class vessel ({size_str}); below 24m / 100 GT threshold"
+    else:
+        size_note = "Vessel size unknown -- length/tonnage not resolved from GFW registry or static profile"
+    trace.append({
+        "branch_id": "behavioural_history", "question_id": "vessel_size_industrial",
+        "answer": "yes" if is_industrial else ("no" if (length_num or tonnage_num) else "unknown"),
+        "severity": "medium" if is_industrial else "none",
+        "rule_fired": is_industrial,
+        "note": size_note,
+    })
+
+    # Surface size on the identity report alongside the existing fields so
+    # the investigation card can render Profile: 42m / 420 GT.
+    report["identity"]["length_m"] = length_num
+    report["identity"]["tonnage_gt"] = tonnage_num
+    report["identity"]["is_industrial"] = is_industrial
+
     # Spatial trace entries
     contested_eez_flags = {"LBY", "SYR", "LBN"}
     vessel_flag = flag

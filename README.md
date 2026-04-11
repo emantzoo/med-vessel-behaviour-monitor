@@ -24,7 +24,7 @@ Live app: [med-vessel-behaviour-monitor.streamlit.app](https://med-vessel-behavi
 - Applies compounding multipliers at the event level: IUU listing, ICCAT authorisation (as opportunity indicator), OFAC sanctions, flag risk
 - Classifies final scores into Kpler-aligned risk bands: Low, Emerging, Elevated, Severe, Critical
 - Aggregates events to vessel level with base vs compounded score decomposition
-- Computes three display-only Kpler-aligned behavioural flags at the vessel level: multi-behaviour compound indicator, dark port call candidate (loitering within 10 km of shore), and repeat-offender-within-90-days (exposure drift)
+- Computes four display-only Kpler-aligned vessel-level flags: industrial profile (>=24m or >=100 GT, the only structural flag of the four), multi-behaviour compound indicator, dark port call candidate (loitering within 10 km of shore), and repeat-offender-within-90-days (exposure drift)
 - Visualises results across six tabs including a structured vessel investigation report and an LLM-based analyst interface
 
 ---
@@ -65,10 +65,11 @@ Final scores are classified into bands aligned with Kpler's R&C vocabulary (*Tur
 
 The `base_risk_score` column preserves the pre-multiplier behavioural score, enabling explicit decomposition of how much of a vessel's risk comes from behaviour versus structural amplifiers.
 
-In addition, three **display-only** behavioural flags are derived at the vessel level and surfaced in the Vessel Summary, Vessel Investigation, and Map & Overview tabs. They mirror three of the six core inputs in Kpler's October 2025 *Deceptive Shipping Practices* predictive model but are **not** multiplied into the risk score, because the underlying signal is already captured at the event level and double-counting would distort the score:
+In addition, four **display-only** vessel-level flags are derived and surfaced in the Vessel Summary, Vessel Investigation, and Map & Overview tabs. They mirror four of the six core inputs in Kpler's October 2025 *Deceptive Shipping Practices* predictive model but are **not** multiplied into the risk score, because the underlying signal is already captured at the event level (or, for industrial profile, would double-count what the flag-multiplier and event-specific carrier/tanker factors already encode):
 
 | Flag | Definition | Source concept |
 |---|---|---|
+| Industrial profile | Vessel >=24m LOA or >=100 GT (ICCAT industrial / EU Control Reg 1224/2009 reporting threshold). Length and tonnage from the GFW Vessels API registry / self-reported metadata in live mode, static profile in demo mode. The only structural flag of the four. | Kpler vessel-class indicator |
 | Multi-behaviour | Vessel shows two or more distinct event types (gap, encounter, loitering) | Kpler compound indicator |
 | Dark port call candidate | LOITERING event within 10 km of shore (AIS-inferred, not satellite-verified) | Kpler dark port call |
 | Repeat offender (90d) | Two or more events within any 90-day rolling window | Kpler exposure drift |
@@ -103,13 +104,15 @@ Eight-module Streamlit application:
 4. Score             compute_risk_score() -> risk_score
 5. Preserve base     base_risk_score = risk_score.copy()
 6. Spatialise        assign_csquare() -> csq_lon, csq_lat
-7. Resolve identity  lookup_vessel_imos() -> imo (live mode only)
+7. Resolve metadata  lookup_vessel_metadata() -> imo, length_m, tonnage_gt,
+                     shiptypes (live mode only; static CSV pre-populates)
 8. IUU match         match_iuu_vessels() -> iuu_* columns, risk *= iuu_multiplier
 9. ICCAT match       match_iccat_vessels() -> iccat_* columns, risk *= iccat_multiplier
 10. OFAC match       match_ofac_vessels() -> ofac_* columns, risk *= ofac_multiplier
 11. Classify         risk_band = classify_risk_band(risk_score)
-12. Flag             compute_vessel_flags() -> multi_behaviour_flag,
-                     dark_port_call_candidate, repeat_offender_90d (display-only)
+12. Flag             compute_vessel_flags() -> is_industrial,
+                     multi_behaviour_flag, dark_port_call_candidate,
+                     repeat_offender_90d (display-only)
 13. Render           Folium map + 6 tabs (with expanders) + AI analyst
 ```
 
@@ -118,11 +121,11 @@ Eight-module Streamlit application:
 Six top-level tabs, organised for a tight 30-minute demo (tab order as rendered in `app.py`):
 
 1. **Vessel Investigation** -- three-layer deep dive for the selected vessel: structured narrative from `investigation.py`, per-branch expander cards over the risk tree trace, an interactive Plotly icicle (click a branch to drill in), the full Graphviz framework diagram in a collapsed expander, and a dedicated Behavioural Flags step (multi-behaviour, dark port call candidate, repeat offender 90d).
-2. **Map & Overview** -- Folium map (dashed amber overlay for dark port call candidates), risk heatmap, daily and monthly event-type trend, and sidebar tiles for the three behavioural flags. Secondary charts (flag breakdown, event types, duration distribution) in collapsed expanders.
-3. **Vessel Summary** -- vessel-level aggregation table with risk bands, base vs compounded score decomposition, and the three display-only behavioural flags. Click a row to pre-select that vessel in the Investigation tab. Secondary views (top vessels legacy, repeat offenders, encounter/carrier alerts, AIS gap behaviour) in collapsed expanders.
+2. **Map & Overview** -- Folium map (dashed amber overlay for dark port call candidates), risk heatmap, daily and monthly event-type trend, and sidebar tiles for the four Kpler-aligned vessel-level flags. Secondary charts (flag breakdown, event types, duration distribution) in collapsed expanders.
+3. **Vessel Summary** -- vessel-level aggregation table with risk bands, base vs compounded score decomposition, and the four display-only Kpler-aligned flags (industrial profile, multi-behaviour, dark port call candidate, repeat offender) plus a sortable length / GT profile column. Click a row to pre-select that vessel in the Investigation tab. Secondary views (top vessels legacy, repeat offenders, encounter/carrier alerts, AIS gap behaviour) in collapsed expanders.
 4. **Fisheries Context** -- FDI overlay, c-square context, species landings. Geographic risk breakdown in an expander.
 5. **AI Analyst** -- Google Gemini 2.5 Flash interface with RAG knowledge base and sandboxed pandas/plotly code execution.
-6. **Reference & Methodology** -- generic framework documentation: risk tree diagram from `data/risk_tree_framework.yaml`, risk formula, **end-to-end scoring pipeline diagram** (one AIS event to vessel-level risk band, with a dashed side-chain showing the three display-only flags), risk-band table, and per-multiplier tables (flag, IUU, ICCAT, OFAC).
+6. **Reference & Methodology** -- generic framework documentation: risk tree diagram from `data/risk_tree_framework.yaml`, risk formula, **end-to-end scoring pipeline diagram** (one AIS event to vessel-level risk band, with a dashed side-chain showing the four display-only Kpler-aligned flags), risk-band table, and per-multiplier tables (flag, IUU, ICCAT, OFAC).
 
 Secondary diagnostic charts live inside collapsed `st.expander` blocks within their parent tabs, keeping the main navigation clean while preserving full analytical depth for follow-up questions.
 
@@ -153,7 +156,7 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-Static demo mode (94 pre-generated events across 88 vessels, including 2 IUU-listed, 6 ICCAT-authorised and 2 OFAC-sanctioned demo vessels, enriched so all three behavioural flags fire visibly) runs without any API credentials. Live mode requires a GFW API JWT token, which can be placed in `.streamlit/secrets.toml` or entered via the sidebar.
+Static demo mode (94 pre-generated events across 88 vessels, including 2 IUU-listed, 6 ICCAT-authorised and 2 OFAC-sanctioned demo vessels, enriched with realistic length / tonnage profiles so all four Kpler-aligned flags -- including industrial profile -- fire visibly across both sides of the 24m / 100 GT threshold) runs without any API credentials. Live mode requires a GFW API JWT token, which can be placed in `.streamlit/secrets.toml` or entered via the sidebar.
 
 ### Optional credentials
 

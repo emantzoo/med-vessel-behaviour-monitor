@@ -430,35 +430,58 @@ def match_ofac_vessels(df, ofac_df):
 def compute_vessel_flags(df):
     """Compute Kpler-aligned vessel-level behavioural flags.
 
-    Display-only signals — these do not multiply into the risk score. They
-    mirror three inputs from Kpler's October 2025 Deceptive Shipping Practices
-    predictive model that can be derived from GFW event data alone:
+    Display-only signals -- these do not multiply into the risk score. They
+    mirror four inputs from Kpler's October 2025 Deceptive Shipping Practices
+    predictive model that can be derived from GFW event/registry data alone:
 
+    - is_industrial               vessel is >= 24m LOA or >= 100 GT
+                                  (structural; ICCAT industrial / EU 1224/2009 threshold)
     - multi_behaviour_flag        vessel has >= 2 distinct event types
     - dark_port_call_candidate    loitering event within 10 km of shore
     - repeat_offender_90d         vessel has >= 2 events in any 90-day window
 
+    is_industrial is the only structural flag of the four (vessel characteristic
+    rather than temporal/behavioural). Length and tonnage come from the GFW
+    Vessels API registry/self-reported metadata in live mode and from the
+    static CSV in demo mode. The flag fires whenever EITHER threshold is met,
+    so a vessel with only one of the two metrics resolved still classifies.
+
     Called from app.py after all scoring and matching is complete.
     """
     if df.empty:
+        df["is_industrial"] = False
         df["multi_behaviour_flag"] = False
         df["dark_port_call_candidate"] = False
         df["repeat_offender_90d"] = False
         return df
 
-    # 1. Multi-behaviour flag — vessel-level, broadcast to each event row
+    # 1. Industrial vessel profile -- structural, vessel-level.
+    # Threshold: >= 24m LOA OR >= 100 GT. Either one trips it. Missing
+    # values do not fire the flag (conservative -- absence of evidence is
+    # not evidence of presence).
+    if "length_m" in df.columns:
+        length = pd.to_numeric(df["length_m"], errors="coerce").fillna(0)
+    else:
+        length = pd.Series(0.0, index=df.index)
+    if "tonnage_gt" in df.columns:
+        tonnage = pd.to_numeric(df["tonnage_gt"], errors="coerce").fillna(0)
+    else:
+        tonnage = pd.Series(0.0, index=df.index)
+    df["is_industrial"] = (length >= 24) | (tonnage >= 100)
+
+    # 2. Multi-behaviour flag -- vessel-level, broadcast to each event row
     vessel_event_types = df.groupby("mmsi")["event_type"].nunique()
     multi_behaviour_mmsi = set(vessel_event_types[vessel_event_types >= 2].index)
     df["multi_behaviour_flag"] = df["mmsi"].isin(multi_behaviour_mmsi)
 
-    # 2. Dark port call candidate — event-level
+    # 3. Dark port call candidate -- event-level
     if "distance_from_shore_km" in df.columns:
         shore = df["distance_from_shore_km"].fillna(999)
     else:
         shore = pd.Series(999, index=df.index)
     df["dark_port_call_candidate"] = (df["event_type"] == "LOITERING") & (shore < 10)
 
-    # 3. Repeat offender — vessel-level, any 90-day window containing >= 2 events
+    # 4. Repeat offender -- vessel-level, any 90-day window containing >= 2 events
     repeat_mmsi = set()
     if "start_time" in df.columns:
         time_col = "start_time"
