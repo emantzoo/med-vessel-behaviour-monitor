@@ -568,13 +568,13 @@ if not df_filtered.empty and "iuu_matched" in df_filtered.columns:
 # Consolidated to 6 top-level tabs per tab_consolidation_spec.md.
 # Secondary diagnostic charts live inside collapsed expanders within
 # their parent tab, keeping navigation clean for a 30-minute demo.
-tab_investigation, tab_map, tab_vessels, tab_fisheries, tab_reference, tab_ai = st.tabs([
+tab_investigation, tab_map, tab_vessels, tab_fisheries, tab_ai, tab_reference = st.tabs([
     "Vessel Investigation",
     "Map & Overview",
     "Vessel Summary",
     "Fisheries Context",
-    "Reference & Methodology",
     "AI Analyst",
+    "Reference & Methodology",
 ])
 
 with tab_map:

@@ -1310,14 +1310,18 @@ def render_vessel_investigation(df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_l
                     hovertemplate="%{customdata}<extra></extra>",
                     tiling=dict(orientation="h"),
                     root=dict(color="#FAFAFA"),
-                    textfont=dict(size=12),
+                    textfont=dict(size=17, family="Helvetica, Arial, sans-serif"),
+                    insidetextfont=dict(size=17, family="Helvetica, Arial, sans-serif"),
+                    outsidetextfont=dict(size=17, family="Helvetica, Arial, sans-serif"),
+                    pathbar=dict(textfont=dict(size=16)),
                 ))
                 fig_icicle.update_layout(
-                    height=520,
-                    margin=dict(l=0, r=0, t=30, b=0),
+                    height=620,
+                    margin=dict(l=0, r=0, t=40, b=0),
+                    uniformtext=dict(minsize=14, mode="hide"),
                     title=dict(
                         text="Click a branch to zoom in; click the breadcrumb at the top to zoom out.",
-                        font=dict(size=12, color="#555"),
+                        font=dict(size=14, color="#555"),
                     ),
                 )
                 st.plotly_chart(fig_icicle, use_container_width=True)
@@ -1359,7 +1363,7 @@ def render_reference():
     Pure rendering: prose from data/reference_content.yaml, numerical tables
     from config.py, framework diagram from risk_tree.render_framework_tree.
     """
-    from risk_tree import load_framework, render_framework_tree
+    from risk_tree import load_framework, render_framework_tree, render_scoring_pipeline_diagram
 
     content = _load_reference_content()
 
@@ -1394,6 +1398,22 @@ def render_reference():
         "     x ofac_multiplier",
         language="text",
     )
+
+    # End-to-end scoring pipeline diagram: AIS event -> base -> compounding
+    # multipliers -> per-event score -> vessel aggregation -> risk band,
+    # with a dashed side-chain for the three display-only vessel flags.
+    with st.expander("End-to-end scoring pipeline (diagram)", expanded=True):
+        st.caption(
+            "How one AIS event becomes a per-vessel risk band. The main "
+            "column is the multiplicative chain that produces the risk "
+            "score; the dashed side-chain shows the three vessel-level "
+            "behavioural flags, which are displayed alongside the score "
+            "but are **not** multiplied into it."
+        )
+        try:
+            st.graphviz_chart(render_scoring_pipeline_diagram())
+        except Exception as e:
+            st.warning(f"Could not render scoring pipeline diagram: {e}")
 
     bands_df = pd.DataFrame(
         [

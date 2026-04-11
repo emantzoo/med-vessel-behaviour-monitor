@@ -55,9 +55,9 @@ Final scores are classified into bands aligned with Kpler's R&C vocabulary (*Tur
 | Band | Score range | Meaning |
 |---|---|---|
 | Low | <50 | Sparse risk signals |
-| Emerging | 50-59 | First risk flags |
-| Elevated | 60-79 | Multiple risk indicators |
-| Severe | 80-99 | Compounding risk |
+| Emerging | 50-60 | First risk flags |
+| Elevated | 60-80 | Multiple risk indicators |
+| Severe | 80-100 | Compounding risk |
 | Critical | >=100 | Threshold breach |
 
 The `base_risk_score` column preserves the pre-multiplier behavioural score, enabling explicit decomposition of how much of a vessel's risk comes from behaviour versus structural amplifiers.
@@ -89,7 +89,7 @@ Eight-module Streamlit application:
 | `tabs.py` | Render functions for each top-level tab and expander section, including `render_vessel_summary` (Kpler-vocabulary aggregation) and `render_daily_trend` (daily + monthly multi-behaviour trend). |
 | `ai_analyst.py` | Google Gemini 2.5 Flash integration with RAG knowledge base, sandboxed pandas/plotly code execution, system prompt builder. |
 | `investigation.py` | Deterministic rule-based vessel investigation (no LLM) -- structured multi-section report used by the Vessel Investigation tab. |
-| `risk_tree.py` | Med IUU Risk Tree framework loaded from `data/risk_tree_framework.yaml` and rendered as a Graphviz diagram. |
+| `risk_tree.py` | Two Graphviz diagram builders: `render_framework_tree()` for the Med IUU Risk Tree framework loaded from `data/risk_tree_framework.yaml`, and `render_scoring_pipeline_diagram()` for the end-to-end scoring pipeline shown in the Reference tab. |
 
 ## Data pipeline
 
@@ -112,14 +112,14 @@ Eight-module Streamlit application:
 
 ## Tab structure
 
-Six top-level tabs, organised for a tight 30-minute demo:
+Six top-level tabs, organised for a tight 30-minute demo (tab order as rendered in `app.py`):
 
-1. **Map & Overview** -- Folium map (with dashed amber overlay for dark port call candidates), risk heatmap, daily and monthly event-type trend, and summary tiles for the three Kpler-aligned flags (multi-behaviour, dark port candidates, repeat offenders). Secondary charts (flag breakdown, event types pie, duration distribution) in collapsed expanders.
-2. **Vessel Summary** -- vessel-level aggregation table with risk bands, base vs compounded score decomposition, and the three Kpler-aligned display-only flags. The Kpler-vocabulary tab. Secondary views (top vessels legacy, repeat offenders, encounter/carrier alerts, AIS gap behaviour) in collapsed expanders.
-3. **Fisheries Context** -- FDI overlay, c-square context, species landings. Geographic risk breakdown in an expander.
-4. **Vessel Investigation** -- three-layer deep dive: framework methodology, structured narrative from `investigation.py`, per-vessel coloured risk tree path, and a dedicated "Kpler-aligned Behavioural Flags" step showing the three display-only flags for the selected vessel.
-5. **Risk Tree Framework** -- methodology visualisation from `data/risk_tree_framework.yaml`. Direct conceptual link to Kpler's April 2026 shadow fleet risk tree blog post.
-6. **AI Analyst** -- Google Gemini 2.5 Flash interface with RAG knowledge base and sandboxed pandas/plotly code execution.
+1. **Vessel Investigation** -- three-layer deep dive for the selected vessel: structured narrative from `investigation.py`, per-branch expander cards over the risk tree trace, an interactive Plotly icicle (click a branch to drill in), the full Graphviz framework diagram in a collapsed expander, and a dedicated Behavioural Flags step (multi-behaviour, dark port call candidate, repeat offender 90d).
+2. **Map & Overview** -- Folium map (dashed amber overlay for dark port call candidates), risk heatmap, daily and monthly event-type trend, and sidebar tiles for the three behavioural flags. Secondary charts (flag breakdown, event types, duration distribution) in collapsed expanders.
+3. **Vessel Summary** -- vessel-level aggregation table with risk bands, base vs compounded score decomposition, and the three display-only behavioural flags. Click a row to pre-select that vessel in the Investigation tab. Secondary views (top vessels legacy, repeat offenders, encounter/carrier alerts, AIS gap behaviour) in collapsed expanders.
+4. **Fisheries Context** -- FDI overlay, c-square context, species landings. Geographic risk breakdown in an expander.
+5. **AI Analyst** -- Google Gemini 2.5 Flash interface with RAG knowledge base and sandboxed pandas/plotly code execution.
+6. **Reference & Methodology** -- generic framework documentation: risk tree diagram from `data/risk_tree_framework.yaml`, risk formula, **end-to-end scoring pipeline diagram** (one AIS event to vessel-level risk band, with a dashed side-chain showing the three display-only flags), risk-band table, and per-multiplier tables (flag, IUU, ICCAT, OFAC).
 
 Secondary diagnostic charts live inside collapsed `st.expander` blocks within their parent tabs, keeping the main navigation clean while preserving full analytical depth for follow-up questions.
 
@@ -148,7 +148,7 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-Static demo mode (94 pre-generated events including IUU, ICCAT and OFAC demo vessels, enriched so all three Kpler-aligned flags fire visibly) runs without any API credentials. Live mode requires a GFW API JWT token, which can be placed in `.streamlit/secrets.toml` or entered via the sidebar.
+Static demo mode (94 pre-generated events across 88 vessels, including 2 IUU-listed, 6 ICCAT-authorised and 2 OFAC-sanctioned demo vessels, enriched so all three behavioural flags fire visibly) runs without any API credentials. Live mode requires a GFW API JWT token, which can be placed in `.streamlit/secrets.toml` or entered via the sidebar.
 
 ### Optional credentials
 
@@ -169,7 +169,7 @@ Both have sidebar text-input fallbacks if the secrets file is missing.
 - 5 risk bands (Low, Emerging, Elevated, Severe, Critical)
 - 6 top-level tabs
 - 369 IUU vessels, 9,203 ICCAT Med-authorised vessels, 1,008 FDI c-squares
-- 94 static demo events including 3 IUU, 3 ICCAT and 2 OFAC demo vessels
+- 94 static demo events across 88 unique MMSI, including 2 IUU-listed, 6 ICCAT-authorised and 2 OFAC-sanctioned demo vessels
 - 3 Kpler-aligned display-only behavioural flags (multi-behaviour, dark port call candidate, repeat offender 90d)
 - Med polygon: `[[-6, 30], [36.5, 30], [36.5, 46], [-6, 46]]`
 - FDI c-square grid: 0.5 deg x 0.5 deg

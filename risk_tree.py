@@ -191,3 +191,164 @@ def render_framework_tree(trace=None, tier=None, vessel_label=None):
             )
 
     return dot
+
+
+def render_scoring_pipeline_diagram():
+    """Render the end-to-end scoring pipeline as a graphviz flowchart.
+
+    Mirrors the mental model a reviewer needs to audit the risk score:
+    one AIS event -> base behavioural score -> compounding multipliers ->
+    per-event score -> vessel-level aggregation -> risk band. A separate
+    dashed side-chain shows the three vessel-level compound/temporal
+    flags (multi-behaviour, dark port call candidate, repeat offender)
+    which are computed independently and fed to the Vessel Summary as
+    display-only signals (never multiplied into the score).
+    """
+    dot = graphviz.Digraph(
+        "scoring_pipeline",
+        graph_attr={
+            "rankdir": "TB",
+            "fontname": "Helvetica",
+            "fontsize": "13",
+            "bgcolor": "white",
+            "splines": "ortho",
+            "nodesep": "0.4",
+            "ranksep": "0.5",
+        },
+        node_attr={
+            "fontname": "Helvetica",
+            "fontsize": "11",
+            "shape": "box",
+            "style": "rounded,filled",
+            "fillcolor": "white",
+            "color": "#555",
+            "margin": "0.15,0.1",
+        },
+        edge_attr={
+            "fontname": "Helvetica",
+            "fontsize": "9",
+            "color": "#555",
+        },
+    )
+
+    # --- Main pipeline (per-event scoring) ---
+    dot.node(
+        "A",
+        "AIS Event\\n(gap / encounter / loitering)",
+        fillcolor="#ECEFF1",
+    )
+    dot.node(
+        "B",
+        "Base Behavioural Score\\n"
+        "duration^0.75 x event_weight\\n"
+        "x flag x shore x event_factors",
+        fillcolor="#E8F4F8",
+    )
+    dot.node(
+        "C",
+        "base_risk_score\\n(snapshot)",
+        fillcolor="#FFFFFF",
+    )
+    dot.node(
+        "D",
+        "x IUU multiplier\\nGFCM 3.0x / other 2.0x",
+        fillcolor="#FFF4E6",
+    )
+    dot.node(
+        "E",
+        "x ICCAT multiplier\\ncarrier 1.4x / BFT 1.3x / SWO-ALB 1.2x",
+        fillcolor="#FFF4E6",
+    )
+    dot.node(
+        "F",
+        "x OFAC multiplier\\n2.5x",
+        fillcolor="#FFF4E6",
+    )
+    dot.node(
+        "G",
+        "risk_score\\n(per event)",
+        fillcolor="#FFF4E6",
+    )
+
+    dot.edge("A", "B")
+    dot.edge("B", "C", label="snapshot")
+    dot.edge("B", "D")
+    dot.edge("D", "E")
+    dot.edge("E", "F")
+    dot.edge("F", "G")
+
+    # --- Vessel-level aggregation ---
+    dot.node(
+        "H",
+        "Sum events per vessel",
+        fillcolor="#FFFFFF",
+    )
+    dot.node(
+        "I",
+        "Sum base per vessel",
+        fillcolor="#FFFFFF",
+    )
+    dot.node(
+        "J",
+        "risk_score_total",
+        fillcolor="#E8F8E8",
+    )
+    dot.node(
+        "K",
+        "base_score_total",
+        fillcolor="#E8F8E8",
+    )
+    dot.node(
+        "L",
+        "compound_multiplier\\n= risk_score_total / base_score_total",
+        fillcolor="#E8F8E8",
+    )
+    dot.node(
+        "M",
+        "risk_band\\nLow / Emerging / Elevated / Severe / Critical",
+        fillcolor="#F8E8E8",
+    )
+
+    dot.edge("G", "H")
+    dot.edge("C", "I")
+    dot.edge("H", "J")
+    dot.edge("I", "K")
+    dot.edge("J", "L")
+    dot.edge("K", "L")
+    dot.edge("J", "M")
+
+    # --- Vessel-level flags (computed separately, dashed to show they
+    # do not multiply into the risk score) ---
+    dot.node(
+        "N",
+        "Vessel-level flags\\n(computed separately)",
+        fillcolor="#F0F0F0",
+    )
+    dot.node("O", "multi_behaviour_flag", fillcolor="#FAFAFA")
+    dot.node("P", "dark_port_call_candidate", fillcolor="#FAFAFA")
+    dot.node("Q", "repeat_offender_90d", fillcolor="#FAFAFA")
+    dot.node(
+        "R",
+        "Display-only:\\nVessel Summary + Investigation badges\\n+ risk tree rules",
+        fillcolor="#F0F0F0",
+    )
+
+    dot.edge("N", "O", style="dashed")
+    dot.edge("N", "P", style="dashed")
+    dot.edge("N", "Q", style="dashed")
+    dot.edge("O", "R", style="dashed")
+    dot.edge("P", "R", style="dashed")
+    dot.edge("Q", "R", style="dashed")
+
+    # --- Final convergence into the Vessel Summary tab ---
+    dot.node(
+        "S",
+        "Vessel Summary tab",
+        fillcolor="#E3F2FD",
+        fontsize="12",
+    )
+    dot.edge("M", "S")
+    dot.edge("L", "S")
+    dot.edge("R", "S")
+
+    return dot
