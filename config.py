@@ -27,6 +27,43 @@ ICCAT_MULTIPLIERS = {
 
 OFAC_MULTIPLIER = 2.5
 
+# ========================= MPA MULTIPLIERS =========================
+# Spatial rule-zone factor applied to the base behavioural score (before
+# IUU/ICCAT/OFAC compound multipliers). Tiered by regulatory enforcement
+# backing rather than empirical outcomes -- calibration is by ordinal
+# anchoring against the existing compliance chain, not by ground truth.
+#
+# Source: GFW Events API `regions.mpa` field, which pre-computes
+# point-in-polygon intersection against WDPA (World Database on Protected
+# Areas). Classification into tiers is by substring pattern on the MPA
+# name returned by GFW.
+#
+# Calibration rationale (see reference_content.yaml::mpa_framing_note):
+#   GFCM FRA    2.0x   parity with "other RFMO IUU listing", Reg 1967/2006
+#   EU site     1.5x   Natura 2000 marine, national MPAs, softer enforcement
+#   General     1.2x   other WDPA entries, contextual signal only
+#
+# AIS-only caveat: McDonald et al. 2024 (Nature) found ~75% of SAR-detected
+# fishing vessels are AIS-dark, and the gap inside MPAs is closer to 90%.
+# An AIS-based MPA intersection is therefore a lower-bound signal on
+# broadcasting vessels, complementary to (not a replacement for) the
+# existing AIS-gap evasion signal.
+
+MPA_MULTIPLIERS = {
+    "gfcm_fra": 2.0,
+    "eu_site":  1.5,
+    "general":  1.2,
+}
+
+# Substring patterns (lowercased) used to classify an MPA name into a tier.
+# Order matters: first match wins, so put stricter patterns first.
+MPA_TIER_PATTERNS = [
+    ("gfcm_fra", ["gfcm", "fisheries restricted area", "fra"]),
+    ("eu_site",  ["natura 2000", "natura2000", "site of community importance",
+                  "special area of conservation", "sac", "spa",
+                  "pelagos sanctuary"]),
+]
+
 # ========================= RISK BANDS =========================
 # Aligned with Kpler R&C "Turning Tides" (Dec 2025) score-band vocabulary.
 # Applied to final compounded risk_score after all multipliers.
@@ -104,6 +141,22 @@ def classify_risk_band(score):
         if low <= score < high:
             return label
     return "Critical"
+
+
+def classify_mpa_tier(mpa_names):
+    """Map a list of MPA names to the highest-severity tier they imply.
+
+    Uses substring matching against MPA_TIER_PATTERNS. Falls back to
+    'general' if no pattern matches. An empty list returns ''.
+    """
+    if not mpa_names:
+        return ""
+    joined = " | ".join(str(n).lower() for n in mpa_names)
+    for tier, patterns in MPA_TIER_PATTERNS:
+        for pat in patterns:
+            if pat in joined:
+                return tier
+    return "general"
 
 
 def assign_csquare(lat, lon):

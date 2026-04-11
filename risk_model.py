@@ -2,7 +2,11 @@
 
 import pandas as pd
 
-from config import TRANSSHIPMENT_VESSEL_TYPES, SPECIES_NAMES, IUU_MULTIPLIERS, ICCAT_MULTIPLIERS, OFAC_MULTIPLIER
+from config import (
+    TRANSSHIPMENT_VESSEL_TYPES, SPECIES_NAMES,
+    IUU_MULTIPLIERS, ICCAT_MULTIPLIERS, OFAC_MULTIPLIER,
+    MPA_MULTIPLIERS,
+)
 
 
 def compute_risk_score(row, event_weights, flag_risks):
@@ -29,6 +33,14 @@ def compute_risk_score(row, event_weights, flag_risks):
     else:
         shore_factor = 1.0
 
+    # MPA intersection factor (spatial rule-zone signal). Applied to the
+    # BASE behavioural score, not the compound multiplier chain, because
+    # MPA intersection answers a "where" question (behavioural/spatial)
+    # rather than a "who" question (list lookup). Uses GFW regions.mpa
+    # pre-computed via WDPA. Tier classification happens in data_loading.
+    mpa_tier = row.get("mpa_tier") if pd.notna(row.get("mpa_tier")) else ""
+    mpa_factor = MPA_MULTIPLIERS.get(str(mpa_tier), 1.0) if mpa_tier else 1.0
+
     if row["event_type"] == "ENCOUNTER":
         dist = row.get("encounter_median_distance_km")
         if pd.notna(dist):
@@ -47,7 +59,7 @@ def compute_risk_score(row, event_weights, flag_risks):
         vtype = str(row.get("vessel_type", "")).upper()
         vessel_factor = 1.4 if vtype in TRANSSHIPMENT_VESSEL_TYPES else 1.0
 
-        return base * ew * fm * shore_factor * proximity_factor * speed_factor * vessel_factor
+        return base * ew * fm * shore_factor * mpa_factor * proximity_factor * speed_factor * vessel_factor
 
     elif row["event_type"] == "LOITERING":
         vtype = str(row.get("vessel_type", "")).upper()
@@ -56,7 +68,7 @@ def compute_risk_score(row, event_weights, flag_risks):
         speed = row.get("loitering_avg_speed_knots")
         speed_factor = 1.4 if pd.notna(speed) and speed < 2.0 else 1.0
 
-        return base * ew * fm * shore_factor * vessel_factor * speed_factor
+        return base * ew * fm * shore_factor * mpa_factor * vessel_factor * speed_factor
 
     elif row["event_type"] == "GAP":
         spd_before = row.get("speed_before_gap")
@@ -67,10 +79,10 @@ def compute_risk_score(row, event_weights, flag_risks):
         else:
             evasion_factor = 1.0
 
-        return base * ew * fm * shore_factor * evasion_factor
+        return base * ew * fm * shore_factor * mpa_factor * evasion_factor
 
     else:
-        return base * ew * fm * shore_factor
+        return base * ew * fm * shore_factor * mpa_factor
 
 
 def get_fdi_context(csq_lon, csq_lat, fdi_effort, fdi_landings, year=None):

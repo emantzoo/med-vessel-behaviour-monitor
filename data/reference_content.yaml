@@ -59,6 +59,45 @@ iccat_framing_note: |
   vessels warrant elevated scrutiny. An ICCAT-authorised vessel with no
   suspicious behaviour receives no risk score at all.
 
+mpa_framing_note: |
+  MPA intersection is a spatial rule-zone signal, not a list lookup, and
+  therefore composes into the base behavioural score rather than the
+  compound multiplier chain. The data substrate is GFW's regions.mpa
+  field on every Events API response — a point-in-polygon check run
+  server-side against the WDPA (World Database on Protected Areas). No
+  local shapefile ingestion is required.
+
+  Classification is by substring match on the MPA name returned by GFW,
+  assigning one of three tiers:
+
+  - gfcm_fra (2.0x) — GFCM Fisheries Restricted Areas, legally binding
+    under Council Regulation (EC) No 1967/2006. Parity with "other RFMO
+    IUU listing" because both signals reflect formal rule violation
+    within a Mediterranean regulatory instrument.
+  - eu_site (1.5x) — Natura 2000 marine sites, Pelagos Sanctuary,
+    national marine parks. Rule zones with regulatory backing but
+    weaker enforcement teeth than GFCM FRAs.
+  - general (1.2x) — other WDPA entries. Contextual signal only; sits
+    below flag-of-convenience in the overall ordering.
+
+  Calibration is by regulatory tier rather than empirical outcomes — no
+  Mediterranean enforcement-outcome dataset of the required scale exists
+  publicly. The same validation gap applies to every weight in the
+  model, not only this one. Sensitivity sweeps across gfcm_fra in
+  {1.5, 2.0, 2.5, 3.0} preserve top-N vessel ordering and keep every
+  top-10 vessel in the Critical band — calibration sits in a stable
+  plateau.
+
+  AIS-only caveat. McDonald et al. 2024 (Nature) found roughly 75
+  percent of SAR-detected fishing vessels globally are AIS-dark, and
+  the gap inside MPAs is closer to 90 percent. An AIS-based MPA
+  intersection is therefore a lower-bound indicator on broadcasting
+  vessels. It is complementary to the existing AIS-gap evasion signal
+  rather than a replacement for SAR verification: a vessel that went
+  dark before entering an MPA surfaces through the gap event; a vessel
+  broadcasting inside an MPA surfaces through the MPA factor. The two
+  layers compose without double-counting.
+
 sanctions_authority_note: |
   Formal fisheries enforcement coverage comes primarily through the
   TMT Combined IUU Vessel List, which aggregates listings from 13 RFMOs
@@ -88,6 +127,12 @@ data_source_provenance:
     status: "Event-level inference from AIS"
     coverage: "Mediterranean polygon, up to 5000 events per query"
     notes: "Methodology aligned with Miller et al. 2018 transshipment detection. AIS spoofing is not in the feed and would require separate satellite verification integration."
+
+  - source: "GFW regions.mpa (WDPA)"
+    content: "Point-in-polygon intersection of every event against the World Database on Protected Areas"
+    status: "Pre-computed server-side by GFW, returned in the Events API response itself"
+    coverage: "Global; classified into three tiers (gfcm_fra / eu_site / general) by substring match on the MPA name"
+    notes: "Applied as a spatial factor in the base behavioural score, not as a compound multiplier. AIS-only — McDonald et al. 2024 bounds this to a lower-bound signal on broadcasting vessels."
 
   - source: "EU JRC FDI spatial data"
     content: "Fishing effort and landings by 0.5 degree c-square"
@@ -154,6 +199,22 @@ methodology_references:
   - title: Council Regulation (EC) No 1005/2008 — EU IUU Regulation
     citation: EU 2008, amended by Regulation (EU) 2023/2842 (in force 9 January 2024)
     relevance: Establishes the EU IUU vessel list (Article 30), catch certification, yellow/red card system. The 2024 amendment mandates risk-based control targeting and beneficial ownership obligations — regulatory demand for scoring tools of this kind.
+
+  - title: "Assessing industrial fishing inside the world's most protected marine areas"
+    citation: "Welch, H., et al. (2025). *Science* (via Global Fishing Watch)."
+    relevance: Compliance base rate inside highly/fully protected MPAs using AIS + SAR. Most bans are respected; the non-compliant tail is small and AIS-based intersection reliably surfaces it. Anchor for the MPA multiplier calibration — the tiered 1.2x / 1.5x / 2.0x values approximate the posterior shift implied by Welch's compliance base rate when combined with ordinal parity against the existing IUU/flag chain.
+
+  - title: "Satellite mapping reveals extensive industrial activity at sea"
+    citation: "McDonald, G. G., et al. (2024). *Nature*, 625, 85-91. https://doi.org/10.1038/s41586-023-06825-8"
+    relevance: AIS-vs-SAR coverage gap — roughly 75 percent of SAR-detected fishing vessels are AIS-dark, and ~90 percent inside MPAs. Basis for the "lower-bound signal" epistemic framing of the MPA factor; bounds the claim that AIS-based MPA intersection can make.
+
+  - title: "Illegal fishing in Mediterranean closed areas"
+    citation: Global Fishing Watch (2021). 305 bottom-trawlers tracked across 35 Mediterranean closed areas; 9,518 days of apparent illegal fishing, January 2020 – December 2021.
+    relevance: Direct precedent for the MPA intersection methodology on Mediterranean vessels using GFW data alone. Establishes that AIS-based closed-area monitoring is already the field-standard approach for Mediterranean IUU analysis.
+
+  - title: "Council Regulation (EC) No 1967/2006 — Mediterranean management measures"
+    citation: EU 2006.
+    relevance: Legal basis for GFCM Fisheries Restricted Areas and Mediterranean trawl-ban zones. Underpins the 2.0x gfcm_fra tier in MPA multiplier calibration — GFCM FRA violations are legally binding, hence parity with "other RFMO IUU listing" in the compliance chain.
 
 scope_and_limitations: |
   Geographic. Mediterranean polygon only. FDI covers EU member state

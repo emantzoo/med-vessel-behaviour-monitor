@@ -8,7 +8,7 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 
-from config import classify_med_zone
+from config import classify_med_zone, classify_mpa_tier
 
 
 # ========================= RAG KNOWLEDGE BASE =========================
@@ -33,6 +33,16 @@ def load_static_data():
     if os.path.exists(csv_path):
         df = pd.read_csv(csv_path, parse_dates=["date"], dtype={"imo": str})
         df["imo"] = df["imo"].fillna("")
+        # Ensure MPA columns exist even for pre-MPA demo rows
+        if "mpa" not in df.columns:
+            df["mpa"] = ""
+        if "mpa_tier" not in df.columns:
+            df["mpa_tier"] = ""
+        if "in_mpa" not in df.columns:
+            df["in_mpa"] = df["mpa"].fillna("").astype(str).str.len() > 0
+        df["mpa"] = df["mpa"].fillna("")
+        df["mpa_tier"] = df["mpa_tier"].fillna("")
+        df["in_mpa"] = df["in_mpa"].fillna(False).astype(bool)
         return df
 
     rng = np.random.default_rng(42)
@@ -196,11 +206,29 @@ def load_live_data(token, start_date, end_date, _min_dur):
             port = distances.get("port") if isinstance(distances.get("port"), dict) else {}
             row_dict["nearest_port"] = port.get("name")
 
+            # GFW regions array carries point-in-polygon intersections for
+            # eez, mpa, rfmo, fao majors — all pre-computed server-side.
+            # We preserve EEZ as a scalar (single name) and accumulate MPAs
+            # and RFMOs as lists since a point may intersect multiple.
+            mpa_names, rfmo_names, mpa_ids = [], [], []
             for region in (r.get("regions") or []):
                 if isinstance(region, dict):
-                    ds = region.get("dataset", "")
+                    ds = str(region.get("dataset", "")).lower()
+                    name = region.get("name")
+                    rid = region.get("id")
                     if "eez" in ds:
-                        row_dict["eez"] = region.get("name")
+                        row_dict["eez"] = name
+                    elif "mpa" in ds and name:
+                        mpa_names.append(str(name))
+                        if rid:
+                            mpa_ids.append(str(rid))
+                    elif "rfmo" in ds and name:
+                        rfmo_names.append(str(name))
+            row_dict["mpa"] = "; ".join(mpa_names) if mpa_names else ""
+            row_dict["mpa_ids"] = "; ".join(mpa_ids) if mpa_ids else ""
+            row_dict["rfmo"] = "; ".join(rfmo_names) if rfmo_names else ""
+            row_dict["in_mpa"] = bool(mpa_names)
+            row_dict["mpa_tier"] = classify_mpa_tier(mpa_names) if mpa_names else ""
 
             event_info = r.get("event_info") if isinstance(r.get("event_info"), dict) else {}
 

@@ -23,7 +23,7 @@ Three chains converge on the Vessel Summary tab: the per-event multiplicative ch
 
 ```mermaid
 flowchart TD
-    A["AIS event<br/>gap / encounter / loitering"] --> B["Base behavioural score<br/>duration^0.75 × event_weight<br/>× flag × shore × event_factors"]
+    A["AIS event<br/>gap / encounter / loitering"] --> B["Base behavioural score<br/>duration^0.75 × event_weight<br/>× flag × shore × mpa × event_factors"]
     B -->|snapshot| C[["base_risk_score"]]
     B --> D["× IUU multiplier<br/><i>GFCM 3.0× / other 2.0×</i>"]
     D --> E["× ICCAT multiplier<br/><i>carrier 1.4× / BFT 1.3× / SWO-ALB 1.2×</i>"]
@@ -61,7 +61,9 @@ flowchart TD
     class N,O,P,Q,R flag
 ```
 
-**One line:** `risk = (duration_h^0.75) × event_weight × flag × shore × event_factors × iuu × iccat × ofac`
+**One line:** `risk = (duration_h^0.75) × event_weight × flag × shore × mpa × event_factors × iuu × iccat × ofac`
+
+**Where does `mpa` come from?** The GFW Events API already returns `regions.mpa` for every event — a pre-computed point-in-polygon intersection against WDPA (World Database on Protected Areas). No shapefile encoding, no external ingestion, authoritative data. The app classifies each MPA name into one of three regulatory tiers.
 
 ---
 
@@ -79,6 +81,11 @@ Replicates and extends the GFW transshipment methodology (Miller et al. 2018, *T
 - `>20 nm` (37 km): 1.5× — high-suspicion zone, GFW "likely transshipment" threshold
 - `>10 km`: 1.2× — GFW encounter threshold
 - `<10 km`: 0.8× — near-shore, less suspicious
+
+**MPA intersection factor** (all event types, from GFW `regions.mpa`)
+- `gfcm_fra` — GFCM Fisheries Restricted Area, legally binding under Reg 1967/2006: 2.0× (parity with "other RFMO IUU listing")
+- `eu_site` — Natura 2000 marine, Pelagos Sanctuary, national MPAs: 1.5×
+- `general` — other WDPA entries: 1.2× (contextual signal only)
 
 **Encounter-specific factors**
 - Proximity: `<500 m` = 1.8× (GFW threshold), `<1 km` = 1.3×
@@ -109,24 +116,30 @@ Replicates and extends the GFW transshipment methodology (Miller et al. 2018, *T
 | 18 h GAP event | duration^0.75 × 3.2 | 8.8 × 3.2 | **28.2** |
 | Flag (Libya → FoC) | × 1.0 | — | 28.2 |
 | 12 km offshore | × 1.2 shore | — | 33.8 |
-| Base score snapshotted | | | **33.8 → Low** |
-| IUU-listed (GFCM) | × 3.0 | | 101.5 |
-| ICCAT BFT-catching | × 1.3 | | 131.9 |
+| Inside a GFCM FRA | × 2.0 mpa | — | 67.6 |
+| Base score snapshotted | | | **67.6 → Elevated** |
+| IUU-listed (GFCM) | × 3.0 | | 202.8 |
+| ICCAT BFT-catching | × 1.3 | | 263.6 |
 | **Final band** | | | **Critical** |
 
-Same event. Behavioural base says "Low". Structural amplifiers move it to "Critical". The analyst sees both numbers, so the compounding is auditable rather than opaque.
+Same event. Behavioural base (including the MPA factor, which is a spatial rule-zone signal) says "Elevated". Structural amplifiers from list lookups compound it to "Critical". The analyst sees both numbers, so the compounding is auditable rather than opaque.
+
+**Calibration of the MPA multiplier.** The MPA factor is anchored by regulatory tier rather than empirical outcomes, the same way every other factor in the formula is methodology-driven rather than enforcement-calibrated. GFCM FRAs (legally binding under Reg 1967/2006) sit at 2.0× for parity with "other RFMO IUU listing"; EU-designated marine sites at 1.5×; general WDPA entries at 1.2× (below flag-of-convenience). Sensitivity sweep on the static demo across `gfcm ∈ {1.5, 2.0, 2.5, 3.0}` preserves top-6 vessel ordering and keeps every top-10 vessel in the Critical band — calibration sits in a stable plateau. Empirical calibration would require a labelled Mediterranean enforcement-outcome dataset which does not currently exist at scale; this is the same gap named for `duration^0.75` and every other weight.
 
 ---
 
-## Five data sources, five epistemologies
+## Five data sources, five epistemologies (plus GFW `regions.mpa`)
 
 | # | Source | Scale | Epistemic role |
 |---|---|---|---|
 | 1 | **GFW Events API** — gap / encounter / loitering | Live, Med polygon | Observed behaviour |
+| 1b | **GFW `regions.mpa`** — WDPA point-in-polygon, pre-computed server-side | Global, tiered into GFCM-FRA / EU-site / general | Spatial rule-zone violation (composes into base score) |
 | 2 | **EU JRC FDI** — effort & landings by c-square × quarter × gear × species | 83k effort rows, 212k landing rows, 27 gear types | Statistical estimate of legitimate activity |
 | 3 | **TMT Combined IUU List** — 13 RFMOs | 369 vessels (168 with IMO, 64 with MMSI) | Confirmed enforcement |
 | 4 | **ICCAT Record of Vessels** — Med-authorised | 9,203 vessels, species-weighted multipliers | Authorisation as *opportunity*, not exoneration |
 | 5 | **OFAC SDN** — US Treasury sanctioned vessels | ~50 vessels | Hard sanctions flag |
+
+MPA intersection is listed as 1b because it is part of the GFW Events API response itself — no additional ingestion, no polygon encoding, WDPA point-in-polygon computed server-side.
 
 Base behavioural score is snapshotted between step 1 and steps 3–5 so the final report can decompose any vessel into **base × compound multiplier**.
 
@@ -141,7 +154,7 @@ From *How Deception Detection Works* and the Dec 2025 "Turning Tides" paper:
 | 1. Formal sanctions status | TMT IUU + OFAC SDN screening | **Implemented** |
 | 2. Behavioural indicators | GFW gap / encounter / loitering, duration^0.75 weighted | **Implemented** |
 | 3. Associative risk | — | **Gap — Maritime 2.0 plugs in here** |
-| 4. Geographic risk | GSA zoning, shore factor, Libya/Tunisia hotspots | **Implemented** |
+| 4. Geographic risk | GSA zoning, shore factor, Libya/Tunisia hotspots, **MPA intersection (GFW `regions.mpa`, tiered)** | **Implemented** |
 | 5. Cargo risk | ICCAT species tiers (carrier 1.4× / BFT 1.3× / SWO-ALB 1.2×) | **Implemented (fisheries-cargo equivalent)** |
 | 6. Ownership opacity | `flag_multiplier` only (FoC proxy) | **Partial — beneficial ownership missing** |
 
@@ -230,6 +243,10 @@ The risk-tree view is the **compound-logic** counterpart to the multiplicative s
 
 - Miller, N. A., Roan, A., Hochberg, T., Amos, J., & Kroodsma, D. A. (2018). Identifying global patterns of transshipment behavior. *Frontiers in Marine Science*, 5, 240. https://doi.org/10.3389/fmars.2018.00240
 - Rodriguez-Diaz, E., Alcaide, J. I., & Endrina, N. (2025). Shadow Fleets: A Growing Challenge in Global Maritime Commerce. *Applied Sciences*, 15(12), 6424. https://doi.org/10.3390/app15126424
+- Welch, H., et al. (2025). Assessing industrial fishing inside the world's most protected marine areas. *Science* — via Global Fishing Watch. (Compliance base rate for MPA multiplier anchoring.)
+- McDonald, G. G., et al. (2024). Satellite mapping reveals extensive industrial activity at sea. *Nature*, 625, 85–91. https://doi.org/10.1038/s41586-023-06825-8 (AIS-vs-SAR coverage gap; basis for the "lower-bound signal" caveat on MPA intersection.)
+- Global Fishing Watch (2021). *Illegal fishing in Mediterranean closed areas* — 305 bottom-trawlers, 35 closed areas, 9,518 days of apparent illegal fishing, 2020–2021.
+- Council Regulation (EC) No 1967/2006 of 21 December 2006 concerning management measures for the sustainable exploitation of fishery resources in the Mediterranean Sea. (Legal basis for GFCM FRA enforcement tier.)
 - Kpler (2025, December). *Turning Tides: Maritime Risk and Compliance Insights 2025–2026*.
 - Kpler (2025, November). *AIS Spoofing: Fast Track to Sanctions*.
 - Kpler (2025). *How Deception Detection Works*.

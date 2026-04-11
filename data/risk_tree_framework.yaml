@@ -143,8 +143,17 @@ framework:
           text: "Did the activity occur in a contested or weakly enforced EEZ (Libyan, Syrian, Lebanese)?"
           weight: high
         - id: closed_fishery
-          text: "Did the activity occur in a closed fishery area or seasonal closure period?"
+          text: "Did the activity occur inside a Marine Protected Area, GFCM Fisheries Restricted Area, or closed fishery?"
           weight: high
+          note: >
+            Bound to GFW's regions.mpa field on each event (WDPA point-in-polygon,
+            computed server-side). Classified into three tiers by substring
+            match on the MPA name: GFCM Fisheries Restricted Area (legally binding
+            under Reg 1967/2006, 2.0x), EU-designated site (Natura 2000, Pelagos
+            Sanctuary, national MPA, 1.5x), and general WDPA entry (1.2x). These
+            multipliers compose into the base behavioural score. The per-vessel
+            risk tree fires this branch at high severity when any event on the
+            vessel has in_mpa=True.
         - id: high_value_grounds
           text: "Is the c-square a known high-value fishing ground (BFT, swordfish, hake)?"
           weight: medium

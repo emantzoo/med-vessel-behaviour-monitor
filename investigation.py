@@ -338,10 +338,35 @@ def investigate_vessel(vessel_identifier, df, iuu_df, iccat_df, ofac_df, fdi_eff
         "rule_fired": in_contested,
         "note": "Activity in contested/weakly enforced EEZ" if in_contested else "Not in contested EEZ",
     })
+    # MPA intersection from GFW regions.mpa (WDPA point-in-polygon)
+    if "in_mpa" in vessel_events.columns:
+        mpa_events = vessel_events[vessel_events["in_mpa"].fillna(False).astype(bool)]
+    else:
+        mpa_events = vessel_events.iloc[0:0]
+    in_mpa_any = len(mpa_events) > 0
+    if in_mpa_any:
+        # Pick the highest-severity tier present on the vessel
+        tier_priority = {"gfcm_fra": 3, "eu_site": 2, "general": 1, "": 0}
+        tiers = mpa_events.get("mpa_tier", pd.Series(dtype=str)).fillna("").astype(str)
+        top_tier = max(tiers, key=lambda t: tier_priority.get(t, 0)) if len(tiers) else ""
+        mpa_names = [
+            str(n) for n in mpa_events.get("mpa", pd.Series(dtype=str)).fillna("").unique()
+            if str(n).strip()
+        ]
+        note = (
+            f"{len(mpa_events)} event(s) inside an MPA "
+            f"(highest tier: {top_tier or 'general'}). "
+            f"Names: {'; '.join(mpa_names[:3])}"
+        )
+    else:
+        top_tier = ""
+        note = "No events intersect an MPA (GFW regions.mpa)"
     trace.append({
         "branch_id": "spatial_context", "question_id": "closed_fishery",
-        "answer": "unknown", "severity": "none", "rule_fired": False,
-        "note": "Closed fishery data not available in current dataset",
+        "answer": "yes" if in_mpa_any else "no",
+        "severity": "high" if in_mpa_any else "none",
+        "rule_fired": in_mpa_any,
+        "note": note,
     })
     trace.append({
         "branch_id": "spatial_context", "question_id": "high_value_grounds",

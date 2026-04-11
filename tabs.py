@@ -13,6 +13,7 @@ from config import (
     ICCAT_MULTIPLIERS,
     IUU_MULTIPLIERS,
     OFAC_MULTIPLIER,
+    MPA_MULTIPLIERS,
     RISK_BAND_COLORS,
     RISK_BANDS,
     SPECIES_NAMES,
@@ -608,7 +609,11 @@ def render_vessel_summary(df):
         "**dark port call candidates** (loitering within 10 km of shore — AIS-inferred, "
         "not satellite-verified), and **repeat-offender** (two or more events within a "
         "90-day window, capturing exposure drift over time). These flags "
-        "are display-only and are not multiplied into the risk score."
+        "are display-only and are not multiplied into the risk score. "
+        "An **MPA intersection** column is also shown: sourced from GFW's `regions.mpa` "
+        "field (WDPA point-in-polygon, pre-computed server-side), tiered into "
+        "GFCM-FRA / EU-site / general. Unlike the behavioural flags, MPA intersection "
+        "*is* multiplied into the base behavioural score."
     )
     if df.empty:
         st.info("No data.")
@@ -627,6 +632,19 @@ def render_vessel_summary(df):
         base_total = float(g["base_risk_score"].sum()) if "base_risk_score" in g.columns else 0.0
         risk_total = float(g["risk_score"].sum())
         compound = round(risk_total / base_total, 2) if base_total > 0 else 1.0
+        # MPA intersection: any event in an MPA, plus highest-severity tier present
+        if "in_mpa" in g.columns:
+            in_mpa_mask = g["in_mpa"].fillna(False).astype(bool)
+            in_mpa_any = bool(in_mpa_mask.any())
+        else:
+            in_mpa_mask = pd.Series([False] * len(g), index=g.index)
+            in_mpa_any = False
+        if in_mpa_any and "mpa_tier" in g.columns:
+            tier_priority = {"gfcm_fra": 3, "eu_site": 2, "general": 1, "": 0}
+            tiers_present = g.loc[in_mpa_mask, "mpa_tier"].fillna("").astype(str).tolist()
+            mpa_tier_top = max(tiers_present, key=lambda t: tier_priority.get(t, 0)) if tiers_present else ""
+        else:
+            mpa_tier_top = ""
         rows.append({
             "mmsi": mmsi,
             "vessel_name": _first(g["vessel_name"]) if "vessel_name" in g.columns else "",
@@ -636,6 +654,8 @@ def render_vessel_summary(df):
             "multi_behaviour": bool(g["multi_behaviour_flag"].any()) if "multi_behaviour_flag" in g.columns else False,
             "dark_port_candidates": int(g["dark_port_call_candidate"].sum()) if "dark_port_call_candidate" in g.columns else 0,
             "repeat_offender": bool(g["repeat_offender_90d"].any()) if "repeat_offender_90d" in g.columns else False,
+            "in_mpa": in_mpa_any,
+            "mpa_tier": mpa_tier_top,
             "base_score_total": round(base_total, 1),
             "risk_score_total": round(risk_total, 1),
             "max_event_risk": round(float(g["risk_score"].max()), 1),
@@ -1491,9 +1511,36 @@ def render_reference():
         )
         st.dataframe(ofac_df, use_container_width=True, hide_index=True)
 
+        st.markdown(
+            "**MPA intersection multipliers** — applied to the base behavioural "
+            "score (spatial rule-zone signal, not a list lookup). Data from "
+            "GFW `regions.mpa` (WDPA point-in-polygon, computed server-side)."
+        )
+        _MPA_LABELS = {
+            "gfcm_fra": "GFCM Fisheries Restricted Area (legally binding, Reg 1967/2006)",
+            "eu_site":  "EU-designated (Natura 2000, Pelagos Sanctuary, national MPAs)",
+            "general":  "Other WDPA entry (contextual signal only)",
+        }
+        mpa_df = pd.DataFrame(
+            [
+                {
+                    "Tier": _MPA_LABELS.get(k, k),
+                    "Key": k,
+                    "Multiplier": v,
+                }
+                for k, v in MPA_MULTIPLIERS.items()
+            ]
+        ).sort_values("Multiplier", ascending=False).reset_index(drop=True)
+        st.dataframe(mpa_df, use_container_width=True, hide_index=True)
+
     # 5. ICCAT framing note
     with st.expander("ICCAT framing note", expanded=False):
         st.markdown(content["iccat_framing_note"])
+
+    # 5a. MPA framing note (spatial rule-zone signal, calibration, AIS caveat)
+    if "mpa_framing_note" in content:
+        with st.expander("MPA intersection and calibration note", expanded=False):
+            st.markdown(content["mpa_framing_note"])
 
     # 5b. Sanctions authority note (IUU list coverage, EU vs OFAC, authority tagging)
     if "sanctions_authority_note" in content:
