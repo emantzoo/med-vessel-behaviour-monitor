@@ -13,7 +13,7 @@ A fisheries application of Kpler's six-layer risk framework
 > Enforcement actions don't come from nowhere — they follow behavioural evidence trails.
 > Quantify exposure **before** the listing happens.
 
-The same methodological move Kpler has made for sanctions (80% spoofing-to-sanction probability within 12 months, concentrated in months 3–9) applied to RFMO IUU listings and port-state enforcement in the Mediterranean.
+The same methodological move Kpler has made for sanctions (80% of *eventually-sanctioned* spoofing vessels are designated within 12 months of their first spoofing incident, concentrated in months 3–9) applied to RFMO IUU listings and port-state enforcement in the Mediterranean.
 
 ---
 
@@ -114,7 +114,7 @@ Replicates and extends the GFW transshipment methodology (Miller et al. 2018, *T
 | Step | Factor | Value | Running score |
 |---|---:|---:|---:|
 | 18 h GAP event | duration^0.75 × 3.2 | 8.8 × 3.2 | **28.2** |
-| Flag (Libya → FoC) | × 1.0 | — | 28.2 |
+| Flag (Libya, no explicit multiplier — risk comes via behaviour, not passport) | × 1.0 | — | 28.2 |
 | 12 km offshore | × 1.2 shore | — | 33.8 |
 | Inside a GFCM FRA | × 2.0 mpa | — | 67.6 |
 | Base score snapshotted | | | **67.6 → Elevated** |
@@ -124,13 +124,13 @@ Replicates and extends the GFW transshipment methodology (Miller et al. 2018, *T
 
 Same event. Behavioural base (including the MPA factor, which is a spatial rule-zone signal) says "Elevated". Structural amplifiers from list lookups compound it to "Critical". The analyst sees both numbers, so the compounding is auditable rather than opaque.
 
-**Calibration of the MPA multiplier.** The MPA factor is anchored by regulatory tier rather than empirical outcomes, the same way every other factor in the formula is methodology-driven rather than enforcement-calibrated. GFCM FRAs (legally binding under Reg 1967/2006) sit at 2.0× for parity with "other RFMO IUU listing"; EU-designated marine sites at 1.5×; general WDPA entries at 1.2× (below flag-of-convenience). Sensitivity sweep on the static demo across `gfcm ∈ {1.5, 2.0, 2.5, 3.0}` preserves top-6 vessel ordering and keeps every top-10 vessel in the Critical band — calibration sits in a stable plateau. Empirical calibration would require a labelled Mediterranean enforcement-outcome dataset which does not currently exist at scale; this is the same gap named for `duration^0.75` and every other weight.
+**Calibration of the MPA multiplier.** The MPA factor is anchored by regulatory tier rather than empirical outcomes, the same way every other factor in the formula is methodology-driven rather than enforcement-calibrated. GFCM FRAs (legally binding under Reg 1967/2006) sit at 2.0× for parity with "other RFMO IUU listing"; EU-designated marine sites at 1.5×; general WDPA entries at 1.2× (below flag-of-convenience). Sensitivity sweep on the static demo across `gfcm ∈ {1.5, 2.0, 2.5, 3.0}` preserves the top-6 *set* across all four values, holds the top-6 *order* stable across `[2.0, 3.0]` (a single rank swap inside the set occurs only at the lowest value), and keeps every top-10 vessel in the Critical band at every setting — calibration sits in a stable plateau. Empirical calibration would require a labelled Mediterranean enforcement-outcome dataset which does not currently exist at scale; this is the same gap named for `duration^0.75` and every other weight.
 
 **Fishing-in-MPA: a stronger signal, kept out of the multiplier chain.** Beyond the behavioural events feed (gaps / encounters / loitering), the app also pulls GFW's `public-global-fishing-events` dataset — per-vessel fishing activity classified by the Kroodsma et al. 2018 CNN that scores every AIS position for "is this vessel fishing right now". Fishing events outside MPAs are not surfaced at all (legitimate fishing is normal commercial activity), but fishing events that intersect WDPA polygons are aggregated per vessel into a fishing-in-MPA event count and total hours, displayed in Vessel Summary and Investigation. The signal is intentionally **not** multiplied into the risk score: it is the strongest publicly available signal for IUU fishing inside protected areas — stronger than any inference-based signal in the behavioural feed — and is therefore reported on its own terms. The risk tree's `fishing_activity` branch fires at high severity when at least one fishing event for the vessel intersects an MPA, propagating the signal into the per-vessel investigation trace without polluting the base behavioural score.
 
 ---
 
-## Five data sources, five epistemologies (plus GFW `regions.mpa`)
+## Five data sources, five epistemologies (GFW provides three distinct feeds)
 
 | # | Source | Scale | Epistemic role |
 |---|---|---|---|
@@ -228,8 +228,8 @@ The risk-tree view is the **compound-logic** counterpart to the multiplicative s
 
 - **Three display-only behavioural flags**: multi-behaviour, dark-port-call candidate, repeat-offender 90d — mirrors three of the six inputs in Kpler's Oct 2025 Deceptive Shipping Practices model
 - **FDI gear mix per c-square** (27 FAO gear codes, top-5 shown) — spatial context, feeds the planned gear-consistency check (does the vessel's movement match the local fleet profile?)
-- **AI Maritime Analyst** (Google Gemini 2.5 Flash) with RAG over 5 methodology/IUU context documents and sandboxed code execution — the domain-specific analogue of Kpler's MCP beta
-- **Per-vessel Investigation tab** with a coloured risk-tree path — the visual analogue of Dimitris's tiered Yellow/Orange/Red flag system, but continuous
+- **AI Maritime Analyst** (Google Gemini 2.5 Flash) with RAG over 5 methodology/IUU context documents and sandboxed code execution — conceptually similar to Kpler's MCP beta (LLM layered over structured risk data), though mine is embedded in the app rather than exposed as an external server
+- **Per-vessel Investigation tab** with a coloured risk-tree path — structurally similar to the tiered Yellow/Orange/Red flag layout in Kpler's R&C product UI, but rendered as a continuous trace per vessel
 
 ---
 
@@ -246,7 +246,8 @@ The risk-tree view is the **compound-logic** counterpart to the multiplicative s
 
 - Miller, N. A., Roan, A., Hochberg, T., Amos, J., & Kroodsma, D. A. (2018). Identifying global patterns of transshipment behavior. *Frontiers in Marine Science*, 5, 240. https://doi.org/10.3389/fmars.2018.00240
 - Rodriguez-Diaz, E., Alcaide, J. I., & Endrina, N. (2025). Shadow Fleets: A Growing Challenge in Global Maritime Commerce. *Applied Sciences*, 15(12), 6424. https://doi.org/10.3390/app15126424
-- Welch, H., et al. (2025). Assessing industrial fishing inside the world's most protected marine areas. *Science* — via Global Fishing Watch. (Compliance base rate for MPA multiplier anchoring.)
+- Seguin, R., Le Manach, F., Devillers, R., Velez, L., & Mouillot, D. (2025). Global patterns and drivers of untracked industrial fishing in coastal marine protected areas. *Science*, 389, 396–401. https://doi.org/10.1126/science.ado9468 (Industrial fishing detected in 47% of coastal MPAs studied — non-compliance is widespread, justifying MPA intersection as a high-tier risk factor.)
+- Raynor, J., Orofino, S., Costello, C., McDonald, G., Mayorga, J., & Sala, E. (2025). Little-to-no industrial fishing occurs in fully and highly protected marine areas. *Science*, 389, 392–395. https://doi.org/10.1126/science.adt9009 (Strongly protected MPAs show 9× fewer fishing vessels/km² than unprotected waters — anchors the GFCM-FRA tier as the strictest enforcement category.)
 - McDonald, G. G., et al. (2024). Satellite mapping reveals extensive industrial activity at sea. *Nature*, 625, 85–91. https://doi.org/10.1038/s41586-023-06825-8 (AIS-vs-SAR coverage gap; basis for the "lower-bound signal" caveat on MPA intersection.)
 - Global Fishing Watch (2021). *Illegal fishing in Mediterranean closed areas* — 305 bottom-trawlers, 35 closed areas, 9,518 days of apparent illegal fishing, 2020–2021.
 - Council Regulation (EC) No 1967/2006 of 21 December 2006 concerning management measures for the sustainable exploitation of fishery resources in the Mediterranean Sea. (Legal basis for GFCM FRA enforcement tier.)
