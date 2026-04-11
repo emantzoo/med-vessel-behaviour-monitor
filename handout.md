@@ -126,6 +126,8 @@ Same event. Behavioural base (including the MPA factor, which is a spatial rule-
 
 **Calibration of the MPA multiplier.** The MPA factor is anchored by regulatory tier rather than empirical outcomes, the same way every other factor in the formula is methodology-driven rather than enforcement-calibrated. GFCM FRAs (legally binding under Reg 1967/2006) sit at 2.0× for parity with "other RFMO IUU listing"; EU-designated marine sites at 1.5×; general WDPA entries at 1.2× (below flag-of-convenience). Sensitivity sweep on the static demo across `gfcm ∈ {1.5, 2.0, 2.5, 3.0}` preserves top-6 vessel ordering and keeps every top-10 vessel in the Critical band — calibration sits in a stable plateau. Empirical calibration would require a labelled Mediterranean enforcement-outcome dataset which does not currently exist at scale; this is the same gap named for `duration^0.75` and every other weight.
 
+**Fishing-in-MPA: a stronger signal, kept out of the multiplier chain.** Beyond the behavioural events feed (gaps / encounters / loitering), the app also pulls GFW's `public-global-fishing-events` dataset — per-vessel fishing activity classified by the Kroodsma et al. 2018 CNN that scores every AIS position for "is this vessel fishing right now". Fishing events outside MPAs are not surfaced at all (legitimate fishing is normal commercial activity), but fishing events that intersect WDPA polygons are aggregated per vessel into a fishing-in-MPA event count and total hours, displayed in Vessel Summary and Investigation. The signal is intentionally **not** multiplied into the risk score: it is the strongest publicly available signal for IUU fishing inside protected areas — stronger than any inference-based signal in the behavioural feed — and is therefore reported on its own terms. The risk tree's `fishing_activity` branch fires at high severity when at least one fishing event for the vessel intersects an MPA, propagating the signal into the per-vessel investigation trace without polluting the base behavioural score.
+
 ---
 
 ## Five data sources, five epistemologies (plus GFW `regions.mpa`)
@@ -134,6 +136,7 @@ Same event. Behavioural base (including the MPA factor, which is a spatial rule-
 |---|---|---|---|
 | 1 | **GFW Events API** — gap / encounter / loitering | Live, Med polygon | Observed behaviour |
 | 1b | **GFW `regions.mpa`** — WDPA point-in-polygon, pre-computed server-side | Global, tiered into GFCM-FRA / EU-site / general | Spatial rule-zone violation (composes into base score) |
+| 1c | **GFW `public-global-fishing-events`** — Kroodsma et al. 2018 CNN-classified fishing activity | Same Med polygon, joined onto MMSI of the behavioural feed | Ground-truth fishing classification (display-only fishing-in-MPA flag, kept out of multiplier chain) |
 | 2 | **EU JRC FDI** — effort & landings by c-square × quarter × gear × species | 83k effort rows, 212k landing rows, 27 gear types | Statistical estimate of legitimate activity |
 | 3 | **TMT Combined IUU List** — 13 RFMOs | 369 vessels (168 with IMO, 64 with MMSI) | Confirmed enforcement |
 | 4 | **ICCAT Record of Vessels** — Med-authorised | 9,203 vessels, species-weighted multipliers | Authorisation as *opportunity*, not exoneration |

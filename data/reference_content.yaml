@@ -98,6 +98,34 @@ mpa_framing_note: |
   broadcasting inside an MPA surfaces through the MPA factor. The two
   layers compose without double-counting.
 
+fishing_in_mpa_note: |
+  In addition to the behavioural events feed (gaps, encounters,
+  loitering), the app pulls a separate GFW dataset —
+  public-global-fishing-events — and joins it to the per-vessel risk
+  view. The GFW fishing-events feed is built from the Kroodsma et al.
+  2018 convolutional-neural-network classifier that scores every AIS
+  position for "is this vessel fishing right now". A FISHING event is
+  not behavioural inference: it is GFW's own ground-truth classification
+  of active fishing.
+
+  Fishing events outside MPAs are not surfaced in the risk model at all.
+  Legitimate fishing outside protected zones is normal commercial
+  activity, and assigning it any risk weight would dilute the
+  behavioural signal. The app instead surfaces a single derived
+  indicator: fishing-in-MPA. Fishing events that intersect WDPA
+  polygons via GFW's regions.mpa field are aggregated per vessel into
+  an event count and total fishing hours, displayed in the Vessel
+  Summary table and the Vessel Investigation tab.
+
+  Fishing-in-MPA is intentionally NOT multiplied into the risk score.
+  It is the strongest publicly available signal for IUU fishing inside
+  protected areas — stronger than any of the inference-based signals
+  in the behavioural feed — and is therefore reported on its own terms
+  rather than being absorbed into a multiplier chain. The risk tree
+  framework fires a dedicated fishing_activity branch at high severity
+  when at least one fishing event for a vessel intersects an MPA, so
+  the signal still propagates into the per-vessel investigation trace.
+
 sanctions_authority_note: |
   Formal fisheries enforcement coverage comes primarily through the
   TMT Combined IUU Vessel List, which aggregates listings from 13 RFMOs
@@ -127,6 +155,12 @@ data_source_provenance:
     status: "Event-level inference from AIS"
     coverage: "Mediterranean polygon, up to 5000 events per query"
     notes: "Methodology aligned with Miller et al. 2018 transshipment detection. AIS spoofing is not in the feed and would require separate satellite verification integration."
+
+  - source: "GFW public-global-fishing-events"
+    content: "Per-vessel fishing activity classified by the Kroodsma et al. 2018 CNN, joined to WDPA via regions.mpa server-side"
+    status: "GFW-classified fishing events (ground-truth, not behavioural inference)"
+    coverage: "Mediterranean polygon, up to 5000 events per query, joined onto the same MMSI keys as the behavioural feed"
+    notes: "Pulled as a separate dataset query, kept out of the scored df to avoid diluting behavioural risk with legitimate fishing. Surfaced display-only as fishing-in-MPA event count and hours per vessel; fires the fishing_activity branch in the per-vessel risk tree at high severity when any fishing event intersects an MPA."
 
   - source: "GFW regions.mpa (WDPA)"
     content: "Point-in-polygon intersection of every event against the World Database on Protected Areas"
@@ -171,6 +205,10 @@ methodology_references:
   - title: Identifying global patterns of transshipment behavior
     citation: "Miller, N. A., Roan, A., Hochberg, T., Amos, J., & Kroodsma, D. A. (2018). *Frontiers in Marine Science*, 5, 240. https://doi.org/10.3389/fmars.2018.00240"
     relevance: Defines the encounter criteria (≤500 m, ≥2 h, <2 kn median speed, ≥10 km from shore) implemented in compute_risk_score, and the "likely vs potential transshipment" distinction used in loitering weighting.
+
+  - title: Tracking the global footprint of fisheries
+    citation: "Kroodsma, D. A., et al. (2018). *Science*, 359(6378), 904-908. https://doi.org/10.1126/science.aao5646"
+    relevance: Origin of the convolutional-neural-network classifier used by GFW to label every AIS position as fishing or not. Underpins the public-global-fishing-events dataset and the fishing-in-MPA signal in this app -- ground-truth classification of active fishing, not behavioural inference.
 
   - title: "Shadow Fleets: A Growing Challenge in Global Maritime Commerce"
     citation: "Rodriguez-Diaz, E., Alcaide, J. I., & Endrina, N. (2025). *Applied Sciences*, 15(12), 6424. https://doi.org/10.3390/app15126424"

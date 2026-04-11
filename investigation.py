@@ -4,12 +4,17 @@ import pandas as pd
 from config import FLAG_RISKS, IUU_MULTIPLIERS, ICCAT_MULTIPLIERS, OFAC_MULTIPLIER
 
 
-def investigate_vessel(vessel_identifier, df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_landings):
+def investigate_vessel(vessel_identifier, df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_landings, fishing_df=None):
     """
     Run a structured 10-step investigation on a vessel.
 
     vessel_identifier: vessel_name (str) or mmsi (str/int)
-    Returns: dict with all 10 investigation steps as structured data.
+    fishing_df: optional dataframe of GFW fishing events (separate dataset
+        from the behavioural events). When provided, the report will
+        include a fishing_in_mpa section and the risk tree will fire a
+        fishing_activity branch when the vessel has GFW-classified
+        fishing events inside any MPA.
+    Returns: dict with all investigation steps as structured data.
     """
     # Find vessel in df (by name or mmsi). Use EXACT match -- fuzzy matching
     # conflates distinct MMSIs that happen to share a name.
@@ -374,6 +379,63 @@ def investigate_vessel(vessel_identifier, df, iuu_df, iccat_df, ofac_df, fdi_eff
         "severity": "medium" if in_known_ground else "none",
         "rule_fired": in_known_ground,
         "note": "Events in known fishing ground" if in_known_ground else "Not in known high-value fishing ground",
+    })
+
+    # ===== Fishing activity from GFW fishing-events dataset (separate from behavioural df) =====
+    fishing_section = {
+        "available": False,
+        "event_count": 0,
+        "hours": 0.0,
+        "top_tier": "",
+        "mpa_names": [],
+        "events": [],
+    }
+    if fishing_df is not None and not fishing_df.empty and "mmsi" in fishing_df.columns:
+        fishing_section["available"] = True
+        fishing_for_vessel = fishing_df[
+            fishing_df["mmsi"].astype(str) == str(mmsi_val)
+        ].copy()
+        if not fishing_for_vessel.empty and "in_mpa" in fishing_for_vessel.columns:
+            fishing_in_mpa = fishing_for_vessel[
+                fishing_for_vessel["in_mpa"].fillna(False).astype(bool)
+            ]
+            if not fishing_in_mpa.empty:
+                tier_priority = {"gfcm_fra": 3, "eu_site": 2, "general": 1, "": 0}
+                tiers_present = fishing_in_mpa.get(
+                    "mpa_tier", pd.Series(dtype=str)
+                ).fillna("").astype(str).tolist()
+                top_tier = max(tiers_present, key=lambda t: tier_priority.get(t, 0)) if tiers_present else ""
+                mpa_names = [
+                    str(n) for n in fishing_in_mpa.get("mpa", pd.Series(dtype=str)).fillna("").unique()
+                    if str(n).strip()
+                ]
+                fishing_section.update({
+                    "event_count": int(len(fishing_in_mpa)),
+                    "hours": round(float(fishing_in_mpa["fishing_hours"].sum()), 1) if "fishing_hours" in fishing_in_mpa.columns else 0.0,
+                    "top_tier": top_tier,
+                    "mpa_names": mpa_names,
+                    "events": fishing_in_mpa.to_dict("records"),
+                })
+    report["fishing_in_mpa"] = fishing_section
+
+    fishing_in_mpa_fired = fishing_section["event_count"] > 0
+    if fishing_in_mpa_fired:
+        fim_note = (
+            f"{fishing_section['event_count']} GFW-classified fishing event(s) "
+            f"inside an MPA (highest tier: {fishing_section['top_tier'] or 'general'}, "
+            f"{fishing_section['hours']:.1f} h total). "
+            f"Names: {'; '.join(fishing_section['mpa_names'][:3])}"
+        )
+    elif fishing_section["available"]:
+        fim_note = "No GFW fishing events inside an MPA for this vessel"
+    else:
+        fim_note = "Fishing events dataset not available in current run"
+    trace.append({
+        "branch_id": "fishing_activity", "question_id": "fishing_in_mpa",
+        "answer": "yes" if fishing_in_mpa_fired else ("no" if fishing_section["available"] else "unknown"),
+        "severity": "high" if fishing_in_mpa_fired else "none",
+        "rule_fired": fishing_in_mpa_fired,
+        "note": fim_note,
     })
 
     # Network exposure trace entries

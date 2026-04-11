@@ -264,6 +264,148 @@ def load_live_data(token, start_date, end_date, _min_dur):
         return load_static_data()
 
 
+# ========================= FISHING EVENTS =========================
+
+@st.cache_data
+def load_fishing_events_static():
+    """Static demo dataset of fishing-event-style rows for the three MPA seeds.
+
+    Live mode pulls from GFW's public-global-fishing-events:latest dataset.
+    Static mode mirrors the structure with a tiny seeded fixture so the
+    Vessel Summary and Investigation tabs render meaningful fishing-in-MPA
+    counts without an API key. Schema is the minimum needed for the
+    fishing-in-MPA aggregation: vessel_name, mmsi, lat/lon, fishing_hours,
+    mpa, mpa_tier, in_mpa.
+    """
+    csv_path = os.path.join(os.path.dirname(__file__), "data", "med_fishing_static.csv")
+    if os.path.exists(csv_path):
+        df = pd.read_csv(csv_path, parse_dates=["date"])
+        for col, default in [("mpa", ""), ("mpa_tier", ""), ("in_mpa", False)]:
+            if col not in df.columns:
+                df[col] = default
+        df["mpa"] = df["mpa"].fillna("")
+        df["mpa_tier"] = df["mpa_tier"].fillna("")
+        df["in_mpa"] = df["in_mpa"].fillna(False).astype(bool)
+        return df
+    return pd.DataFrame(columns=[
+        "date", "vessel_name", "mmsi", "lat", "lon",
+        "fishing_hours", "mpa", "mpa_tier", "in_mpa",
+    ])
+
+
+@st.cache_data
+def load_fishing_events_live(token, start_date, end_date):
+    """Fetch fishing events from GFW Events API as a separate, lightweight df.
+
+    Uses the public-global-fishing-events:latest dataset. We only need
+    enough fields to compute fishing-in-MPA aggregates per vessel. Falls
+    back to the static fixture on any error so the rest of the app still
+    works. The fishing df is intentionally NOT merged into the behavioural
+    df: legitimate fishing outside MPAs is normal and would dilute the
+    behavioural risk signal. Only fishing INSIDE MPAs is the IUU signal,
+    and we expose it as a display-only flag rather than a multiplier.
+    """
+    try:
+        import gfwapiclient as gfw
+
+        gfw_client = gfw.Client(access_token=token)
+        med_geometry = {
+            "type": "Polygon",
+            "coordinates": [[[-6, 30], [36.5, 30], [36.5, 46], [-6, 46], [-6, 30]]],
+        }
+
+        async def _fetch():
+            result = await gfw_client.events.get_all_events(
+                datasets=["public-global-fishing-events:latest"],
+                start_date=start_date.strftime("%Y-%m-%d"),
+                end_date=end_date.strftime("%Y-%m-%d"),
+                geometry=med_geometry,
+                limit=5000,
+            )
+            return result.df()
+
+        raw_df = asyncio.run(_fetch())
+        if raw_df.empty:
+            return load_fishing_events_static()
+
+        rows = []
+        for _, r in raw_df.iterrows():
+            row = {}
+            row["date"] = r.get("start")
+            pos = r.get("position") if isinstance(r.get("position"), dict) else {}
+            row["lat"] = pos.get("lat")
+            row["lon"] = pos.get("lon")
+
+            vessel = r.get("vessel") if isinstance(r.get("vessel"), dict) else {}
+            row["mmsi"] = vessel.get("ssvid", "0")
+            row["flag"] = vessel.get("flag", "UNK")
+            row["vessel_name"] = vessel.get("name", "")
+
+            if r.get("start") and r.get("end"):
+                try:
+                    start_dt = pd.to_datetime(r["start"])
+                    end_dt = pd.to_datetime(r["end"])
+                    row["fishing_hours"] = round((end_dt - start_dt).total_seconds() / 3600, 2)
+                except Exception:
+                    row["fishing_hours"] = 0.0
+            else:
+                row["fishing_hours"] = 0.0
+
+            mpa_names = []
+            for region in (r.get("regions") or []):
+                if isinstance(region, dict):
+                    ds = str(region.get("dataset", "")).lower()
+                    name = region.get("name")
+                    if "mpa" in ds and name:
+                        mpa_names.append(str(name))
+            row["mpa"] = "; ".join(mpa_names) if mpa_names else ""
+            row["in_mpa"] = bool(mpa_names)
+            row["mpa_tier"] = classify_mpa_tier(mpa_names) if mpa_names else ""
+            rows.append(row)
+
+        return pd.DataFrame(rows)
+
+    except Exception as e:
+        st.warning(f"Fishing events API error: {e}. Using static fishing fixture.")
+        return load_fishing_events_static()
+
+
+def aggregate_fishing_in_mpa(fishing_df):
+    """Per-vessel aggregation of fishing-in-MPA hours and event counts.
+
+    Returns a dataframe keyed by mmsi with columns:
+        fishing_in_mpa_events, fishing_in_mpa_hours, fishing_in_mpa_top_tier
+    Vessels with no fishing-in-MPA activity are not included; the caller
+    can left-join on mmsi and fill missing values.
+    """
+    if fishing_df is None or fishing_df.empty or "in_mpa" not in fishing_df.columns:
+        return pd.DataFrame(columns=[
+            "mmsi", "fishing_in_mpa_events",
+            "fishing_in_mpa_hours", "fishing_in_mpa_top_tier",
+        ])
+    in_mpa = fishing_df[fishing_df["in_mpa"].fillna(False).astype(bool)].copy()
+    if in_mpa.empty:
+        return pd.DataFrame(columns=[
+            "mmsi", "fishing_in_mpa_events",
+            "fishing_in_mpa_hours", "fishing_in_mpa_top_tier",
+        ])
+
+    tier_priority = {"gfcm_fra": 3, "eu_site": 2, "general": 1, "": 0}
+
+    def _top_tier(s):
+        tiers = [str(t) for t in s.fillna("").tolist()]
+        return max(tiers, key=lambda t: tier_priority.get(t, 0)) if tiers else ""
+
+    agg = in_mpa.groupby("mmsi").agg(
+        fishing_in_mpa_events=("in_mpa", "sum"),
+        fishing_in_mpa_hours=("fishing_hours", "sum"),
+        fishing_in_mpa_top_tier=("mpa_tier", _top_tier),
+    ).reset_index()
+    agg["fishing_in_mpa_events"] = agg["fishing_in_mpa_events"].astype(int)
+    agg["fishing_in_mpa_hours"] = agg["fishing_in_mpa_hours"].round(1)
+    return agg
+
+
 # ========================= VESSEL IMO LOOKUP =========================
 
 def lookup_vessel_imos(mmsi_list, token, progress_callback=None):

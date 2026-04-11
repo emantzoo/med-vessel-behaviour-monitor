@@ -16,6 +16,7 @@ from data_loading import (
     load_knowledge_base, load_static_data, load_live_data,
     load_fdi_effort, load_fdi_landings, load_iuu_vessels, load_iccat_vessels,
     load_ofac_vessels, lookup_vessel_imos,
+    load_fishing_events_static, load_fishing_events_live, aggregate_fishing_in_mpa,
 )
 from risk_model import compute_risk_score, get_fdi_context, match_iuu_vessels, match_iccat_vessels, match_ofac_vessels, compute_vessel_flags
 from tabs import (
@@ -94,8 +95,10 @@ show_fdi_layer = st.sidebar.toggle(
 # ========================= DATA LOADING =========================
 if use_live and token:
     df = load_live_data(token, date_range[0], date_range[1], min_duration)
+    fishing_df = load_fishing_events_live(token, date_range[0], date_range[1])
 else:
     df = load_static_data()
+    fishing_df = load_fishing_events_static()
 
 fdi_effort = load_fdi_effort()
 fdi_landings = load_fdi_landings()
@@ -103,6 +106,9 @@ iuu_vessels = load_iuu_vessels()
 iccat_vessels = load_iccat_vessels()
 ofac_vessels = load_ofac_vessels()
 knowledge_base = load_knowledge_base()
+
+# Per-vessel fishing-in-MPA aggregation (display-only, no risk multiplier)
+fishing_mpa_agg = aggregate_fishing_in_mpa(fishing_df)
 
 # ========================= FILTER & SCORE =========================
 # Clip events to selected date range (± 3 day buffer for long-running events)
@@ -168,6 +174,25 @@ if not df_filtered.empty:
 
 # Kpler-aligned display-only behavioural flags (do not multiply into risk_score)
 df_filtered = compute_vessel_flags(df_filtered)
+
+# Fishing-in-MPA join (display-only, no risk multiplier).
+# fishing_mpa_agg is keyed on mmsi; both event and fishing loaders pull
+# vessel.ssvid as mmsi from GFW so the join key is consistent.
+if not df_filtered.empty and not fishing_mpa_agg.empty:
+    df_filtered["mmsi"] = df_filtered["mmsi"].astype(str)
+    fishing_mpa_agg["mmsi"] = fishing_mpa_agg["mmsi"].astype(str)
+    df_filtered = df_filtered.merge(fishing_mpa_agg, on="mmsi", how="left")
+# Ensure columns exist even when no fishing-in-MPA join hits
+for _col, _default in [
+    ("fishing_in_mpa_events", 0),
+    ("fishing_in_mpa_hours", 0.0),
+    ("fishing_in_mpa_top_tier", ""),
+]:
+    if _col not in df_filtered.columns:
+        df_filtered[_col] = _default
+df_filtered["fishing_in_mpa_events"] = df_filtered["fishing_in_mpa_events"].fillna(0).astype(int)
+df_filtered["fishing_in_mpa_hours"] = df_filtered["fishing_in_mpa_hours"].fillna(0.0)
+df_filtered["fishing_in_mpa_top_tier"] = df_filtered["fishing_in_mpa_top_tier"].fillna("")
 
 # ========================= MAIN MAP & METRICS =========================
 col1, col2 = st.columns([3, 1])
@@ -614,7 +639,7 @@ with tab_fisheries:
 with tab_investigation:
     render_vessel_investigation(
         df_filtered, iuu_vessels, iccat_vessels, ofac_vessels,
-        fdi_effort, fdi_landings,
+        fdi_effort, fdi_landings, fishing_df=fishing_df,
     )
     st.caption("See **Reference & Methodology** tab for the generic framework and multiplier tables.")
 

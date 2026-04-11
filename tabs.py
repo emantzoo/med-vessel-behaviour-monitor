@@ -613,7 +613,12 @@ def render_vessel_summary(df):
         "An **MPA intersection** column is also shown: sourced from GFW's `regions.mpa` "
         "field (WDPA point-in-polygon, pre-computed server-side), tiered into "
         "GFCM-FRA / EU-site / general. Unlike the behavioural flags, MPA intersection "
-        "*is* multiplied into the base behavioural score."
+        "*is* multiplied into the base behavioural score. The "
+        "**fishing-in-MPA** columns (event count and total hours) come from a "
+        "separate GFW `public-global-fishing-events` query and are display-only -- "
+        "they are not multiplied into the risk score, because legitimate fishing "
+        "outside MPAs is normal and only fishing inside protected zones is the "
+        "actionable IUU signal."
     )
     if df.empty:
         st.info("No data.")
@@ -645,6 +650,19 @@ def render_vessel_summary(df):
             mpa_tier_top = max(tiers_present, key=lambda t: tier_priority.get(t, 0)) if tiers_present else ""
         else:
             mpa_tier_top = ""
+        # Fishing-in-MPA: pre-joined onto every event row in app.py from a
+        # separate GFW fishing-events query, so all events for a given mmsi
+        # share the same value. Take any non-null max as the per-vessel value.
+        fim_events = (
+            int(g["fishing_in_mpa_events"].max())
+            if "fishing_in_mpa_events" in g.columns and g["fishing_in_mpa_events"].notna().any()
+            else 0
+        )
+        fim_hours = (
+            float(g["fishing_in_mpa_hours"].max())
+            if "fishing_in_mpa_hours" in g.columns and g["fishing_in_mpa_hours"].notna().any()
+            else 0.0
+        )
         rows.append({
             "mmsi": mmsi,
             "vessel_name": _first(g["vessel_name"]) if "vessel_name" in g.columns else "",
@@ -656,6 +674,8 @@ def render_vessel_summary(df):
             "repeat_offender": bool(g["repeat_offender_90d"].any()) if "repeat_offender_90d" in g.columns else False,
             "in_mpa": in_mpa_any,
             "mpa_tier": mpa_tier_top,
+            "fishing_in_mpa_events": fim_events,
+            "fishing_in_mpa_hours": round(fim_hours, 1),
             "base_score_total": round(base_total, 1),
             "risk_score_total": round(risk_total, 1),
             "max_event_risk": round(float(g["risk_score"].max()), 1),
@@ -896,7 +916,7 @@ def render_fisheries_context(df, fdi_effort, fdi_landings):
         st.info("FDI landings data not available.")
 
 
-def render_vessel_investigation(df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_landings):
+def render_vessel_investigation(df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_landings, fishing_df=None):
     """Deterministic vessel investigation tab."""
     from investigation import investigate_vessel
     from risk_tree import render_framework_tree
@@ -954,7 +974,7 @@ def render_vessel_investigation(df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_l
         key="investigation_vessel",
     )
 
-    report = investigate_vessel(selected, df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_landings)
+    report = investigate_vessel(selected, df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_landings, fishing_df=fishing_df)
 
     if "error" in report:
         st.error(report["error"])
@@ -1041,6 +1061,37 @@ def render_vessel_investigation(df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_l
         )
     else:
         st.info("No FDI fisheries context available for this vessel's events.")
+
+    # Step 5b: Fishing activity inside MPAs (display-only signal)
+    st.markdown("### 5b. Fishing Activity Inside MPAs")
+    st.caption(
+        "GFW-classified FISHING events for this vessel, intersected with the WDPA "
+        "via GFW's `regions.mpa` field. This is GFW's own neural-network classification "
+        "of active fishing (Kroodsma et al. 2018) -- not behavioural inference -- and "
+        "is the strongest publicly available signal for IUU fishing inside protected "
+        "areas. Display-only: not multiplied into the risk score, because legitimate "
+        "fishing outside MPAs is normal and only fishing inside protected zones is the "
+        "actionable IUU signal."
+    )
+    fishing_section = report.get("fishing_in_mpa") or {}
+    fim_total_events = int(fishing_section.get("event_count", 0))
+    fim_total_hours = float(fishing_section.get("hours", 0.0))
+    fim_top_tier = str(fishing_section.get("top_tier", ""))
+    if fim_total_events > 0:
+        fcol_a, fcol_b, fcol_c = st.columns(3)
+        fcol_a.metric("Fishing events in MPA", fim_total_events)
+        fcol_b.metric("Total fishing hours", f"{fim_total_hours:.1f}")
+        fcol_c.metric("Highest tier", fim_top_tier or "general")
+        mpa_names = fishing_section.get("mpa_names", []) or []
+        if mpa_names:
+            st.write("**MPAs intersected by fishing activity:** " + "; ".join(mpa_names[:5]))
+        ev_rows = fishing_section.get("events", []) or []
+        if ev_rows:
+            ev_df = pd.DataFrame(ev_rows)
+            keep_cols = [c for c in ["date", "lat", "lon", "fishing_hours", "mpa", "mpa_tier"] if c in ev_df.columns]
+            st.dataframe(ev_df[keep_cols], use_container_width=True, hide_index=True)
+    else:
+        st.info("No GFW fishing events recorded inside an MPA for this vessel in the current dataset.")
 
     # Step 6: Behaviour
     st.markdown("### 6. Behavioural Pattern")
@@ -1541,6 +1592,11 @@ def render_reference():
     if "mpa_framing_note" in content:
         with st.expander("MPA intersection and calibration note", expanded=False):
             st.markdown(content["mpa_framing_note"])
+
+    # 5a-bis. Fishing-in-MPA framing note (separate GFW dataset, display-only signal)
+    if "fishing_in_mpa_note" in content:
+        with st.expander("Fishing-in-MPA framing note", expanded=False):
+            st.markdown(content["fishing_in_mpa_note"])
 
     # 5b. Sanctions authority note (IUU list coverage, EU vs OFAC, authority tagging)
     if "sanctions_authority_note" in content:

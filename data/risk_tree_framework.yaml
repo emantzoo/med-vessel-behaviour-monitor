@@ -159,6 +159,24 @@ framework:
           weight: medium
           note: "Higher economic incentive for IUU activity."
 
+    - id: fishing_activity
+      name: "Fishing Activity (GFW classification)"
+      type: additive
+      questions:
+        - id: fishing_in_mpa
+          text: "Did the vessel have GFW-classified FISHING events inside any MPA?"
+          weight: high
+          note: >
+            GFW classifies fishing activity per AIS point using the Kroodsma
+            et al. 2018 neural network. FISHING events inside an MPA are
+            the strongest publicly available signal for IUU fishing -- not
+            behavioural inference, but GFW's own ground-truth classification
+            of active fishing inside a closed area. Bound to the per-vessel
+            GFW fishing-events dataset (public-global-fishing-events:latest)
+            joined to GFW's regions.mpa field. The branch fires at high
+            severity when at least one fishing event for the vessel
+            intersects an MPA.
+
     - id: network_exposure
       name: "Network Exposure"
       type: gate
@@ -186,6 +204,7 @@ framework:
       - "Non-cooperating flag AND (multiple AIS gaps OR encounter with carrier) -> Elevated minimum"
       - "Identity unverifiable AND any behavioural flag -> Elevated minimum"
       - "Three or more additive flags raised -> escalate one tier"
+      - "GFW-classified fishing inside an MPA -> Elevated minimum (GFW ground-truth signal, not inference)"
       - "No flags raised -> Low"
 
   notes:
