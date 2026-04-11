@@ -23,6 +23,7 @@ Live app: [med-vessel-behaviour-monitor.streamlit.app](https://med-vessel-behavi
 - Applies compounding multipliers at the event level: IUU listing, ICCAT authorisation (as opportunity indicator), OFAC sanctions, flag risk
 - Classifies final scores into Kpler-aligned risk bands: Low, Emerging, Elevated, Severe, Critical
 - Aggregates events to vessel level with base vs compounded score decomposition
+- Computes three display-only Kpler-aligned behavioural flags at the vessel level: multi-behaviour compound indicator, dark port call candidate (loitering within 10 km of shore), and repeat-offender-within-90-days (exposure drift)
 - Visualises results across six tabs including a structured vessel investigation report and an LLM-based analyst interface
 
 ---
@@ -61,6 +62,16 @@ Final scores are classified into bands aligned with Kpler's R&C vocabulary (*Tur
 
 The `base_risk_score` column preserves the pre-multiplier behavioural score, enabling explicit decomposition of how much of a vessel's risk comes from behaviour versus structural amplifiers.
 
+In addition, three **display-only** behavioural flags are derived at the vessel level and surfaced in the Vessel Summary, Vessel Investigation, and Map & Overview tabs. They mirror three of the six core inputs in Kpler's October 2025 *Deceptive Shipping Practices* predictive model but are **not** multiplied into the risk score, because the underlying signal is already captured at the event level and double-counting would distort the score:
+
+| Flag | Definition | Source concept |
+|---|---|---|
+| Multi-behaviour | Vessel shows two or more distinct event types (gap, encounter, loitering) | Kpler compound indicator |
+| Dark port call candidate | LOITERING event within 10 km of shore (AIS-inferred, not satellite-verified) | Kpler dark port call |
+| Repeat offender (90d) | Two or more events within any 90-day rolling window | Kpler exposure drift |
+
+Dark port call candidates are also rendered on the Folium map with a dashed amber outline on top of the existing shape/fill/size encoding, providing a fourth orthogonal visual channel without overloading the existing colour scheme.
+
 Methodology aligned with GFW transshipment detection (Miller et al. 2018): encounters defined as <500m, >=2h, <2kn, >=10km from shore.
 
 ---
@@ -74,7 +85,7 @@ Eight-module Streamlit application:
 | `app.py` | Orchestrator. Loads data, applies filters, runs scoring pipeline, renders Folium map, dispatches to six tabs. |
 | `config.py` | Constants (event weights, flag risks, IUU/ICCAT/OFAC multipliers, risk bands, species names, sandbox forbidden code list) and pure utility functions (`classify_med_zone`, `assign_csquare`, `classify_risk_band`). |
 | `data_loading.py` | All data loaders with `@st.cache_data`: static CSV, GFW Events API (async), FDI effort/landings, IUU vessels, ICCAT vessels, OFAC SDN, GFW Vessels API (IMO lookup). |
-| `risk_model.py` | `compute_risk_score()`, `get_fdi_context()`, IUU matching, ICCAT matching, OFAC matching. |
+| `risk_model.py` | `compute_risk_score()`, `get_fdi_context()`, IUU matching, ICCAT matching, OFAC matching, `compute_vessel_flags()` (Kpler-aligned display-only flags). |
 | `tabs.py` | Render functions for each top-level tab and expander section, including `render_vessel_summary` (Kpler-vocabulary aggregation) and `render_daily_trend` (daily + monthly multi-behaviour trend). |
 | `ai_analyst.py` | Google Gemini 2.5 Flash integration with RAG knowledge base, sandboxed pandas/plotly code execution, system prompt builder. |
 | `investigation.py` | Deterministic rule-based vessel investigation (no LLM) -- structured multi-section report used by the Vessel Investigation tab. |
@@ -94,17 +105,19 @@ Eight-module Streamlit application:
 9. ICCAT match       match_iccat_vessels() -> iccat_* columns, risk *= iccat_multiplier
 10. OFAC match       match_ofac_vessels() -> ofac_* columns, risk *= ofac_multiplier
 11. Classify         risk_band = classify_risk_band(risk_score)
-12. Render           Folium map + 6 tabs (with expanders) + AI analyst
+12. Flag             compute_vessel_flags() -> multi_behaviour_flag,
+                     dark_port_call_candidate, repeat_offender_90d (display-only)
+13. Render           Folium map + 6 tabs (with expanders) + AI analyst
 ```
 
 ## Tab structure
 
 Six top-level tabs, organised for a tight 30-minute demo:
 
-1. **Map & Overview** -- Folium map, risk heatmap, daily and monthly event-type trend. Secondary charts (flag breakdown, event types pie, duration distribution) in collapsed expanders.
-2. **Vessel Summary** -- vessel-level aggregation table with risk bands and base vs compounded score decomposition. The Kpler-vocabulary tab. Secondary views (top vessels legacy, repeat offenders, encounter/carrier alerts, AIS gap behaviour) in collapsed expanders.
+1. **Map & Overview** -- Folium map (with dashed amber overlay for dark port call candidates), risk heatmap, daily and monthly event-type trend, and summary tiles for the three Kpler-aligned flags (multi-behaviour, dark port candidates, repeat offenders). Secondary charts (flag breakdown, event types pie, duration distribution) in collapsed expanders.
+2. **Vessel Summary** -- vessel-level aggregation table with risk bands, base vs compounded score decomposition, and the three Kpler-aligned display-only flags. The Kpler-vocabulary tab. Secondary views (top vessels legacy, repeat offenders, encounter/carrier alerts, AIS gap behaviour) in collapsed expanders.
 3. **Fisheries Context** -- FDI overlay, c-square context, species landings. Geographic risk breakdown in an expander.
-4. **Vessel Investigation** -- three-layer deep dive: framework methodology, structured narrative from `investigation.py`, per-vessel coloured risk tree path.
+4. **Vessel Investigation** -- three-layer deep dive: framework methodology, structured narrative from `investigation.py`, per-vessel coloured risk tree path, and a dedicated "Kpler-aligned Behavioural Flags" step showing the three display-only flags for the selected vessel.
 5. **Risk Tree Framework** -- methodology visualisation from `data/risk_tree_framework.yaml`. Direct conceptual link to Kpler's April 2026 shadow fleet risk tree blog post.
 6. **AI Analyst** -- Google Gemini 2.5 Flash interface with RAG knowledge base and sandboxed pandas/plotly code execution.
 
@@ -135,7 +148,7 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-Static demo mode (88 pre-generated events including IUU, ICCAT and OFAC demo vessels) runs without any API credentials. Live mode requires a GFW API JWT token, which can be placed in `.streamlit/secrets.toml` or entered via the sidebar.
+Static demo mode (94 pre-generated events including IUU, ICCAT and OFAC demo vessels, enriched so all three Kpler-aligned flags fire visibly) runs without any API credentials. Live mode requires a GFW API JWT token, which can be placed in `.streamlit/secrets.toml` or entered via the sidebar.
 
 ### Optional credentials
 
@@ -156,7 +169,8 @@ Both have sidebar text-input fallbacks if the secrets file is missing.
 - 5 risk bands (Low, Emerging, Elevated, Severe, Critical)
 - 6 top-level tabs
 - 369 IUU vessels, 9,203 ICCAT Med-authorised vessels, 1,008 FDI c-squares
-- 88 static demo events including 3 IUU, 3 ICCAT and 2 OFAC demo vessels
+- 94 static demo events including 3 IUU, 3 ICCAT and 2 OFAC demo vessels
+- 3 Kpler-aligned display-only behavioural flags (multi-behaviour, dark port call candidate, repeat offender 90d)
 - Med polygon: `[[-6, 30], [36.5, 30], [36.5, 46], [-6, 46]]`
 - FDI c-square grid: 0.5 deg x 0.5 deg
 

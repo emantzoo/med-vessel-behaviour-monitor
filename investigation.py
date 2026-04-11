@@ -11,18 +11,23 @@ def investigate_vessel(vessel_identifier, df, iuu_df, iccat_df, ofac_df, fdi_eff
     vessel_identifier: vessel_name (str) or mmsi (str/int)
     Returns: dict with all 10 investigation steps as structured data.
     """
-    # Find vessel in df (by name or mmsi)
+    # Find vessel in df (by name or mmsi). Use EXACT match -- fuzzy matching
+    # conflates distinct MMSIs that happen to share a name.
     if str(vessel_identifier).isdigit():
         vessel_events = df[df["mmsi"].astype(str) == str(vessel_identifier)]
     else:
-        vessel_events = df[
-            df["vessel_name"].str.upper().str.contains(
-                str(vessel_identifier).upper(), na=False
-            )
-        ]
+        probe = str(vessel_identifier).upper()
+        vessel_events = df[df["vessel_name"].astype(str).str.upper() == probe]
 
     if vessel_events.empty:
         return {"error": f"Vessel '{vessel_identifier}' not found in current dataset."}
+
+    # If the name happens to map to more than one MMSI (should not happen after
+    # the 1:1 rename in the static CSV, but defensively guard anyway), pick the
+    # MMSI with the most events so the report is self-consistent.
+    if vessel_events["mmsi"].nunique() > 1:
+        top_mmsi = vessel_events.groupby("mmsi").size().idxmax()
+        vessel_events = vessel_events[vessel_events["mmsi"] == top_mmsi]
 
     primary = vessel_events.iloc[0]
     report = {}
@@ -271,6 +276,48 @@ def investigate_vessel(vessel_identifier, df, iuu_df, iccat_df, ofac_df, fdi_eff
         "severity": "high" if speed_drop_fired else "none",
         "rule_fired": speed_drop_fired,
         "note": f"Speed drop {avg_speed_before:.1f} -> {avg_speed_after:.1f} kn" if speed_drop_fired else "No significant speed change at gap",
+    })
+
+    # Kpler-aligned compound / temporal flags (display-only, derived from vessel-level columns)
+    multi_behaviour = bool(primary.get("multi_behaviour_flag", False))
+    trace.append({
+        "branch_id": "behavioural_history", "question_id": "multi_behaviour_compound",
+        "answer": "yes" if multi_behaviour else "no",
+        "severity": "medium" if multi_behaviour else "none",
+        "rule_fired": multi_behaviour,
+        "note": (
+            "Vessel shows multiple distinct event types (compound indicator)"
+            if multi_behaviour
+            else "Single event type only"
+        ),
+    })
+
+    dark_port_candidates = 0
+    if "dark_port_call_candidate" in vessel_events.columns:
+        dark_port_candidates = int(vessel_events["dark_port_call_candidate"].sum())
+    trace.append({
+        "branch_id": "behavioural_history", "question_id": "dark_port_call_candidate",
+        "answer": "yes" if dark_port_candidates > 0 else "no",
+        "severity": "medium" if dark_port_candidates > 0 else "none",
+        "rule_fired": dark_port_candidates > 0,
+        "note": (
+            f"{dark_port_candidates} loitering event(s) within 10 km of shore -- dark port call candidate(s)"
+            if dark_port_candidates > 0
+            else "No loitering events near shore"
+        ),
+    })
+
+    repeat_offender = bool(primary.get("repeat_offender_90d", False))
+    trace.append({
+        "branch_id": "behavioural_history", "question_id": "repeat_offender_90d",
+        "answer": "yes" if repeat_offender else "no",
+        "severity": "medium" if repeat_offender else "none",
+        "rule_fired": repeat_offender,
+        "note": (
+            "Two or more events within a 90-day window (exposure drift)"
+            if repeat_offender
+            else "No temporal clustering of events"
+        ),
     })
 
     # Spatial trace entries

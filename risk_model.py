@@ -411,3 +411,59 @@ def match_ofac_vessels(df, ofac_df):
     # Apply risk multiplier
     df["risk_score"] = (df["risk_score"] * df["ofac_multiplier"]).round(1)
     return df
+
+
+# ========================= KPLER-ALIGNED VESSEL FLAGS =========================
+
+def compute_vessel_flags(df):
+    """Compute Kpler-aligned vessel-level behavioural flags.
+
+    Display-only signals — these do not multiply into the risk score. They
+    mirror three inputs from Kpler's October 2025 Deceptive Shipping Practices
+    predictive model that can be derived from GFW event data alone:
+
+    - multi_behaviour_flag        vessel has >= 2 distinct event types
+    - dark_port_call_candidate    loitering event within 10 km of shore
+    - repeat_offender_90d         vessel has >= 2 events in any 90-day window
+
+    Called from app.py after all scoring and matching is complete.
+    """
+    if df.empty:
+        df["multi_behaviour_flag"] = False
+        df["dark_port_call_candidate"] = False
+        df["repeat_offender_90d"] = False
+        return df
+
+    # 1. Multi-behaviour flag — vessel-level, broadcast to each event row
+    vessel_event_types = df.groupby("mmsi")["event_type"].nunique()
+    multi_behaviour_mmsi = set(vessel_event_types[vessel_event_types >= 2].index)
+    df["multi_behaviour_flag"] = df["mmsi"].isin(multi_behaviour_mmsi)
+
+    # 2. Dark port call candidate — event-level
+    if "distance_from_shore_km" in df.columns:
+        shore = df["distance_from_shore_km"].fillna(999)
+    else:
+        shore = pd.Series(999, index=df.index)
+    df["dark_port_call_candidate"] = (df["event_type"] == "LOITERING") & (shore < 10)
+
+    # 3. Repeat offender — vessel-level, any 90-day window containing >= 2 events
+    repeat_mmsi = set()
+    if "start_time" in df.columns:
+        time_col = "start_time"
+    elif "date" in df.columns:
+        time_col = "date"
+    else:
+        time_col = None
+    if time_col is not None:
+        for mmsi, group in df.groupby("mmsi"):
+            if len(group) < 2:
+                continue
+            times = pd.to_datetime(group[time_col], errors="coerce").dropna().sort_values()
+            if len(times) < 2:
+                continue
+            deltas = times.diff().dt.days.dropna()
+            if (deltas <= 90).any():
+                repeat_mmsi.add(mmsi)
+    df["repeat_offender_90d"] = df["mmsi"].isin(repeat_mmsi)
+
+    return df

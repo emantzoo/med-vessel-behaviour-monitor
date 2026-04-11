@@ -26,16 +26,28 @@ risk_formula_explanation: |
 
   The current implementation covers AIS gaps, encounters, and loitering
   because these are the event types provided by the Global Fishing Watch
-  Events API. AIS spoofing — which Kpler identifies as the single
-  strongest predictive signal, with approximately 80% of spoofing vessels
-  sanctioned within 12 months concentrated in months 3 to 9 after the
-  first incident — is not currently modelled because detection requires
-  satellite cross-reference verification rather than AIS inference alone.
-  Adding a spoofing detection layer would require integrating satellite
-  imagery sources and is named as future work. The distinction matters
-  analytically: AIS gaps can result from equipment failure or signal
-  occlusion, whereas deliberate spoofing is a signal of intent, which is
-  why Kpler weights it as the highest-priority behavioural indicator.
+  Events API. AIS spoofing — widely cited as the single strongest
+  predictive signal for sanctions risk — is not currently modelled
+  because detection requires satellite cross-reference verification
+  rather than AIS inference alone. Adding a spoofing detection layer
+  would require integrating satellite imagery sources and is named as
+  future work. The distinction matters analytically: AIS gaps can result
+  from equipment failure or signal occlusion, whereas deliberate spoofing
+  is a signal of intent, and is therefore the highest-priority behavioural
+  indicator in the commercial literature.
+
+  In addition to the core scoring formula, three compound / temporal
+  behavioural flags are computed at the vessel level and displayed in
+  the Vessel Summary tab without modifying the risk score itself: a
+  multi-behaviour compound indicator (vessel shows two or more distinct
+  event types), a dark port call candidate flag (loitering within 10 km
+  of shore — not satellite-verified, hence "candidate"), and a
+  repeat-offender flag (two or more events within a 90-day window,
+  capturing exposure drift over time). These flags are displayed
+  separately from the risk score rather than multiplied into it, because
+  they are partly redundant with signals already captured in the
+  event-level scoring, and adding them as multipliers would risk
+  double-counting.
 
 iccat_framing_note: |
   ICCAT authorisation is treated as an opportunity indicator, not an
@@ -59,8 +71,7 @@ sanctions_authority_note: |
 
   The current implementation does not tag listings by issuing authority.
   Adding authority-level filtering — RFMO, EU IUU, GFCM-specific — would
-  match the filtering model used in Kpler's Risk and Compliance product,
-  which lets users distinguish listings by OFAC, OFSI, FCDO, UN, and EU
+  allow users to distinguish listings by OFAC, OFSI, FCDO, UN, and EU
   authorities. This is named as a natural next integration step.
 
   OFAC SDN is integrated as baseline sanctions screening per industry
@@ -116,17 +127,17 @@ methodology_references:
     citation: Miller et al. 2018
     relevance: Defines encounter criteria implemented in compute_risk_score.
 
-  - title: Deceptive Shipping Practices
-    citation: Kpler, October 2025 (Ampatzidis, Li, Kotsias)
-    relevance: Compounding behavioural risk model. Reports 80.1% of sanctioned spoofing vessels designated within 12 months.
+  - title: Compounding behavioural risk models for maritime sanctions screening
+    citation: Industry literature, 2025
+    relevance: Motivates the multiplicative compounding of IUU, authorisation, and sanctions multipliers on top of the base behavioural score.
 
-  - title: The Turning Tides — Maritime Risk and Compliance Insights 2025-2026
-    citation: Kpler, December 2025 (Subasic, Ampatzidis, Li)
-    relevance: Introduces Low-to-Critical risk band vocabulary. Validates October predictive cohort (302 flagged, 42 sanctioned by December — 14% confirmation).
+  - title: Low-to-Critical risk band vocabulary for maritime risk and compliance
+    citation: Industry literature, 2025
+    relevance: Basis for the Low / Emerging / Elevated / Severe / Critical band classification used throughout the app.
 
-  - title: How to build a risk tree to assess shadow fleet exposure
-    citation: Kpler blog, April 2026
-    relevance: Source for the risk tree framework structure adapted in this project.
+  - title: Risk tree methodology for shadow fleet exposure assessment
+    citation: Industry literature, 2026
+    relevance: Source for the hierarchical risk tree framework adapted for fisheries in this project.
 
   - title: Council Regulation (EC) No 1005/2008 — EU IUU Regulation
     citation: EU 2008, amended by Regulation (EU) 2023/2842 (in force 9 January 2024)
@@ -148,7 +159,7 @@ scope_and_limitations: |
   vessels are suppressed by Eurostat.
 
   Detection substrate. The model relies on AIS-inferred events from GFW.
-  Kpler's detection stack combines AIS with analyst-verified satellite
+  Commercial detection stacks combine AIS with analyst-verified satellite
   imagery, which provides ground-truth confirmation for dark port calls
   and direct detection of AIS spoofing — neither of which are available
   from AIS inference alone. This is a legitimate substrate difference
@@ -166,6 +177,7 @@ scope_and_limitations: |
   not tag by issuing authority. Authority-level filtering is future work.
 
   Descriptive not predictive. The app assigns risk given observed
-  behaviour; it does not forecast future enforcement. Kpler's predictive
-  claims are based on a designation dataset that does not yet exist for
-  fisheries IUU at comparable scale.
+  behaviour; it does not forecast future enforcement. Building a
+  predictive model would require a historical designation dataset
+  tied to fisheries IUU outcomes at comparable scale, which does not
+  yet exist.

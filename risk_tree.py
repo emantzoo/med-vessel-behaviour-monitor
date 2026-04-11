@@ -3,6 +3,14 @@
 import yaml
 import graphviz
 import os
+import textwrap
+
+
+def _wrap(text, width=38):
+    """Wrap a string into multiple lines on word boundaries for Graphviz nodes."""
+    if not text:
+        return ""
+    return "\n".join(textwrap.wrap(str(text), width=width)) or str(text)
 
 
 def load_framework(path=None):
@@ -62,7 +70,9 @@ def render_framework_tree(trace=None, tier=None, vessel_label=None):
             "fontsize": "9",
             "shape": "box",
             "style": "rounded,filled",
-            "width": "2.5",
+            "width": "3.0",
+            "height": "0.6",
+            "margin": "0.12,0.08",
         },
         edge_attr={
             "fontname": "Helvetica",
@@ -77,11 +87,11 @@ def render_framework_tree(trace=None, tier=None, vessel_label=None):
             trace_lookup[entry["question_id"]] = entry
 
     # Root node
-    root_label = framework["name"]
+    _framework_name_wrapped = _wrap(framework["name"], width=28)
     if vessel_label:
-        root_label = f"{framework['name']}\n{vessel_label}"
+        root_label = f"{_framework_name_wrapped}\n{_wrap(vessel_label, width=28)}"
     else:
-        root_label = f"{framework['name']}\nVessel under assessment"
+        root_label = f"{_framework_name_wrapped}\nVessel under assessment"
 
     dot.node(
         "root",
@@ -114,7 +124,7 @@ def render_framework_tree(trace=None, tier=None, vessel_label=None):
 
         dot.node(
             branch_id,
-            f"{branch['name']}\n[{branch['type'].upper()}]",
+            f"{_wrap(branch['name'], width=24)}\n[{branch['type'].upper()}]",
             fillcolor=branch_color,
             fontcolor="white",
         )
@@ -123,9 +133,8 @@ def render_framework_tree(trace=None, tier=None, vessel_label=None):
         # Question sub-nodes
         for q in branch.get("questions", []):
             q_id = f"{branch_id}_{q['id']}"
-            q_text = q["text"]
-            if len(q_text) > 50:
-                q_text = q_text[:50] + "..."
+            # Word-wrap the full question text so nothing is truncated
+            q_text = _wrap(q["text"], width=38)
 
             # Colour from trace if available
             if trace:

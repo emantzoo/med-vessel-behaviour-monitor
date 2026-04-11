@@ -17,7 +17,7 @@ from data_loading import (
     load_fdi_effort, load_fdi_landings, load_iuu_vessels, load_iccat_vessels,
     load_ofac_vessels, lookup_vessel_imos,
 )
-from risk_model import compute_risk_score, get_fdi_context, match_iuu_vessels, match_iccat_vessels, match_ofac_vessels
+from risk_model import compute_risk_score, get_fdi_context, match_iuu_vessels, match_iccat_vessels, match_ofac_vessels, compute_vessel_flags
 from tabs import (
     render_daily_trend, render_flag_breakdown, render_event_types,
     render_duration_analysis, render_geographic_risk, render_risk_heatmap,
@@ -166,6 +166,9 @@ if not df_filtered.empty and not ofac_vessels.empty:
 if not df_filtered.empty:
     df_filtered["risk_band"] = df_filtered["risk_score"].apply(classify_risk_band)
 
+# Kpler-aligned display-only behavioural flags (do not multiply into risk_score)
+df_filtered = compute_vessel_flags(df_filtered)
+
 # ========================= MAIN MAP & METRICS =========================
 col1, col2 = st.columns([3, 1])
 
@@ -233,21 +236,29 @@ with col1:
             for csq_lon, csq_lat in df_filtered[["csq_lon", "csq_lat"]].drop_duplicates().values:
                 fdi_cache[(csq_lon, csq_lat)] = get_fdi_context(csq_lon, csq_lat, fdi_effort, fdi_landings)
 
-        def _svg_shape(event_type, fill, size, stroke="#222", stroke_w=1.5):
+        def _svg_shape(event_type, fill, size, stroke="#222", stroke_w=1.5, dashed=False):
             """Return an inline SVG shape for a Folium DivIcon.
 
             Circle = GAP, square = LOITERING, triangle = ENCOUNTER.
+            `dashed=True` draws an amber dashed outline used to flag Kpler-aligned
+            dark port call candidates (loitering within 10 km of shore).
             """
             s = size
             half = s / 2
+            if dashed:
+                stroke = "#ff9900"
+                stroke_w = 2.0
+                dash_attr = ' stroke-dasharray="3 2"'
+            else:
+                dash_attr = ""
             if event_type == "LOITERING":
-                body = f'<rect x="1" y="1" width="{s-2}" height="{s-2}" fill="{fill}" stroke="{stroke}" stroke-width="{stroke_w}"/>'
+                body = f'<rect x="1" y="1" width="{s-2}" height="{s-2}" fill="{fill}" stroke="{stroke}" stroke-width="{stroke_w}"{dash_attr}/>'
             elif event_type == "ENCOUNTER":
                 pts = f"{half},1 {s-1},{s-1} 1,{s-1}"
-                body = f'<polygon points="{pts}" fill="{fill}" stroke="{stroke}" stroke-width="{stroke_w}"/>'
+                body = f'<polygon points="{pts}" fill="{fill}" stroke="{stroke}" stroke-width="{stroke_w}"{dash_attr}/>'
             else:  # GAP or unknown -> circle
                 r = half - 1
-                body = f'<circle cx="{half}" cy="{half}" r="{r}" fill="{fill}" stroke="{stroke}" stroke-width="{stroke_w}"/>'
+                body = f'<circle cx="{half}" cy="{half}" r="{r}" fill="{fill}" stroke="{stroke}" stroke-width="{stroke_w}"{dash_attr}/>'
             return f'<svg width="{s}" height="{s}" xmlns="http://www.w3.org/2000/svg">{body}</svg>'
 
         for _, row in df_filtered.iterrows():
@@ -280,6 +291,19 @@ with col1:
             if is_iccat:
                 listings.append("ICCAT")
             listing_txt = ", ".join(listings) if listings else "clean"
+
+            # Compound / temporal behavioural flags (display-only, do not modify fill/size)
+            is_dpc = bool(row.get("dark_port_call_candidate", False))
+            is_multi = bool(row.get("multi_behaviour_flag", False))
+            is_repeat = bool(row.get("repeat_offender_90d", False))
+            behavioural_flags = []
+            if is_dpc:
+                behavioural_flags.append("dark-port-candidate")
+            if is_multi:
+                behavioural_flags.append("multi-behaviour")
+            if is_repeat:
+                behavioural_flags.append("repeat-offender")
+
             tooltip_parts = [
                 vname if pd.notna(vname) and vname else "(unknown)",
                 f"{row['event_type']}",
@@ -287,9 +311,11 @@ with col1:
                 f"risk {row['risk_score']:.1f} ({band})",
                 listing_txt,
             ]
+            if behavioural_flags:
+                tooltip_parts.append("Behavioural flags: " + ", ".join(behavioural_flags))
             tooltip = " | ".join(tooltip_parts)
 
-            svg = _svg_shape(row["event_type"], fill, size)
+            svg = _svg_shape(row["event_type"], fill, size, dashed=is_dpc)
             icon = folium.DivIcon(
                 html=f'<div style="width:{size}px;height:{size}px">{svg}</div>',
                 icon_size=(size, size),
@@ -312,16 +338,19 @@ with col1:
         map_data = st_folium(m, width=700, height=500)
 
         # Dual-encoding legend: shape = behaviour, fill = listing, size = risk band
-        def _legend_svg(shape, fill="#888", size=14):
+        def _legend_svg(shape, fill="#888", size=14, dashed=False):
             s = size
             half = s / 2
+            stroke = "#ff9900" if dashed else "#222"
+            sw = 2.0 if dashed else 1.2
+            dash_attr = ' stroke-dasharray="3 2"' if dashed else ""
             if shape == "square":
-                body = f'<rect x="1" y="1" width="{s-2}" height="{s-2}" fill="{fill}" stroke="#222" stroke-width="1.2"/>'
+                body = f'<rect x="1" y="1" width="{s-2}" height="{s-2}" fill="{fill}" stroke="{stroke}" stroke-width="{sw}"{dash_attr}/>'
             elif shape == "triangle":
                 pts = f"{half},1 {s-1},{s-1} 1,{s-1}"
-                body = f'<polygon points="{pts}" fill="{fill}" stroke="#222" stroke-width="1.2"/>'
+                body = f'<polygon points="{pts}" fill="{fill}" stroke="{stroke}" stroke-width="{sw}"{dash_attr}/>'
             else:
-                body = f'<circle cx="{half}" cy="{half}" r="{half-1}" fill="{fill}" stroke="#222" stroke-width="1.2"/>'
+                body = f'<circle cx="{half}" cy="{half}" r="{half-1}" fill="{fill}" stroke="{stroke}" stroke-width="{sw}"{dash_attr}/>'
             return (
                 f'<span style="display:inline-block;vertical-align:middle;margin-right:4px">'
                 f'<svg width="{s}" height="{s}">{body}</svg></span>'
@@ -343,7 +372,9 @@ with col1:
             f'{_legend_svg("circle", fill=_RBC["Emerging"], size=17)} Emerging&ensp;'
             f'{_legend_svg("circle", fill=_RBC["Elevated"], size=20)} Elevated&ensp;'
             f'{_legend_svg("circle", fill=_RBC["Severe"], size=24)} Severe&ensp;'
-            f'{_legend_svg("circle", fill=_RBC["Critical"], size=28)} Critical&emsp;'
+            f'{_legend_svg("circle", fill=_RBC["Critical"], size=28)} Critical<br/>'
+            '<b>Behavioural flag</b>:&ensp;'
+            f'{_legend_svg("square", fill=_RBC["Low"], size=17, dashed=True)} dashed amber outline = dark port call candidate (loitering within 10 km of shore, AIS-inferred, not satellite-verified)&emsp;'
             '<b>FDI effort</b>:&ensp;'
             '<span style="display:inline-block;width:11px;height:11px;background:#ffffb2;border:1px solid #ccc;margin-right:3px"></span><small>&lt;50d</small>&ensp;'
             '<span style="display:inline-block;width:11px;height:11px;background:#fecc5c;border:1px solid #ccc;margin-right:3px"></span><small>50-500d</small>&ensp;'
@@ -468,6 +499,35 @@ with col2:
             ofac_count = int(df_filtered["ofac_sanctioned"].sum())
             if ofac_count > 0:
                 st.metric("OFAC Sanctioned", ofac_count)
+        # Kpler-aligned behavioural flags (display-only, do not affect risk_score)
+        if "multi_behaviour_flag" in df_filtered.columns:
+            multi_vessels = int(
+                df_filtered[df_filtered["multi_behaviour_flag"]]["mmsi"].nunique()
+            )
+            if multi_vessels > 0:
+                st.metric(
+                    "Multi-behaviour Vessels", multi_vessels,
+                    help="Vessels showing two or more distinct GFW event types "
+                         "(gap, encounter, loitering). Compound behavioural indicator.",
+                )
+        if "dark_port_call_candidate" in df_filtered.columns:
+            dpc_events = int(df_filtered["dark_port_call_candidate"].sum())
+            if dpc_events > 0:
+                st.metric(
+                    "Dark Port Call Candidates", dpc_events,
+                    help="Loitering events within 10 km of shore. AIS-inferred, "
+                         "not satellite-verified (hence 'candidate').",
+                )
+        if "repeat_offender_90d" in df_filtered.columns:
+            repeat_vessels = int(
+                df_filtered[df_filtered["repeat_offender_90d"]]["mmsi"].nunique()
+            )
+            if repeat_vessels > 0:
+                st.metric(
+                    "Repeat Offenders (90d)", repeat_vessels,
+                    help="Vessels with two or more events within any 90-day window. "
+                         "Captures exposure drift over time.",
+                )
 
 # OFAC Alert Box (full width, below map — highest priority)
 if not df_filtered.empty and "ofac_sanctioned" in df_filtered.columns:

@@ -49,7 +49,7 @@ def render_daily_trend(df):
                    title="Daily Risk by Event Type")
     st.plotly_chart(fig2)
 
-    # Monthly multi-behaviour event counts (Kpler Graph 4 analogue)
+    # Monthly multi-behaviour event counts
     df_m = df.copy()
     df_m["date"] = pd.to_datetime(df_m["date"], errors="coerce")
     df_m = df_m.dropna(subset=["date"])
@@ -67,8 +67,7 @@ def render_daily_trend(df):
         )
         st.plotly_chart(fig3)
         st.caption(
-            "Same analytic frame as Kpler's \"Turning Tides\" whitepaper Graph 4 "
-            "(monthly deceptive behaviour trends), applied here to Mediterranean GFW "
+            "Monthly deceptive behaviour trends across Mediterranean GFW "
             "event types over the selected date range."
         )
 
@@ -149,7 +148,7 @@ def render_event_types(df):
         "avg_duration": "{:.1f}h", "avg_risk": "{:.1f}", "total_risk": "{:.0f}"
     }))
 
-    # Band distribution (Kpler R&C "Turning Tides" vocabulary)
+    # Band distribution (R&C risk-band vocabulary)
     if "risk_band" in df.columns:
         st.markdown("**Event distribution by risk band:**")
         band_order = ["Low", "Emerging", "Elevated", "Severe", "Critical"]
@@ -600,9 +599,16 @@ def render_top_vessels(df):
 def render_vessel_summary(df):
     st.subheader("Vessel Summary")
     st.caption(
-        "Vessel-level aggregation mirrors the presentation style in Kpler's "
-        "\"Turning Tides\" whitepaper (Dec 2025), where risk is reported per vessel "
-        "across multiple behavioural events rather than per individual event."
+        "Vessel-level aggregation reports risk per vessel across multiple "
+        "behavioural events rather than per individual event."
+    )
+    st.caption(
+        "Three behavioural flags are shown alongside the risk band: "
+        "**multi-behaviour** (vessel shows two or more distinct event types), "
+        "**dark port call candidates** (loitering within 10 km of shore — AIS-inferred, "
+        "not satellite-verified), and **repeat-offender** (two or more events within a "
+        "90-day window, capturing exposure drift over time). These flags "
+        "are display-only and are not multiplied into the risk score."
     )
     if df.empty:
         st.info("No data.")
@@ -627,6 +633,9 @@ def render_vessel_summary(df):
             "flag": _first(g["flag"]) if "flag" in g.columns else "",
             "event_count": int(len(g)),
             "event_types": ", ".join(sorted(g["event_type"].dropna().unique())),
+            "multi_behaviour": bool(g["multi_behaviour_flag"].any()) if "multi_behaviour_flag" in g.columns else False,
+            "dark_port_candidates": int(g["dark_port_call_candidate"].sum()) if "dark_port_call_candidate" in g.columns else 0,
+            "repeat_offender": bool(g["repeat_offender_90d"].any()) if "repeat_offender_90d" in g.columns else False,
             "base_score_total": round(base_total, 1),
             "risk_score_total": round(risk_total, 1),
             "max_event_risk": round(float(g["risk_score"].max()), 1),
@@ -652,7 +661,32 @@ def render_vessel_summary(df):
         if v in RISK_BAND_COLORS else "",
         subset=["risk_band"],
     )
-    st.dataframe(styled, use_container_width=True)
+    # Single-row selection hands a vessel off to the Vessel Investigation tab.
+    # We write to the same sentinel key that the map click uses, so the
+    # Investigation selector picks it up on the next rerun.
+    st.caption(
+        "Click a row to pre-select that vessel in the **Vessel Investigation** tab."
+    )
+    selection = st.dataframe(
+        styled,
+        use_container_width=True,
+        on_select="rerun",
+        selection_mode="single-row",
+        key="vessel_summary_table",
+    )
+    selected_rows = (selection.selection.rows
+                     if selection is not None and hasattr(selection, "selection")
+                     else [])
+    if selected_rows:
+        picked_idx = selected_rows[0]
+        if 0 <= picked_idx < len(vessel_df):
+            picked_name = vessel_df.iloc[picked_idx]["vessel_name"]
+            if picked_name:
+                st.session_state["map_clicked_vessel"] = picked_name
+                st.success(
+                    f"Pre-selected **{picked_name}** for the Vessel Investigation tab. "
+                    "Switch to that tab to see the full report."
+                )
 
     # Band summary under the table
     band_order = ["Critical", "Severe", "Elevated", "Emerging", "Low"]
@@ -1000,6 +1034,41 @@ def render_vessel_investigation(df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_l
             speed_drop = ga["avg_speed_before"] - ga["avg_speed_after"]
             st.write(f"**Gap speed analysis:** before={ga['avg_speed_before']:.1f}kn, after={ga['avg_speed_after']:.1f}kn (drop: {speed_drop:.1f}kn)")
 
+    # Step 6b: behavioural flags (display-only, do not multiply into risk_score)
+    st.markdown("### 6b. Behavioural Flags")
+    st.caption(
+        "Three compound/temporal flags derived directly from GFW event data. "
+        "Display-only -- these are not multiplied into the risk score, to avoid "
+        "double-counting with signals already captured at the event level."
+    )
+    # Resolve flags by MMSI from the investigation report (authoritative),
+    # not by re-matching on vessel_name. This guarantees the flags shown here
+    # correspond to the SAME MMSI the rest of the report is describing.
+    investigated_mmsi = str(report["identity"].get("mmsi", ""))
+    if investigated_mmsi and "mmsi" in df.columns:
+        vessel_rows_for_flags = df[df["mmsi"].astype(str) == investigated_mmsi]
+    else:
+        vessel_rows_for_flags = df.iloc[0:0]
+    multi_behaviour = bool(vessel_rows_for_flags["multi_behaviour_flag"].any()) if "multi_behaviour_flag" in vessel_rows_for_flags.columns else False
+    dark_port_candidates = int(vessel_rows_for_flags["dark_port_call_candidate"].sum()) if "dark_port_call_candidate" in vessel_rows_for_flags.columns else 0
+    repeat_offender = bool(vessel_rows_for_flags["repeat_offender_90d"].any()) if "repeat_offender_90d" in vessel_rows_for_flags.columns else False
+    fcol1, fcol2, fcol3 = st.columns(3)
+    fcol1.metric(
+        "Multi-behaviour",
+        "Yes" if multi_behaviour else "No",
+        help="Vessel shows two or more distinct event types (gap, encounter, loitering).",
+    )
+    fcol2.metric(
+        "Dark Port Call Candidates",
+        dark_port_candidates,
+        help="Count of loitering events within 10 km of shore. AIS-inferred, not satellite-verified.",
+    )
+    fcol3.metric(
+        "Repeat Offender (90d)",
+        "Yes" if repeat_offender else "No",
+        help="Two or more events within any 90-day window. Exposure drift concept.",
+    )
+
     # Step 7: Risk Decomposition
     st.markdown("### 7. Risk Score Decomposition")
     cols = st.columns(4)
@@ -1040,28 +1109,31 @@ def render_vessel_investigation(df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_l
         st.markdown("### Risk Tree -- This Vessel's Path")
         st.markdown(
             "The framework applied to this specific vessel. "
-            "Coloured nodes show which questions raised concerns and which "
-            "rules fired. The highlighted tier is the final classification."
+            "Expand each branch below to see which questions raised concerns "
+            "and which rules fired. The full Graphviz diagram is available "
+            "in the expander at the bottom if you prefer the spatial view."
         )
 
         vessel_label = (
             f"{report['identity']['vessel_name']}\n"
             f"{report['identity']['flag']} | {report['identity']['vessel_type'] or 'Unknown type'}"
         )
-        try:
-            dot_vessel = render_framework_tree(
-                trace=report["trace"],
-                tier=report["assessment"]["threat_level"],
-                vessel_label=vessel_label,
-            )
-            st.graphviz_chart(dot_vessel)
-        except Exception as e:
-            st.warning(f"Per-vessel tree render error: {e}")
 
-        # Interactive trace table grouped by branch
+        # Interactive trace: one collapsible expander per branch, with a
+        # severity summary in the header. Click a branch to reveal the
+        # individual questions (leaves) underneath. Each leaf is rendered
+        # as a compact card with a colour strip instead of a raw dataframe
+        # row, so the visual scan is cleaner than a wall of tables.
         _SEV_COLORS = {
-            "none": "#E8F5E9", "low": "#FFF9C4", "medium": "#FFE0B2",
-            "high": "#FFAB91", "critical": "#EF5350",
+            "none": "#81C784",     # green
+            "low": "#FFF176",      # yellow
+            "medium": "#FFB74D",   # orange
+            "high": "#E57373",     # red
+            "critical": "#B71C1C", # dark red
+        }
+        _SEV_RANK = {"none": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}
+        _SEV_ICONS = {
+            "none": "OK", "low": "LOW", "medium": "MED", "high": "HIGH", "critical": "CRIT",
         }
         _BRANCH_NAMES = {
             "identity": "Identity Verification",
@@ -1073,45 +1145,198 @@ def render_vessel_investigation(df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_l
             "network_exposure": "Network Exposure",
         }
 
-        with st.expander("Evaluation trace (details)", expanded=False):
-            # Group trace entries by branch
-            from collections import OrderedDict
-            branches = OrderedDict()
-            for entry in report["trace"]:
-                bid = entry["branch_id"]
-                if bid not in branches:
-                    branches[bid] = []
-                branches[bid].append(entry)
+        st.markdown("#### Evaluation trace")
+        st.caption(
+            "One expander per risk tree branch. The header shows the worst "
+            "severity found in that branch and how many rules fired. "
+            "Click a branch to drill into the individual questions (leaves) "
+            "that were evaluated for this vessel."
+        )
 
-            for bid, entries in branches.items():
-                branch_fired = any(e.get("rule_fired") for e in entries)
-                branch_label = _BRANCH_NAMES.get(bid, bid)
-                if branch_fired:
-                    st.markdown(f"**{branch_label}** -- rules fired")
-                else:
-                    st.markdown(f"**{branch_label}**")
+        # Group trace entries by branch, preserving the original order.
+        from collections import OrderedDict
+        branches = OrderedDict()
+        for entry in report["trace"]:
+            bid = entry["branch_id"]
+            if bid not in branches:
+                branches[bid] = []
+            branches[bid].append(entry)
 
-                trace_df = pd.DataFrame([
-                    {
-                        "Question": e["question_id"].replace("_", " ").title(),
-                        "Answer": e.get("answer", "?").upper(),
-                        "Severity": e.get("severity", "none").title(),
-                        "Finding": e.get("note", ""),
-                    }
-                    for e in entries
-                ])
+        for bid, entries in branches.items():
+            branch_label = _BRANCH_NAMES.get(bid, bid)
+            fired_count = sum(1 for e in entries if e.get("rule_fired"))
+            total = len(entries)
+            worst_sev = max(
+                (e.get("severity", "none") for e in entries),
+                key=lambda s: _SEV_RANK.get(s, 0),
+                default="none",
+            )
+            sev_tag = _SEV_ICONS.get(worst_sev, "OK")
+            # Emoji-free, monospace-friendly header
+            header = f"[{sev_tag}] {branch_label}  ·  {fired_count}/{total} rules fired"
+            # Auto-expand only if something fired in this branch
+            with st.expander(header, expanded=(fired_count > 0)):
+                for e in entries:
+                    sev = e.get("severity", "none")
+                    bg = _SEV_COLORS.get(sev, "#EEEEEE")
+                    fg = "white" if sev in ("high", "critical") else "#222"
+                    q = e.get("question_id", "?").replace("_", " ").title()
+                    a = str(e.get("answer", "?")).upper()
+                    note = e.get("note", "")
+                    fired = e.get("rule_fired", False)
+                    # Card: left colour strip + question/answer/note block
+                    card = (
+                        f"<div style='display:flex;align-items:stretch;"
+                        f"margin:6px 0;border-radius:4px;overflow:hidden;"
+                        f"border:1px solid #ddd;'>"
+                        f"<div style='width:6px;background:{bg};'></div>"
+                        f"<div style='padding:8px 12px;flex:1;background:#FAFAFA;'>"
+                        f"<div style='font-weight:600;color:#222;'>{q}</div>"
+                        f"<div style='font-size:12px;color:#555;margin-top:2px;'>"
+                        f"Answer: <span style='background:{bg};color:{fg};"
+                        f"padding:1px 6px;border-radius:3px;font-weight:600;'>{a}</span>"
+                        f"{'  ·  <span style=\"color:#B71C1C;font-weight:600;\">rule fired</span>' if fired else ''}"
+                        f"</div>"
+                        f"<div style='font-size:12px;color:#444;margin-top:4px;'>{note}</div>"
+                        f"</div></div>"
+                    )
+                    st.markdown(card, unsafe_allow_html=True)
 
-                def _color_severity(val):
-                    sev = val.lower()
-                    bg = _SEV_COLORS.get(sev, "#F0F0F0")
-                    fg = "white" if sev in ("high", "critical") else "black"
-                    return f"background-color: {bg}; color: {fg}"
+        # Interactive Plotly icicle. Two-level hierarchy: branch -> leaf.
+        # Click any branch to zoom into its leaves; click the centre
+        # breadcrumb to zoom back out. Severity is colour-encoded with
+        # the same palette as the card view above.
+        with st.expander("Show interactive risk tree (click to drill in)", expanded=False):
+            try:
+                _PLOTLY_SEV_COLORS = {
+                    "none": "#81C784",
+                    "low": "#FFF176",
+                    "medium": "#FFB74D",
+                    "high": "#E57373",
+                    "critical": "#B71C1C",
+                }
+                _PLOTLY_SEV_RANK = {"none": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}
+                _PLOTLY_BRANCH_NAMES = {
+                    "identity": "Identity Verification",
+                    "flag_risk": "Flag State Risk",
+                    "regulatory_status": "Regulatory Status",
+                    "authorization": "Fishing Authorization",
+                    "behavioural_history": "Behavioural History",
+                    "spatial_context": "Spatial / Contextual",
+                    "network_exposure": "Network Exposure",
+                }
 
-                st.dataframe(
-                    trace_df.style.applymap(_color_severity, subset=["Severity"]),
-                    use_container_width=True,
-                    hide_index=True,
+                # Build icicle arrays: labels, parents, values, colours, hover text.
+                # `ids` gives each node a unique key so Plotly does not
+                # collapse duplicate question_ids across branches; `labels`
+                # hold the *display* text that appears on the chart.
+                root_id = "__root__"
+                root_label = f"{report['identity']['vessel_name']} ({report['assessment']['threat_level']})"
+                ids = [root_id]
+                labels = [root_label]
+                parents = [""]
+                # With branchvalues="remainder", root can have intrinsic
+                # value 0 and children stack on top of it.
+                values = [0]
+                colors = ["#CFD8DC"]  # neutral for root
+                display_labels = [root_label]
+                hovers = [f"Final tier: {report['assessment']['threat_level']}"]
+
+                # Group trace entries by branch so we can build parent nodes
+                from collections import OrderedDict
+                _branches_for_icicle = OrderedDict()
+                for entry in report["trace"]:
+                    bid = entry["branch_id"]
+                    if bid not in _branches_for_icicle:
+                        _branches_for_icicle[bid] = []
+                    _branches_for_icicle[bid].append(entry)
+
+                for bid, entries in _branches_for_icicle.items():
+                    branch_name = _PLOTLY_BRANCH_NAMES.get(bid, bid)
+                    fired_count = sum(1 for e in entries if e.get("rule_fired"))
+                    total = len(entries)
+                    # Branch colour = worst severity in the branch
+                    worst_sev = max(
+                        (e.get("severity", "none") for e in entries),
+                        key=lambda s: _PLOTLY_SEV_RANK.get(s, 0),
+                        default="none",
+                    )
+                    branch_id = f"branch::{bid}"
+                    branch_display = f"{branch_name} ({fired_count}/{total})"
+                    ids.append(branch_id)
+                    labels.append(branch_display)
+                    parents.append(root_id)
+                    # Intrinsic value 0 — children (leaves, each value 1)
+                    # stack on top via branchvalues="remainder", so the
+                    # branch's visual size equals its number of leaves.
+                    values.append(0)
+                    colors.append(_PLOTLY_SEV_COLORS.get(worst_sev, "#CFD8DC"))
+                    display_labels.append(branch_display)
+                    hovers.append(f"{branch_name}<br>{fired_count}/{total} rules fired")
+
+                    # Leaf nodes: one per question. Use a unique `id` so
+                    # Plotly keeps them distinct across branches; the
+                    # displayed label stays clean.
+                    for idx, e in enumerate(entries):
+                        leaf_display = e.get("question_id", "?").replace("_", " ").title()
+                        leaf_id = f"leaf::{bid}::{idx}::{e.get('question_id', '?')}"
+                        sev = e.get("severity", "none")
+                        fired = e.get("rule_fired", False)
+                        ids.append(leaf_id)
+                        labels.append(leaf_display)
+                        parents.append(branch_id)
+                        values.append(1)
+                        colors.append(_PLOTLY_SEV_COLORS.get(sev, "#CFD8DC"))
+                        display_labels.append(leaf_display)
+                        note = str(e.get("note", "")).replace("<", "&lt;").replace(">", "&gt;")
+                        ans = str(e.get("answer", "?")).upper()
+                        fired_tag = " | RULE FIRED" if fired else ""
+                        hovers.append(
+                            f"<b>{leaf_display}</b><br>"
+                            f"Answer: {ans}<br>"
+                            f"Severity: {sev.title()}{fired_tag}<br>"
+                            f"{note}"
+                        )
+
+                import plotly.graph_objects as go
+                fig_icicle = go.Figure(go.Icicle(
+                    ids=ids,
+                    labels=labels,
+                    parents=parents,
+                    values=values,
+                    branchvalues="remainder",
+                    marker=dict(colors=colors, line=dict(color="white", width=1)),
+                    customdata=hovers,
+                    hovertemplate="%{customdata}<extra></extra>",
+                    tiling=dict(orientation="h"),
+                    root=dict(color="#FAFAFA"),
+                    textfont=dict(size=12),
+                ))
+                fig_icicle.update_layout(
+                    height=520,
+                    margin=dict(l=0, r=0, t=30, b=0),
+                    title=dict(
+                        text="Click a branch to zoom in; click the breadcrumb at the top to zoom out.",
+                        font=dict(size=12, color="#555"),
+                    ),
                 )
+                st.plotly_chart(fig_icicle, use_container_width=True)
+            except Exception as e:
+                st.warning(f"Icicle render error: {e}")
+
+        # Full Graphviz diagram, tucked into a collapsed expander so it
+        # does not dominate the tab. Kept for users who prefer the
+        # spatial view over the per-branch card cards.
+        with st.expander("Show full risk tree diagram (Graphviz)", expanded=False):
+            try:
+                dot_vessel = render_framework_tree(
+                    trace=report["trace"],
+                    tier=report["assessment"]["threat_level"],
+                    vessel_label=vessel_label,
+                )
+                st.graphviz_chart(dot_vessel)
+            except Exception as e:
+                st.warning(f"Per-vessel tree render error: {e}")
 
 
 # ============================================================================
@@ -1181,7 +1406,7 @@ def render_reference():
             for low, high, label, desc in RISK_BANDS
         ]
     )
-    st.markdown("**Kpler-aligned risk bands (applied to final compounded score)**")
+    st.markdown("**Risk bands (applied to final compounded score)**")
     st.dataframe(bands_df, use_container_width=True, hide_index=True)
 
     # 4. Multiplier tables (collapsed)

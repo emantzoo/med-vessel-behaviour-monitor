@@ -3,11 +3,11 @@ framework:
   version: "1.0"
   description: >
     Hierarchical risk framework for assessing IUU fishing exposure in
-    Mediterranean vessel behaviour. Adapted from Kpler's shadow fleet
-    risk tree methodology (April 2026) for fisheries-specific application.
-    Three branch types: gating (override), additive (cumulative), and
-    contextual (direction-dependent). Compound logic matters more than
-    individual factors.
+    Mediterranean vessel behaviour. Adapted from shadow fleet risk tree
+    methodology for fisheries-specific application. Three branch types:
+    gating (override), additive (cumulative), and contextual
+    (direction-dependent). Compound logic matters more than individual
+    factors.
 
   tier_outcomes:
     - tier: "Critical"
@@ -108,6 +108,32 @@ framework:
         - id: speed_change_at_gap
           text: "Did the vessel show significant speed change (>3 knots) before/after AIS gap?"
           escalation: "Speed drop indicates mid-sea operation, not equipment failure."
+        - id: multi_behaviour_compound
+          text: "Does the vessel show two or more distinct event types (gap, encounter, loitering)?"
+          weight: medium
+          note: >
+            Compound behavioural indicator. Vessels exhibiting multiple
+            distinct behavioural patterns carry elevated risk because the
+            combination suggests deliberate operational choices rather than
+            equipment failure or incidental behaviour.
+        - id: dark_port_call_candidate
+          text: "Does the vessel have loitering events within 10 km of shore?"
+          weight: medium
+          note: >
+            Derived dark port call indicator. Loitering within 10 km of shore
+            is a candidate signal for a dark port call -- a port approach or
+            departure with AIS disabled. Confirmed detection in commercial
+            stacks relies on satellite imagery verification; this
+            implementation uses AIS inference only and flags candidates
+            rather than confirmed events.
+        - id: repeat_offender_90d
+          text: "Does the vessel have two or more events within any 90-day window?"
+          weight: medium
+          note: >
+            Captures exposure drift -- risk accumulating over time through
+            repeated deceptive behaviours within a bounded time window.
+            Vessels with clustered behavioural signals are weighted more
+            heavily than those with isolated incidents.
 
     - id: spatial_context
       name: "Spatial / Contextual Risk"
