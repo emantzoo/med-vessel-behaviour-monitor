@@ -670,7 +670,7 @@ Use the slider to control how many vessels appear.
 -- Top vessels segmented -- Type mismatch by vessel class -- Repeat offenders -- Encounter analysis -- AIS gap behaviour.""")
 
         # ---- Pill filters (multi-select, None = show all) ----
-        fc1, fc2, fc3 = st.columns(3)
+        fc1, fc2, fc3, fc4 = st.columns(4)
         with fc1:
             event_types_in_data = sorted(df_filtered["event_type"].dropna().unique())
             pill_events = st.pills(
@@ -690,6 +690,14 @@ Use the slider to control how many vessels appear.
                 "Flag state", flags_in_data,
                 selection_mode="multi", default=None, key="pill_flag",
             )
+        with fc4:
+            classes_in_data = sorted(
+                df_filtered["vessel_class"].dropna().unique()
+            ) if "vessel_class" in df_filtered.columns else []
+            pill_class = st.pills(
+                "Vessel class", classes_in_data,
+                selection_mode="multi", default=None, key="pill_vessel_class",
+            ) if classes_in_data else []
 
         df_tab = df_filtered.copy()
         if pill_events:
@@ -698,6 +706,8 @@ Use the slider to control how many vessels appear.
             df_tab = df_tab[df_tab["risk_band"].isin(pill_bands)]
         if pill_flags:
             df_tab = df_tab[df_tab["flag"].isin(pill_flags)]
+        if pill_class:
+            df_tab = df_tab[df_tab["vessel_class"].isin(pill_class)]
 
         if len(df_tab) < len(df_filtered):
             st.caption(
