@@ -162,8 +162,29 @@ Intervals are half-open (the upper bound belongs to the next band). Use `risk_ba
 
 ---
 
+## 6. Visualisations that expose these layers
+
+Five plots in the UI surface the vessel intelligence layers visually. They live in expanders inside the existing four-tab layout, never as a separate tab. Each plot has a "How to read this chart" expander immediately above it.
+
+| # | Plot | Tab location | Purpose | Reads from |
+|---|---|---|---|---|
+| 1 | **Base vs structural-amplifier decomposition** | Vessel Watch → Vessel Summary | Fleet-wide methodology illustration. One stacked horizontal bar showing the base contribution and the structural amplifier delta. | `df["base_risk_score"]`, `df["risk_score"]` |
+| 2 | **Risk band distribution** | Vessel Watch → Vessel Summary | Vessel count per Kpler *Turning Tides* band. The single chart that lands fastest because it uses the recognised vocabulary verbatim. | `df.groupby("mmsi")["risk_score"].sum()` then `classify_risk_band()` |
+| 3 | **Top vessels: base vs structural amplifier** | Vessel Watch → Vessel Summary | Vessel-centric counterpart to plot #1. Top-10 horizontal bars segmented into base + structural delta. Answers "who is worst?" while #1 answers "how does scoring work?". | `df.groupby("mmsi")` of `base_risk_score` and `risk_score` |
+| 4 | **Risk exposure by MPA tier** | Fleet Overview → Map & Overview | Donut split of total risk by `mpa_tier`. Quantifies the spatial-regulatory layer in one glance. | `df.groupby("mpa_tier")["risk_score"].sum()` |
+| 5 | **Fishing activity inside MPAs** | Fleet Overview → Fisheries Context | Scatter map of `fishing_df[in_mpa==True]` sized by `fishing_hours`, coloured by `mpa_tier`. Display-only context. Gracefully handles small-N in static demo mode by warning the user. | `fishing_df[fishing_df["in_mpa"]]` |
+
+**Two design rules these plots follow:**
+
+1. **Plots 1, 3, 4 read off the base-vs-compound decomposition**, which is *the* methodological story. If the AI analyst is asked "explain how scoring works", these are the three plots to point at — together they show the principle, the worst actors, and the spatial component.
+2. **Plot 5 is never scored.** It is the only place in the entire app where `fishing_df` is rendered geographically, and it is explicitly labelled "display-only" because GFW's fishing classification fires on every commercial fishing trip globally and would otherwise penalise legitimate EU fishing.
+
+**For analyst answers about visualisations:** if a user asks "where can I see X", the table above is the canonical lookup. Refer to plots by their UI label, not by their function name.
+
+---
+
 ## Summary for the analyst
 
-When a user asks about MPA activity, use `df[df["in_mpa"]]` for events and cross-reference `fishing_df` for active fishing inside protected areas. When a user asks about deceptive behaviour patterns, use the four Kpler-aligned flags. When a user asks about risk ranking, use `risk_score_total` and `risk_band` from the vessel summary. When a user asks "why is this vessel scored this way", decompose into `base_score_total` (behavioural observation including MPA) and the compound multiplier chain (IUU × ICCAT × OFAC).
+When a user asks about MPA activity, use `df[df["in_mpa"]]` for events and cross-reference `fishing_df` for active fishing inside protected areas. When a user asks about deceptive behaviour patterns, use the four Kpler-aligned flags. When a user asks about risk ranking, use `risk_score_total` and `risk_band` from the vessel summary. When a user asks "why is this vessel scored this way", decompose into `base_score_total` (behavioural observation including MPA) and the compound multiplier chain (IUU × ICCAT × OFAC). When a user asks "where can I see this", refer to Section 6.
 
 Never score fishing events. Never add the four flags into `risk_score`. Always caveat AIS-based findings with the McDonald 2024 lower-bound framing for MPA-related answers.

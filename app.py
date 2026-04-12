@@ -25,6 +25,9 @@ from tabs import (
     render_repeat_offenders, render_gap_behaviour, render_encounter_analysis,
     render_vessel_summary, render_vessel_investigation,
     render_fisheries_context, render_reference,
+    render_base_vs_compound_decomposition, render_risk_band_distribution,
+    render_mpa_tier_exposure, render_top_vessels_segmented,
+    render_fishing_in_mpa_map,
 )
 from ai_analyst import render_ai_analyst
 
@@ -619,6 +622,15 @@ with tab_watch:
     with sub_summary:
         render_vessel_summary(df_filtered)
 
+        with st.expander("Risk band distribution", expanded=False):
+            render_risk_band_distribution(df_filtered)
+
+        with st.expander("Base vs structural-amplifier decomposition", expanded=False):
+            render_base_vs_compound_decomposition(df_filtered)
+
+        with st.expander("Top vessels: base vs structural amplifier", expanded=False):
+            render_top_vessels_segmented(df_filtered, top_n=10)
+
         with st.expander("Repeat offenders -- IUU and ICCAT detail"):
             render_repeat_offenders(df_filtered)
 
@@ -642,6 +654,9 @@ with tab_overview:
         render_risk_heatmap(df_filtered)
         render_daily_trend(df_filtered)
 
+        with st.expander("Risk exposure by MPA tier", expanded=False):
+            render_mpa_tier_exposure(df_filtered)
+
         with st.expander("Flag breakdown"):
             render_flag_breakdown(df_filtered)
 
@@ -653,6 +668,9 @@ with tab_overview:
 
     with sub_fisheries:
         render_fisheries_context(df_filtered, fdi_effort, fdi_landings)
+
+        with st.expander("Fishing activity inside MPAs", expanded=False):
+            render_fishing_in_mpa_map(df_filtered, fishing_df)
 
         with st.expander("Geographic risk breakdown"):
             render_geographic_risk(df_filtered)

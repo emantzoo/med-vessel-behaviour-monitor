@@ -24,6 +24,21 @@ from risk_model import get_fdi_context
 
 def render_daily_trend(df):
     st.subheader("Daily Behavioral Risk Trend")
+    with st.expander("How to read this chart", expanded=False):
+        st.markdown(
+            """
+- **Top line chart**: total compounded `risk_score` summed across all
+  events on each calendar day. Spikes mean either many events on one day
+  or one very large structurally amplified event.
+- **Black dashed verticals labelled "IUU"**: dates on which at least one
+  IUU-listed vessel had an event. These dates are precomputed from the
+  IUU-matching pipeline and overlaid here as flags, not added to the
+  numeric series.
+- **Bottom stacked area**: same daily totals split by event type so you
+  can see the composition (gap vs encounter vs loitering) shifting over
+  time. This is the Med analogue of Kpler *Turning Tides* Graph 4.
+            """
+        )
     if df.empty:
         st.info("No data.")
         return
@@ -75,6 +90,21 @@ def render_daily_trend(df):
 
 def render_flag_breakdown(df):
     st.subheader("Breakdown by Flag State")
+    with st.expander("How to read this chart", expanded=False):
+        st.markdown(
+            """
+- **Top horizontal bar**: total compounded `risk_score` per flag state,
+  sorted descending. Long bars at the top are the headline finding.
+- **Bottom stacked bar**: same totals broken out by event type so you
+  can see whether a flag's exposure comes from gaps, encounters or
+  loitering.
+- **Side tables**: per-flag counts of vessels matched to the IUU list,
+  ICCAT Med record, and OFAC SDN list. These three tables are the
+  structural-amplifier provenance for the bars above.
+- High-risk flags often combine: a Russian-flagged vessel may show up
+  on the IUU table *and* dominate the encounter bar simultaneously.
+            """
+        )
     if df.empty:
         st.info("No data.")
         return
@@ -123,6 +153,20 @@ def render_flag_breakdown(df):
 
 def render_event_types(df):
     st.subheader("Breakdown by Event Type")
+    with st.expander("How to read this chart", expanded=False):
+        st.markdown(
+            """
+- **Pie**: share of total compounded `risk_score` contributed by each
+  event type. Encounters typically dominate because their event weight
+  is the highest (5.0 vs 3.2 for gaps and 2.0 for loitering).
+- **Summary table**: per-event-type event count, mean duration, mean
+  risk per event, total risk, and structural matches (IUU / ICCAT
+  counts).
+- **Risk band distribution table**: events binned into the Turning
+  Tides bands. This is *event-level* banding -- the band column on the
+  Vessel Summary table is *vessel-level* banding (sum across events).
+            """
+        )
     if df.empty:
         st.info("No data.")
         return
@@ -166,6 +210,23 @@ def render_event_types(df):
 
 def render_duration_analysis(df):
     st.subheader("Event Duration Distribution")
+    with st.expander("How to read this chart", expanded=False):
+        st.markdown(
+            """
+- **Top histogram**: distribution of event duration in hours, coloured
+  by event type. Long-tail bars on the right are the suspicious cases:
+  gaps over 24h suggest deliberate AIS disabling, encounters over 8h
+  suggest transshipment, multi-day loitering near a coastline suggests
+  staging.
+- **Bottom scatter**: each dot is one event, x = duration, y = compounded
+  risk score, colour = flag. The non-linear relationship comes from the
+  `duration_h ^ 0.75` term in the scoring formula plus the structural
+  multipliers.
+- The two charts together show why we use a sub-linear duration term:
+  doubling the duration of an event roughly multiplies its score by 1.7,
+  not by 2.
+            """
+        )
     if df.empty:
         st.info("No data.")
         return
@@ -192,6 +253,20 @@ def render_duration_analysis(df):
 
 def render_geographic_risk(df):
     st.subheader("Geographic Risk Analysis")
+    with st.expander("How to read this chart", expanded=False):
+        st.markdown(
+            """
+- Events are placed into Mediterranean sub-zones via
+  `classify_med_zone(lon, lat)` (a longitude-band partition: Western
+  basin, Tyrrhenian, Ionian/Adriatic, Aegean/Levantine).
+- The **bar chart** sums compounded risk per zone, with colour encoding
+  the marker class (Regular / IUU-Listed / ICCAT-Authorized / OFAC).
+- The **port-distance scatter** shows each event's distance from the
+  nearest major port on the x axis vs total risk on the y axis. Events
+  far offshore that nonetheless score high are the prime investigation
+  targets -- they cannot be explained as port-adjacent loitering.
+            """
+        )
     if df.empty:
         st.info("No data.")
         return
@@ -266,6 +341,20 @@ def render_geographic_risk(df):
 
 def render_risk_heatmap(df):
     st.subheader("Risk Heatmap: Flag State vs Event Type")
+    with st.expander("How to read this chart", expanded=False):
+        st.markdown(
+            """
+- Each cell = total compounded `risk_score` for that
+  (flag, event-type) combination. Brighter cells = more risk.
+- Rows are sorted bottom-to-top by total risk so the worst flags
+  always sit at the top of the heatmap.
+- The "Highest risk combination" line under the chart names the single
+  cell with the largest score -- the headline finding.
+- Look for cells where a high-risk flag (Russia, Iran, FoCs) intersects
+  with a high-weight event type (encounter, gap). These are the
+  combinations the analyst should open in the Vessel Investigation tab.
+            """
+        )
     if df.empty:
         st.info("No data.")
         return
@@ -303,6 +392,23 @@ def render_risk_heatmap(df):
 
 def render_repeat_offenders(df):
     st.subheader("Repeat Offenders -- Vessels with Multiple Events")
+    with st.expander("How to read this chart", expanded=False):
+        st.markdown(
+            """
+- A vessel is a "repeat offender" here if it has at least **two
+  events** in the current filter window (any event type, any spacing).
+  This is the loose definition; the strict 90-day version drives the
+  `repeat_offender_90d` flag in the Vessel Summary.
+- **Bar chart**: top 15 vessels by event count, x = MMSI, y = number of
+  events, colour = total compounded risk.
+- IUU-listed vessels are pulled to the top of the underlying table
+  regardless of event count.
+- The **timeline plot** below the bars shows the top-3 repeat offenders'
+  events on a true time axis so you can read the spacing.
+- Hovering on a bar exposes flag, event types, average duration and
+  total risk for that vessel.
+            """
+        )
     if df.empty:
         st.info("No data.")
         return
@@ -387,6 +493,22 @@ def render_repeat_offenders(df):
 
 def render_gap_behaviour(df):
     st.subheader("Gap Behaviour Analysis")
+    with st.expander("How to read this chart", expanded=False):
+        st.markdown(
+            """
+- **GAP events** are AIS broadcast interruptions of significant
+  duration that GFW classifies separately from ordinary signal loss.
+- **IUU gap warning box** (if present): the precise list of IUU-matched
+  vessels with gap events in the current window. Treat as the highest-
+  priority leads in the entire dataset.
+- **Distribution histogram**: gap durations in hours. Long-tail bars
+  represent multi-day disabling events that cannot be explained by
+  signal degradation.
+- **Geographic scatter**: gap end-point positions, sized by duration.
+  Geographic clustering of long gaps off a coastline often signals a
+  ship-to-ship transfer or unreported port call.
+            """
+        )
     gap_df = df[df["event_type"] == "GAP"].copy()
 
     # IUU gap warning
@@ -443,6 +565,23 @@ def render_gap_behaviour(df):
 
 def render_encounter_analysis(df):
     st.subheader("Encounter Analysis")
+    with st.expander("How to read this chart", expanded=False):
+        st.markdown(
+            """
+- **ENCOUNTER events** are GFW pairings: two AIS-broadcasting vessels
+  within ~500 m for >2h while both are moving at <2 kn. The classic
+  signature of a ship-to-ship transfer.
+- **Scatter**: x = median distance between the two vessels in km, y =
+  encounter duration in hours, dot size = compounded risk score, colour
+  = flag.
+- **Carrier alert**: ICCAT-authorized BFT carriers (`type=Carrier`)
+  flagged separately because they are *the* watchlist for unreported
+  bluefin tuna transshipment in the Med.
+- The encounter table at the bottom enumerates the partner vessel name
+  and flag for every encounter -- this is the most operationally
+  actionable column in the entire dashboard.
+            """
+        )
     enc_df = df[df["event_type"] == "ENCOUNTER"].copy()
 
     if not enc_df.empty and "encounter_median_distance_km" in enc_df.columns:
@@ -517,27 +656,36 @@ def render_vessel_summary(df):
         "Vessel-level aggregation reports risk per vessel across multiple "
         "behavioural events rather than per individual event."
     )
-    st.caption(
-        "Four Kpler-aligned flags are shown alongside the risk band: "
-        "**industrial** (vessel >=24m LOA or >=100 GT, the ICCAT industrial / "
-        "EU 1224/2009 reporting threshold -- the only structural flag of the four), "
-        "**multi-behaviour** (vessel shows two or more distinct event types), "
-        "**dark port call candidates** (loitering within 10 km of shore -- AIS-inferred, "
-        "not satellite-verified), and **repeat-offender** (two or more events within a "
-        "90-day window, capturing exposure drift over time). These flags "
-        "are display-only and are not multiplied into the risk score. "
-        "Length and tonnage come from the GFW Vessels API registry / self-reported "
-        "metadata in live mode and from the static profile in demo mode. "
-        "An **MPA intersection** column is also shown: sourced from GFW's `regions.mpa` "
-        "field (WDPA point-in-polygon, pre-computed server-side), tiered into "
-        "GFCM-FRA / EU-site / general. Unlike the behavioural flags, MPA intersection "
-        "*is* multiplied into the base behavioural score. The "
-        "**fishing-in-MPA** columns (event count and total hours) come from a "
-        "separate GFW `public-global-fishing-events` query and are display-only -- "
-        "they are not multiplied into the risk score, because legitimate fishing "
-        "outside MPAs is normal and only fishing inside protected zones is the "
-        "actionable IUU signal."
-    )
+
+    with st.expander("How to read this table", expanded=False):
+        st.markdown(
+            """
+**Four behavioural flags** are shown alongside the risk band. They are
+**display-only** -- they are *not* multiplied into the risk score
+(the underlying signal is already captured at the event level).
+
+| Flag | Definition | Type |
+|---|---|---|
+| **Industrial** | Vessel >=24 m LOA or >=100 GT (ICCAT industrial / EU 1224/2009 reporting threshold) | Structural |
+| **Multi-behaviour** | Vessel shows two or more distinct event types | Compound |
+| **Dark port call candidate** | Loitering within 10 km of shore (AIS-inferred, not satellite-verified) | Spatial |
+| **Repeat offender** | Two or more events within a 90-day window (exposure drift) | Temporal |
+
+Length and tonnage come from the GFW Vessels API registry / self-reported
+metadata in live mode and from the static profile in demo mode.
+
+**Two spatial-context columns** are also shown:
+
+- **MPA intersection** -- sourced from GFW's `regions.mpa` field
+  (WDPA point-in-polygon, pre-computed server-side), tiered into
+  GFCM-FRA / EU-site / general. *Unlike the behavioural flags, MPA
+  intersection **is** multiplied into the base behavioural score.*
+- **Fishing-in-MPA** (event count and total hours) -- comes from a
+  separate GFW `public-global-fishing-events` query. Display-only:
+  legitimate fishing outside MPAs is normal commercial activity, so
+  only fishing inside protected zones is the actionable IUU signal.
+            """
+        )
     if df.empty:
         st.info("No data.")
         return
@@ -684,6 +832,26 @@ def render_fisheries_context(df, fdi_effort, fdi_landings):
         "Overlaying GFW behavioural events with EU Fisheries Dependent Information (FDI) "
         "spatial data to assess whether events occur in known fishing grounds."
     )
+    with st.expander("How to read this section", expanded=False):
+        st.markdown(
+            """
+- **FDI** = EU Joint Research Centre's Fisheries Dependent Information.
+  Spatially aggregated to **0.5 x 0.5 degree c-squares** by year, gear,
+  and species. We use the Mediterranean (MBS) supra-region, 2017-2024.
+- **Section A: Effort vs events**: c-square fishing-effort heat overlaid
+  with GFW behavioural events. Events that fall in *low-effort*
+  c-squares are the suspicious ones -- they happen in waters where
+  legitimate fishing rarely occurs.
+- **Section B: Species landings**: top species (by weight or value)
+  for the c-squares that contain GFW events. Highlights when
+  ICCAT-managed species (BFT, SWO, ALB) dominate the landings of the
+  same c-squares where GFW events occur -- the basis for transshipment
+  hypotheses.
+- FDI is *baseline data*, not a risk signal. It tells you whether the
+  GFW event sits inside a known fishing ground, which is the difference
+  between "vessel transiting" and "vessel operating".
+            """
+        )
 
     if fdi_effort.empty:
         st.warning("FDI data not available. Run `python data/prepare_fdi.py` to generate.")
@@ -856,6 +1024,410 @@ def render_fisheries_context(df, fdi_effort, fdi_landings):
             st.info("No FDI landings data matches GFW event c-squares.")
     else:
         st.info("FDI landings data not available.")
+
+
+def render_base_vs_compound_decomposition(df):
+    """Fleet-level base-vs-compound decomposition.
+
+    The single best chart for explaining the scoring methodology visually:
+    a horizontal stacked bar where the left segment is the behavioural base
+    risk (what we observed) and the right segment is the structural amplifier
+    delta (what we looked up about the vessel via IUU/ICCAT/OFAC). Aggregated
+    across the entire filtered fleet so it answers "how does scoring work?"
+    rather than "who is worst?" (the latter is plot #6).
+    """
+    st.subheader("Base vs structural-amplifier decomposition")
+    st.caption(
+        "Fleet-wide split between behavioural risk (event observation) and "
+        "structural amplifiers (IUU / ICCAT-Carrier / OFAC list lookups). "
+        "Reads the methodology directly off real data."
+    )
+    with st.expander("How to read this chart", expanded=False):
+        st.markdown(
+            """
+- **Blue segment** = sum of `base_risk_score` across every event in the
+  current filter window. This is what we *observed*: event duration,
+  shore distance, MPA tier, flag-state risk, event-specific factors.
+- **Red segment** = the additional risk added by the IUU x ICCAT x OFAC
+  multiplier chain. This is what we *looked up* about the vessels.
+- **Compound multiplier** in the title = total / base. A value close to
+  1.0x means the fleet's risk is almost entirely behavioural; values
+  above 2x mean structural lookups dominate.
+- MPA tier multipliers live in the *blue* segment because they describe
+  where the event happened, not who the vessel is.
+            """
+        )
+    if df.empty or "base_risk_score" not in df.columns:
+        st.info("Base risk score not available in current dataset.")
+        return
+
+    base_total = float(df["base_risk_score"].sum())
+    risk_total = float(df["risk_score"].sum())
+    structural_delta = max(risk_total - base_total, 0.0)
+    if base_total <= 0:
+        st.info("No risk scored in current filter window.")
+        return
+
+    compound_mult = risk_total / base_total if base_total > 0 else 1.0
+
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        y=["Fleet total"], x=[base_total], name="Behavioural base",
+        orientation="h", marker_color="#4C78A8",
+        hovertemplate="Behavioural base: %{x:.1f}<extra></extra>",
+    ))
+    fig.add_trace(go.Bar(
+        y=["Fleet total"], x=[structural_delta], name="Structural amplifier (IUU/ICCAT/OFAC)",
+        orientation="h", marker_color="#E45756",
+        hovertemplate="Structural amplifier: %{x:.1f}<extra></extra>",
+    ))
+    fig.update_layout(
+        barmode="stack", height=180,
+        title=f"Total risk = {risk_total:.0f}  ({compound_mult:.2f}x compound multiplier over base {base_total:.0f})",
+        xaxis_title="Risk score",
+        showlegend=True,
+        legend=dict(orientation="h", yanchor="bottom", y=-0.6, xanchor="center", x=0.5),
+        margin=dict(l=20, r=20, t=50, b=20),
+    )
+    st.plotly_chart(fig, use_container_width=True)
+    st.markdown(
+        f"**Read:** the fleet-wide compound multiplier is **{compound_mult:.2f}x** -- "
+        f"i.e. structural list lookups added **{structural_delta:.0f} points** "
+        f"({structural_delta / risk_total * 100:.0f}% of total) on top of the "
+        f"**{base_total:.0f}-point** behavioural base. "
+        "MPA tier multipliers live in the *base* segment because they describe "
+        "where the event happened, not who the vessel is."
+    )
+
+
+def render_risk_band_distribution(df):
+    """Vessel count per Kpler 'Turning Tides' risk band.
+
+    The single chart Amanda will recognise fastest because it's literally
+    the Kpler vocabulary. One bar per band, coloured by band.
+    """
+    st.subheader("Risk band distribution")
+    st.caption(
+        "Vessels grouped into the Turning Tides risk vocabulary. "
+        "Bands apply to the *compounded* per-vessel risk total."
+    )
+    with st.expander("How to read this chart", expanded=False):
+        st.markdown(
+            """
+- Each bar = number of unique vessels whose **summed compounded risk
+  score** falls into that band.
+- Aggregation is per `mmsi`, not per event -- a vessel with five small
+  loitering events can sit in a higher band than a vessel with one
+  large gap event.
+- Band colours match the vessel-summary table and the map markers.
+- Cutoffs align with Kpler R&C *Turning Tides* (Dec 2025): Low <50,
+  Emerging 50-60, Elevated 60-80, Severe 80-100, Critical >=100.
+- A healthy fleet skews left (Low/Emerging). A right-skewed distribution
+  is the headline finding for the analyst.
+            """
+        )
+    if df.empty:
+        st.info("No data.")
+        return
+
+    vessel_totals = df.groupby("mmsi")["risk_score"].sum()
+    if vessel_totals.empty:
+        st.info("No vessel-level risk in current filter window.")
+        return
+
+    bands = vessel_totals.apply(classify_risk_band)
+    band_order = ["Low", "Emerging", "Elevated", "Severe", "Critical"]
+    counts = bands.value_counts().reindex(band_order, fill_value=0)
+
+    fig = go.Figure()
+    for band in band_order:
+        fig.add_trace(go.Bar(
+            x=[band], y=[int(counts[band])],
+            marker_color=RISK_BAND_COLORS.get(band, "#888"),
+            text=[int(counts[band])], textposition="outside",
+            name=band, showlegend=False,
+            hovertemplate=f"<b>{band}</b><br>Vessels: %{{y}}<extra></extra>",
+        ))
+    fig.update_layout(
+        height=320,
+        xaxis_title="Risk band",
+        yaxis_title="Vessel count",
+        title="Vessels per risk band",
+        margin=dict(l=20, r=20, t=50, b=20),
+    )
+    st.plotly_chart(fig, use_container_width=True)
+    st.markdown(
+        "**Bands:** Low <50 | Emerging 50-60 | Elevated 60-80 | Severe 80-100 | Critical >=100. "
+        "Cutoffs aligned with Kpler R&C *Turning Tides* (Dec 2025)."
+    )
+
+
+def render_mpa_tier_exposure(df):
+    """Donut of total risk_score split by MPA tier of the underlying event."""
+    st.subheader("Risk exposure by MPA tier")
+    st.caption(
+        "Where the risk lives: total compounded risk split by the protected-area "
+        "tier of each event's location. MPA tier is the only spatial-regulatory "
+        "signal that enters the *base* score."
+    )
+    with st.expander("How to read this chart", expanded=False):
+        st.markdown(
+            """
+- Each donut slice = total compounded `risk_score` summed across every
+  event whose location intersects an MPA of that tier.
+- **GFCM FRA** (red): Fisheries Restricted Areas under EC 1967/2006.
+  Strongest regulatory signal -- 2.0x base multiplier.
+- **EU site** (orange): Natura 2000 marine sites and EU member-state MPAs.
+  1.5x base multiplier.
+- **Other WDPA** (light orange): general protected areas without EU/GFCM
+  designation. 1.2x contextual multiplier.
+- **Outside MPA** (grey): events on the high seas or in unprotected EEZ.
+- Per McDonald 2024 (*Nature*), AIS-broadcast vessels are a lower bound:
+  ~90% of fishing vessels detected inside MPAs by satellite radar do not
+  broadcast AIS at all.
+            """
+        )
+    if df.empty or "mpa_tier" not in df.columns:
+        st.info("MPA tier column not available in current dataset.")
+        return
+
+    tier_labels = {
+        "gfcm_fra": "GFCM FRA",
+        "eu_site": "EU site",
+        "general": "Other WDPA",
+        "": "Outside MPA",
+    }
+    tier_colors = {
+        "gfcm_fra": "#8B0000",
+        "eu_site": "#E45756",
+        "general": "#F58518",
+        "": "#B0B0B0",
+    }
+
+    tier_series = df["mpa_tier"].fillna("").astype(str)
+    risk_by_tier = df.assign(_tier=tier_series).groupby("_tier")["risk_score"].sum()
+    risk_by_tier = risk_by_tier[risk_by_tier > 0]
+    if risk_by_tier.empty:
+        st.info("No risk scored in current filter window.")
+        return
+
+    labels = [tier_labels.get(t, t or "Outside MPA") for t in risk_by_tier.index]
+    colors = [tier_colors.get(t, "#888") for t in risk_by_tier.index]
+
+    fig = go.Figure(data=[go.Pie(
+        labels=labels, values=risk_by_tier.values,
+        hole=0.55,
+        marker=dict(colors=colors),
+        textinfo="label+percent",
+        hovertemplate="<b>%{label}</b><br>Risk: %{value:.1f}<br>Share: %{percent}<extra></extra>",
+        sort=False,
+    )])
+    fig.update_layout(
+        height=380,
+        title=f"Total risk score by MPA tier (sum: {float(risk_by_tier.sum()):.0f})",
+        margin=dict(l=20, r=20, t=50, b=20),
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+    in_mpa_share = float(risk_by_tier.drop("", errors="ignore").sum()) / float(risk_by_tier.sum())
+    st.markdown(
+        f"**Read:** {in_mpa_share*100:.0f}% of total compounded risk comes from "
+        "events that fell inside a WDPA-listed MPA. GFCM FRAs carry a 2.0x base "
+        "multiplier, EU sites 1.5x, other WDPA 1.2x. "
+        "*AIS-broadcast vessels inside MPAs are a lower bound -- per McDonald 2024 "
+        "(Nature), ~90% of fishing vessels detected by satellite radar inside MPAs "
+        "do not broadcast AIS at all.*"
+    )
+
+
+def render_top_vessels_segmented(df, top_n=10):
+    """Top-N vessels horizontal bar with base + structural-amplifier segmentation.
+
+    Vessel-centric counterpart to render_base_vs_compound_decomposition: same
+    visual grammar, different question. Plot #1 shows the principle, this shows
+    the worst actors. Both belong in Vessel Summary because they tell the
+    interviewer two things at once -- here is how scoring works, and here is who
+    it singles out.
+    """
+    st.subheader(f"Top {top_n} vessels: base vs structural amplifier")
+    st.caption(
+        "Each bar splits a vessel's total risk into the behavioural base (left) "
+        "and the structural amplifier delta from list lookups (right). Sorted by "
+        "compounded risk total."
+    )
+    with st.expander("How to read this chart", expanded=False):
+        st.markdown(
+            """
+- One row per vessel, top to bottom = lowest to highest compounded risk
+  in the top-N slice. Sorted by `risk_score_total` descending overall.
+- **Blue segment** = `base_risk_score` summed across that vessel's events.
+- **Red segment** = the additional risk added by IUU x ICCAT x OFAC list
+  lookups (the gap between `risk_score` and `base_risk_score`).
+- **A vessel with mostly red** is on a sanctions or IUU list -- the
+  behavioural signal alone wouldn't put it on the list, but the structural
+  multiplier amplifies whatever it does to the top.
+- **A vessel with mostly blue** is a pure behavioural outlier -- it
+  earned its position from event observation alone, with little or no
+  list-based amplification.
+- The hover shows exact base and amplifier values for each row.
+            """
+        )
+    if df.empty or "base_risk_score" not in df.columns:
+        st.info("Base risk score not available in current dataset.")
+        return
+
+    g = df.groupby("mmsi").agg(
+        vessel_name=("vessel_name", lambda s: next((x for x in s.dropna() if x), "")),
+        flag=("flag", lambda s: next((x for x in s.dropna() if x), "")),
+        base_total=("base_risk_score", "sum"),
+        risk_total=("risk_score", "sum"),
+    ).reset_index()
+    g["structural_delta"] = (g["risk_total"] - g["base_total"]).clip(lower=0)
+    g = g.sort_values("risk_total", ascending=False).head(top_n)
+    if g.empty:
+        st.info("No vessels in current filter window.")
+        return
+
+    g["label"] = g.apply(
+        lambda r: f"{r['vessel_name'] or r['mmsi']} ({r['flag']})", axis=1
+    )
+    g = g.iloc[::-1]  # plotly horizontal bars draw bottom-up
+
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        y=g["label"], x=g["base_total"], name="Behavioural base",
+        orientation="h", marker_color="#4C78A8",
+        hovertemplate="<b>%{y}</b><br>Behavioural base: %{x:.1f}<extra></extra>",
+    ))
+    fig.add_trace(go.Bar(
+        y=g["label"], x=g["structural_delta"], name="Structural amplifier",
+        orientation="h", marker_color="#E45756",
+        hovertemplate="<b>%{y}</b><br>Structural amplifier: %{x:.1f}<extra></extra>",
+    ))
+    fig.update_layout(
+        barmode="stack",
+        height=max(280, 38 * len(g) + 80),
+        title=f"Top {len(g)} vessels by compounded risk score",
+        xaxis_title="Risk score",
+        legend=dict(orientation="h", yanchor="bottom", y=-0.25, xanchor="center", x=0.5),
+        margin=dict(l=20, r=20, t=50, b=20),
+    )
+    st.plotly_chart(fig, use_container_width=True)
+    st.markdown(
+        "**Read:** vessels with a long red segment owe most of their score to "
+        "structural lookups (IUU listing, ICCAT carrier authorisation, OFAC "
+        "sanctions). Vessels with little or no red segment are pure behavioural "
+        "outliers."
+    )
+
+
+def render_fishing_in_mpa_map(df, fishing_df):
+    """Scatter of GFW fishing events that fall inside an MPA.
+
+    Sized by fishing_hours, coloured by mpa_tier. Gracefully handles small-N
+    in static demo mode (5 events at last check) by showing a banner inviting
+    the user to switch to live mode for denser data.
+    """
+    st.subheader("Fishing activity inside MPAs")
+    st.caption(
+        "GFW classified-fishing events that fell inside a WDPA-listed MPA. "
+        "Display-only -- never scored into risk_score, because GFW's fishing "
+        "classifier applies globally and would otherwise penalise legitimate EU "
+        "fishing. Inside an MPA the same signal becomes the strongest publicly "
+        "available IUU indicator."
+    )
+    with st.expander("How to read this chart", expanded=False):
+        st.markdown(
+            """
+- Each dot = one GFW *fishing* event (from the
+  `public-global-fishing-events` feed) whose position fell inside a WDPA
+  MPA polygon. The fishing classification is the Kroodsma 2018 CNN
+  applied per AIS position.
+- **Dot size** = duration of the fishing event in hours.
+- **Dot colour** = MPA tier of the polygon the event fell into:
+  red GFCM FRA, orange-red EU site, orange other WDPA.
+- These events are **never** added to `risk_score`. They are shown as
+  context because GFW's fishing classifier fires on every commercial
+  fishing trip globally -- inside an MPA the same signal flips from
+  background noise into the strongest publicly available IUU indicator.
+- **Cross-reference**: vessels appearing here should match the
+  `fishing_in_mpa_count > 0` column in the Vessel Summary table.
+- In static demo mode coverage is sparse (a handful of events). Switch
+  to live GFW mode for the full picture.
+            """
+        )
+    if fishing_df is None or fishing_df.empty:
+        st.info("No GFW fishing events available in current dataset.")
+        return
+
+    in_mpa_col = "in_mpa" if "in_mpa" in fishing_df.columns else None
+    mpa_col = "mpa" if "mpa" in fishing_df.columns else (
+        "mpa_name" if "mpa_name" in fishing_df.columns else None
+    )
+    hours_col = "fishing_hours" if "fishing_hours" in fishing_df.columns else (
+        "duration_h" if "duration_h" in fishing_df.columns else None
+    )
+
+    if in_mpa_col is None:
+        st.info("`in_mpa` column not available on fishing_df.")
+        return
+
+    fim = fishing_df[fishing_df[in_mpa_col].fillna(False).astype(bool)].copy()
+    n_events = len(fim)
+    n_vessels = fim["mmsi"].nunique() if "mmsi" in fim.columns else 0
+
+    if n_events == 0:
+        st.info("No fishing-in-MPA events in current dataset.")
+        return
+
+    if n_events < 8:
+        st.warning(
+            f"Showing {n_events} fishing-in-MPA event(s) across {n_vessels} vessel(s) "
+            "from the static demo dataset. Switch to live GFW mode for denser coverage."
+        )
+
+    tier_colors = {
+        "gfcm_fra": "#8B0000",
+        "eu_site": "#E45756",
+        "general": "#F58518",
+        "": "#888888",
+    }
+    if "mpa_tier" in fim.columns:
+        fim["_tier"] = fim["mpa_tier"].fillna("").astype(str)
+    else:
+        fim["_tier"] = ""
+
+    if hours_col and hours_col in fim.columns:
+        fim["_hours"] = pd.to_numeric(fim[hours_col], errors="coerce").fillna(0.0)
+        size_col = "_hours"
+    else:
+        fim["_hours"] = 1.0
+        size_col = "_hours"
+
+    hover_cols = [c for c in ["vessel_name", "flag", mpa_col, "_hours", "date"] if c and c in fim.columns]
+
+    fig = px.scatter_map(
+        fim,
+        lat="lat", lon="lon",
+        color="_tier",
+        color_discrete_map=tier_colors,
+        size=size_col, size_max=22,
+        hover_data=hover_cols,
+        zoom=4, height=500,
+    )
+    fig.update_layout(
+        map_style="open-street-map",
+        margin=dict(l=0, r=0, t=10, b=0),
+        legend_title_text="MPA tier",
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+    if hours_col and hours_col in fim.columns:
+        total_h = float(pd.to_numeric(fim[hours_col], errors="coerce").fillna(0).sum())
+        st.markdown(
+            f"**Total fishing-in-MPA hours:** {total_h:.1f}h across "
+            f"**{n_events} events** from **{n_vessels} vessels**."
+        )
 
 
 def render_vessel_investigation(df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_landings, fishing_df=None):
