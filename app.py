@@ -651,6 +651,23 @@ with tab_watch:
     ])
 
     with sub_summary:
+        with st.expander("Tab guide", expanded=False):
+            st.markdown("""\
+**What it shows:** One row per vessel, sorted by compounded risk score (highest first). \
+The table aggregates all behavioural events per vessel and cross-references each against \
+the IUU vessel list, ICCAT authorized vessel record, and OFAC sanctions list.
+
+**Data:** GFW behavioural events (AIS gaps, encounters, loitering) scored with the risk \
+formula, then aggregated per vessel (MMSI). IUU / ICCAT / OFAC cross-reference results merged in.
+
+**Key columns:** risk_band (colour-coded), compound_multiplier (structural vs behavioural), \
+vessel_class, type_mismatch, four behavioural flags (industrial, multi-behaviour, dark port call, repeat offender).
+
+**Interactions:** Click a row to filter the map and pre-select the vessel for investigation. \
+Use the slider to control how many vessels appear.
+
+**Collapsed expanders below:** Risk band distribution -- Base vs structural-amplifier decomposition \
+-- Top vessels segmented -- Type mismatch by vessel class -- Repeat offenders -- Encounter analysis -- AIS gap behaviour.""")
         render_vessel_summary(df_filtered)
 
         with st.expander("Risk band distribution", expanded=False):
@@ -675,6 +692,21 @@ with tab_watch:
             render_gap_behaviour(df_filtered)
 
     with sub_investigation:
+        with st.expander("Tab guide", expanded=False):
+            st.markdown("""\
+**What it shows:** A per-vessel structured investigation report that walks the risk-tree framework \
+from identity through behaviour, spatial context, structural lookups, to a final threat assessment.
+
+**Data:** Scored GFW events for the selected vessel + IUU vessel list + ICCAT authorized vessels \
++ OFAC SDN list + FDI fishing effort and landings (spatial join by c-square) + fishing-in-MPA events.
+
+**Report sections:** Identity confirmation -- IUU / ICCAT / OFAC listing status -- Fisheries \
+context (FDI overlay) -- Fishing activity inside MPAs -- Behavioural pattern and flags -- Risk \
+score decomposition -- Hypotheses -- External lookup links -- Threat assessment.
+
+**Interactions:** Select a vessel from the dropdown, or click a row in Vessel Summary / a marker \
+on the map to pre-select it. The risk-tree trace at the bottom shows which branches fired \
+and at what severity (expandable by branch).""")
         render_vessel_investigation(
             df_filtered, iuu_vessels, iccat_vessels, ofac_vessels,
             fdi_effort, fdi_landings, fishing_df=fishing_df,
@@ -685,6 +717,19 @@ with tab_overview:
     sub_map, sub_fisheries = st.tabs(["Map & Overview", "Fisheries Context"])
 
     with sub_map:
+        with st.expander("Tab guide", expanded=False):
+            st.markdown("""\
+**What it shows:** Fleet-level aggregate views across all filtered vessels and events.
+
+**Data:** GFW behavioural events scored per event (the same df_filtered used across all tabs).
+
+**Key charts (always visible):** Risk heatmap (flag state vs event type, coloured by total risk) \
+-- Daily behavioural risk trend with IUU-event dates marked as dashed verticals -- Monthly event \
+counts by event type.
+
+**Collapsed expanders below:** Risk exposure by MPA tier (donut) -- Fleet composition by vessel \
+class (donut) -- Flag breakdown (bars + IUU/ICCAT/OFAC tables) -- Event type distribution \
+(pie + summary table) -- Event duration distribution (histogram + scatter).""")
         render_risk_heatmap(df_filtered)
         render_daily_trend(df_filtered)
 
@@ -704,6 +749,22 @@ with tab_overview:
             render_duration_analysis(df_filtered)
 
     with sub_fisheries:
+        with st.expander("Tab guide", expanded=False):
+            st.markdown("""\
+**What it shows:** GFW behavioural events overlaid with the EU JRC Fisheries Dependent Information \
+(FDI) baseline -- fishing effort (days) and species landings aggregated to 0.5-degree c-squares.
+
+**Data:** GFW events (spatially joined via c-square) + FDI effort (data/fdi_effort_med.csv, \
+~83K rows, 2017-2024) + FDI landings (data/fdi_landings_med.csv, ~212K rows).
+
+**Key insight:** Events that fall in low-effort c-squares are the suspicious ones -- they happen \
+in waters where legitimate fishing rarely occurs.
+
+**Sections:** FDI effort vs GFW events scatter map -- Event context table (fishing days, top \
+species, landings value) -- Seasonal patterns by Med zone -- Species context (top species by value).
+
+**Collapsed expanders below:** Fishing activity inside MPAs (scatter map) -- Geographic risk \
+breakdown (sub-zone bars, port-distance scatter).""")
         render_fisheries_context(df_filtered, fdi_effort, fdi_landings)
 
         with st.expander("Fishing activity inside MPAs", expanded=False):
@@ -713,10 +774,40 @@ with tab_overview:
             render_geographic_risk(df_filtered)
 
 with tab_reference:
+    with st.expander("Tab guide", expanded=False):
+        st.markdown("""\
+**What it shows:** The scoring framework, multiplier tables, and methodology that underpin \
+every number in the dashboard.
+
+**Data:** Constants from config.py + reference_content.yaml + risk_tree_framework.yaml. \
+No event data is used here -- this tab is pure methodology.
+
+**Contents:** Risk-tree framework diagram (interactive Graphviz) -- Scoring formula with \
+annotated terms -- End-to-end scoring pipeline diagram -- Risk band definitions -- All \
+multiplier tables (flag risk, IUU, ICCAT, OFAC, MPA) -- ICCAT framing note -- MPA calibration \
+note -- Fishing-in-MPA framing note -- Sanctions authority note -- Data source provenance -- \
+Epistemological separation -- Methodology references -- Scope and limitations.
+
+**When to use:** Point stakeholders here when they ask "where do these numbers come from?".""")
     render_reference()
     st.caption("See **Vessel Watch -> Vessel Investigation** for an applied per-vessel example.")
 
 with tab_ai:
+    with st.expander("Tab guide", expanded=False):
+        st.markdown("""\
+**What it shows:** An AI-powered analyst (Gemini 2.5 Flash) with sandboxed code execution \
+that can query, filter, aggregate, and plot the dashboard data on demand.
+
+**Data available to the analyst:** Copies of the full scored event dataframe, FDI effort and \
+landings, IUU / ICCAT / OFAC vessel lists, and fishing-in-MPA events. The model operates on \
+copies -- it cannot modify the live data or make network calls.
+
+**How to use:** Pick an example question from the dropdown or type your own. The analyst \
+generates pandas / plotly code, executes it in a sandbox, and renders the output (chart, \
+table, or metric) inline. The system prompt includes the full knowledge base, column schemas, \
+and scoring methodology so it knows what every column means.
+
+**Requires:** A Gemini API key (entered in the sidebar or via .streamlit/secrets.toml).""")
     render_ai_analyst(
         df_filtered, fdi_effort, fdi_landings, knowledge_base, "",
         iuu_vessels, iccat_vessels, ofac_vessels, fishing_df=fishing_df,
