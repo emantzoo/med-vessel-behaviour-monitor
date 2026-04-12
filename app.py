@@ -634,20 +634,18 @@ if not df_filtered.empty and "iuu_matched" in df_filtered.columns:
             )
 
 # ========================= TABS =========================
-# Four top-level tabs ordered drill -> zoom out -> explain -> ask.
-# Vessel Watch groups Vessel Summary + Vessel Investigation (drill flow).
-# Fleet Overview groups Map & Overview + Fisheries Context (aggregate
-# fleet views). The remaining two are generic / interactive.
-tab_watch, tab_overview, tab_reference, tab_ai = st.tabs([
-    "Vessel Watch",
+# Four top-level tabs: Fleet Overview (all fleet-level views),
+# Vessel Investigation (per-vessel drill-down), Reference, AI Analyst.
+tab_overview, tab_investigation, tab_reference, tab_ai = st.tabs([
     "Fleet Overview",
+    "Vessel Investigation",
     "Reference & Methodology",
     "AI Analyst",
 ])
 
-with tab_watch:
-    sub_summary, sub_investigation = st.tabs([
-        "Vessel Summary", "Vessel Investigation",
+with tab_overview:
+    sub_summary, sub_map, sub_fisheries = st.tabs([
+        "Vessel Summary", "Map & Overview", "Fisheries Context",
     ])
 
     with sub_summary:
@@ -663,8 +661,8 @@ formula, then aggregated per vessel (MMSI). IUU / ICCAT / OFAC cross-reference r
 **Key columns:** risk_band (colour-coded), compound_multiplier (structural vs behavioural), \
 vessel_class, type_mismatch, four behavioural flags (industrial, multi-behaviour, dark port call, repeat offender).
 
-**Interactions:** Click a row to filter the map and pre-select the vessel for investigation. \
-Use the slider to control how many vessels appear.
+**Interactions:** Use the slider to control how many vessels appear. Use pill filters to narrow by \
+event type, risk band, flag state, or vessel class. Switch to **Vessel Investigation** tab for per-vessel drill-down.
 
 **Collapsed expanders below:** Risk band distribution -- Base vs structural-amplifier decomposition \
 -- Top vessels segmented -- Type mismatch by vessel class -- Repeat offenders -- Encounter analysis -- AIS gap behaviour.""")
@@ -738,31 +736,6 @@ Use the slider to control how many vessels appear.
         with st.expander("AIS gap behaviour"):
             render_gap_behaviour(df_tab)
 
-    with sub_investigation:
-        with st.expander("Tab guide", expanded=False):
-            st.markdown("""\
-**What it shows:** A per-vessel structured investigation report that walks the risk-tree framework \
-from identity through behaviour, spatial context, structural lookups, to a final threat assessment.
-
-**Data:** Scored GFW events for the selected vessel + IUU vessel list + ICCAT authorized vessels \
-+ OFAC SDN list + FDI fishing effort and landings (spatial join by c-square) + fishing-in-MPA events.
-
-**Report sections:** Identity confirmation -- IUU / ICCAT / OFAC listing status -- Fisheries \
-context (FDI overlay) -- Fishing activity inside MPAs -- Behavioural pattern and flags -- Risk \
-score decomposition -- Hypotheses -- External lookup links -- Threat assessment.
-
-**Interactions:** Select a vessel from the dropdown, or click a row in Vessel Summary / a marker \
-on the map to pre-select it. The risk-tree trace at the bottom shows which branches fired \
-and at what severity (expandable by branch).""")
-        render_vessel_investigation(
-            df_filtered, iuu_vessels, iccat_vessels, ofac_vessels,
-            fdi_effort, fdi_landings, fishing_df=fishing_df,
-        )
-        st.caption("See **Reference & Methodology** tab for the generic framework and multiplier tables.")
-
-with tab_overview:
-    sub_map, sub_fisheries = st.tabs(["Map & Overview", "Fisheries Context"])
-
     with sub_map:
         with st.expander("Tab guide", expanded=False):
             st.markdown("""\
@@ -820,6 +793,28 @@ breakdown (sub-zone bars, port-distance scatter).""")
         with st.expander("Geographic risk breakdown"):
             render_geographic_risk(df_filtered)
 
+with tab_investigation:
+    with st.expander("Tab guide", expanded=False):
+        st.markdown("""\
+**What it shows:** A per-vessel structured investigation report that walks the risk-tree framework \
+from identity through behaviour, spatial context, structural lookups, to a final threat assessment.
+
+**Data:** Scored GFW events for the selected vessel + IUU vessel list + ICCAT authorized vessels \
++ OFAC SDN list + FDI fishing effort and landings (spatial join by c-square) + fishing-in-MPA events.
+
+**Report sections:** Identity confirmation -- IUU / ICCAT / OFAC listing status -- Fisheries \
+context (FDI overlay) -- Fishing activity inside MPAs -- Behavioural pattern and flags -- Risk \
+score decomposition -- Hypotheses -- External lookup links -- Threat assessment.
+
+**Interactions:** Select a vessel from the dropdown or the quick-select table, or click a marker \
+on the map to pre-select it. The risk-tree trace at the bottom shows which branches fired \
+and at what severity (expandable by branch).""")
+    render_vessel_investigation(
+        df_filtered, iuu_vessels, iccat_vessels, ofac_vessels,
+        fdi_effort, fdi_landings, fishing_df=fishing_df,
+    )
+    st.caption("See **Reference & Methodology** tab for the generic framework and multiplier tables.")
+
 with tab_reference:
     with st.expander("Tab guide", expanded=False):
         st.markdown("""\
@@ -837,7 +832,7 @@ Epistemological separation -- Methodology references -- Scope and limitations.
 
 **When to use:** Point stakeholders here when they ask "where do these numbers come from?".""")
     render_reference()
-    st.caption("See **Vessel Watch -> Vessel Investigation** for an applied per-vessel example.")
+    st.caption("See **Vessel Investigation** tab for an applied per-vessel example.")
 
 with tab_ai:
     with st.expander("Tab guide", expanded=False):

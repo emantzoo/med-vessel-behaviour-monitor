@@ -823,56 +823,7 @@ metadata in live mode and from the static profile in demo mode.
         if v in RISK_BAND_COLORS else "",
         subset=["risk_band"],
     )
-    # Two-way selection sync: table row click → map filter (via
-    # map_clicked_vessel), and map marker click → table row highlight.
-    # Streamlit 1.56+ allows programmatic pre-selection by writing to
-    # st.session_state[key] before rendering. For older versions the
-    # table still works for user clicks but won't auto-highlight on
-    # map click.
-    st.caption(
-        "Click a row to pre-select that vessel in the **Vessel Investigation** subtab "
-        "and filter the map above."
-    )
-    table_key = "vessel_summary_table"
-    # Highlight the row matching the map-clicked vessel with a light
-    # blue background so the user can spot it immediately. Programmatic
-    # checkbox selection is not supported by st.dataframe, so visual
-    # highlighting is the best we can do for map → table sync.
-    map_vessel = st.session_state.get("map_clicked_vessel")
-    if map_vessel:
-        def _highlight_vessel(row):
-            if row["vessel_name"] == map_vessel:
-                return ["background-color: #e0f0ff"] * len(row)
-            return [""] * len(row)
-        styled = styled.apply(_highlight_vessel, axis=1)
-    selection = st.dataframe(
-        styled,
-        use_container_width=True,
-        on_select="rerun",
-        selection_mode="single-row",
-        key=table_key,
-    )
-    selected_rows = (selection.selection.rows
-                     if selection is not None and hasattr(selection, "selection")
-                     else [])
-    if selected_rows:
-        picked_idx = selected_rows[0]
-        if 0 <= picked_idx < len(vessel_df):
-            picked_name = vessel_df.iloc[picked_idx]["vessel_name"]
-            if picked_name:
-                # Trigger a rerun if the selection has actually changed,
-                # so the map (rendered ABOVE this tab) can pick up the new
-                # vessel on the next pass. Without the rerun the map only
-                # updates after a second user interaction.
-                prev = st.session_state.get("map_clicked_vessel")
-                st.session_state["map_clicked_vessel"] = picked_name
-                st.success(
-                    f"Pre-selected **{picked_name}** for the Vessel Investigation subtab. "
-                    "Switch to that subtab to see the full report. The map above "
-                    "is now filtered to this vessel's events."
-                )
-                if prev != picked_name:
-                    st.rerun()
+    st.dataframe(styled, use_container_width=True)
 
     # Band summary under the table
     band_order = ["Critical", "Severe", "Elevated", "Emerging", "Low"]
@@ -1675,15 +1626,12 @@ def render_vessel_investigation(df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_l
     # The user can always override the map click by picking a different
     # vessel from the dropdown afterwards.
     map_clicked = st.session_state.get("map_clicked_vessel")
-    if map_clicked and map_clicked in vessel_options:
-        # Seed the selectbox key so it opens on the clicked vessel, then
-        # clear the click sentinel so it doesn't keep overriding manual picks.
+    current_inv = st.session_state.get("investigation_vessel")
+    if map_clicked and map_clicked in vessel_options and map_clicked != current_inv:
+        # Seed the selectbox key so it opens on the map-clicked vessel.
+        # Keep map_clicked_vessel in session state so the map (rendered
+        # above the tabs) stays filtered to this vessel.
         st.session_state["investigation_vessel"] = map_clicked
-        st.session_state.pop("map_clicked_vessel", None)
-        st.caption(
-            f"Pre-selected **{map_clicked}** from your last map click. "
-            "Pick any vessel from the dropdown to override."
-        )
     elif "investigation_vessel" not in st.session_state:
         st.session_state["investigation_vessel"] = vessel_options[0]
 
@@ -1691,10 +1639,65 @@ def render_vessel_investigation(df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_l
         "Select vessel to investigate",
         options=vessel_options,
         help="Vessels are ordered by total risk score (highest first). "
-             "Click a marker on the Fleet Overview -> Map & Overview subtab "
-             "or a row in the Vessel Summary subtab to pre-select a vessel here.",
+             "Click a marker on the map or use the quick-select table below "
+             "to pick a vessel.",
         key="investigation_vessel",
     )
+    # --- Compact vessel summary table (click a row to switch) ---
+    with st.expander("Vessel quick-select table", expanded=False):
+        _grouped = df.dropna(subset=["vessel_name"]).groupby("vessel_name")
+        _compact_rows = []
+        for _vn, _vg in _grouped:
+            _risk = float(_vg["risk_score"].sum())
+            _compact_rows.append({
+                "vessel_name": _vn,
+                "flag": _vg["flag"].dropna().iloc[0] if _vg["flag"].notna().any() else "",
+                "events": len(_vg),
+                "risk_score": round(_risk, 1),
+                "risk_band": classify_risk_band(_risk),
+                "iuu": bool(_vg["iuu_matched"].any()) if "iuu_matched" in _vg.columns else False,
+                "ofac": bool(_vg["ofac_sanctioned"].any()) if "ofac_sanctioned" in _vg.columns else False,
+            })
+        _compact_df = (
+            pd.DataFrame(_compact_rows)
+            .sort_values("risk_score", ascending=False)
+            .reset_index(drop=True)
+        )
+        _compact_styled = _compact_df.style.format({"risk_score": "{:.1f}"}).map(
+            lambda v: f"background-color: {RISK_BAND_COLORS.get(v, '')}; color: white"
+            if v in RISK_BAND_COLORS else "",
+            subset=["risk_band"],
+        )
+        # Highlight currently selected vessel
+        if selected:
+            def _hl_inv(row):
+                if row["vessel_name"] == selected:
+                    return ["background-color: #e0f0ff"] * len(row)
+                return [""] * len(row)
+            _compact_styled = _compact_styled.apply(_hl_inv, axis=1)
+
+        _inv_sel = st.dataframe(
+            _compact_styled,
+            use_container_width=True,
+            on_select="rerun",
+            selection_mode="single-row",
+            key="investigation_quick_table",
+        )
+        _sel_rows = (
+            _inv_sel.selection.rows
+            if _inv_sel is not None and hasattr(_inv_sel, "selection")
+            else []
+        )
+        if _sel_rows:
+            _picked = _compact_df.iloc[_sel_rows[0]]["vessel_name"]
+            if _picked and _picked != selected:
+                # Write to map_clicked_vessel only — the selectbox key
+                # cannot be modified after the widget is instantiated.
+                # On rerun the map_clicked logic at the top of this
+                # function will seed investigation_vessel BEFORE the
+                # selectbox renders.
+                st.session_state["map_clicked_vessel"] = _picked
+                st.rerun()
 
     report = investigate_vessel(selected, df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_landings, fishing_df=fishing_df)
 

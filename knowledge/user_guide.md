@@ -6,14 +6,13 @@ A short field guide to the four-tab UI, what each chart shows, and how to read i
 
 ## The four top-level tabs
 
-The app collapses what used to be six flat tabs into four, ordered **drill → zoom out → explain → ask**:
+The app uses four top-level tabs, ordered **fleet → drill → explain → ask**:
 
-1. **Vessel Watch** — drill: pick a vessel and read its full report
-   - Subtab *Vessel Summary*: ranked table + fleet-level plots
-   - Subtab *Vessel Investigation*: per-vessel structured report with coloured risk-tree path
-2. **Fleet Overview** — zoom out: aggregate fleet views
+1. **Fleet Overview** — fleet-level aggregate views
+   - Subtab *Vessel Summary*: ranked vessel table with pill filters + fleet-level plots
    - Subtab *Map & Overview*: heatmaps, daily trends, MPA tier exposure
    - Subtab *Fisheries Context*: FDI overlay, fishing-in-MPA scatter
+2. **Vessel Investigation** — per-vessel structured report with coloured risk-tree path and quick-select table
 3. **Reference & Methodology** — explain: scoring framework, multiplier tables, methodology diagram
 4. **AI Analyst** — ask: Gemini 2.5 Flash sandboxed code interface
 
@@ -21,7 +20,7 @@ The Map and the OFAC/IUU alert boxes sit *above* the tabs because they are the h
 
 ---
 
-## Vessel Watch → Vessel Summary
+## Fleet Overview → Vessel Summary
 
 The single most important table in the app. One row per vessel, sorted by compounded `risk_score_total` descending.
 
@@ -34,7 +33,7 @@ The single most important table in the app. One row per vessel, sorted by compou
 - **MPA intersection + tier** — sourced from GFW's `regions.mpa` field (WDPA point-in-polygon, server-side). Unlike the four flags, MPA tier *is* multiplied into the base score.
 - **Fishing-in-MPA events / hours** — pre-joined from a separate GFW fishing-events query. Display-only.
 
-**Click a row** to (a) pre-select that vessel for the Vessel Investigation subtab, and (b) filter the main map (above the tabs) to only that vessel's events. The map auto-zooms to fit the vessel's track. Use the *Clear map filter* button to return to the full fleet view. Fleet-level tabs below are unaffected — they always show the full filtered fleet.
+**Pill filters** at the top of this subtab let you narrow by event type, risk band, flag state, or vessel class. All expander charts below cascade from the filtered data. Switch to the **Vessel Investigation** tab for per-vessel drill-down.
 
 ### Plots in the Vessel Summary expanders
 
@@ -49,14 +48,6 @@ The single most important table in the app. One row per vessel, sorted by compou
 | AIS gap behaviour | Distribution + geographic scatter of GAP events | "Who's going dark?" |
 
 Every plot has a **"How to read this chart"** expander immediately above it that explains exactly what the axes mean and what to look for.
-
----
-
-## Vessel Watch → Vessel Investigation
-
-Per-vessel structured report. Either picked from the dropdown, pre-selected by clicking a row in the Vessel Summary table, or pre-selected by clicking a marker on the map (all three write to the same `map_clicked_vessel` session-state key).
-
-The report walks the **risk tree framework**: identity → behaviour → spatial context → structural lookups → final band. The path the vessel actually traversed is highlighted in colour.
 
 ---
 

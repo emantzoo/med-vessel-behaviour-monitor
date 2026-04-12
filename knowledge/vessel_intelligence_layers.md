@@ -204,13 +204,13 @@ Seven plots in the UI surface the vessel intelligence layers visually. They live
 
 | # | Plot | Tab location | Purpose | Reads from |
 |---|---|---|---|---|
-| 1 | **Base vs structural-amplifier decomposition** | Vessel Watch → Vessel Summary | Fleet-wide methodology illustration. One stacked horizontal bar showing the base contribution and the structural amplifier delta. | `df["base_risk_score"]`, `df["risk_score"]` |
-| 2 | **Risk band distribution** | Vessel Watch → Vessel Summary | Vessel count per Kpler *Turning Tides* band. The single chart that lands fastest because it uses the recognised vocabulary verbatim. | `df.groupby("mmsi")["risk_score"].sum()` then `classify_risk_band()` |
-| 3 | **Top vessels: base vs structural amplifier** | Vessel Watch → Vessel Summary | Vessel-centric counterpart to plot #1. Top-10 horizontal bars segmented into base + structural delta. Answers "who is worst?" while #1 answers "how does scoring work?". | `df.groupby("mmsi")` of `base_risk_score` and `risk_score` |
+| 1 | **Base vs structural-amplifier decomposition** | Fleet Overview → Vessel Summary | Fleet-wide methodology illustration. One stacked horizontal bar showing the base contribution and the structural amplifier delta. | `df["base_risk_score"]`, `df["risk_score"]` |
+| 2 | **Risk band distribution** | Fleet Overview → Vessel Summary | Vessel count per Kpler *Turning Tides* band. The single chart that lands fastest because it uses the recognised vocabulary verbatim. | `df.groupby("mmsi")["risk_score"].sum()` then `classify_risk_band()` |
+| 3 | **Top vessels: base vs structural amplifier** | Fleet Overview → Vessel Summary | Vessel-centric counterpart to plot #1. Top-10 horizontal bars segmented into base + structural delta. Answers "who is worst?" while #1 answers "how does scoring work?". | `df.groupby("mmsi")` of `base_risk_score` and `risk_score` |
 | 4 | **Risk exposure by MPA tier** | Fleet Overview → Map & Overview | Donut split of total risk by `mpa_tier`. Quantifies the spatial-regulatory layer in one glance. | `df.groupby("mpa_tier")["risk_score"].sum()` |
 | 5 | **Fishing activity inside MPAs** | Fleet Overview → Fisheries Context | Scatter map of `fishing_df[in_mpa==True]` sized by `fishing_hours`, coloured by `mpa_tier`. Display-only context. Gracefully handles small-N in static demo mode by warning the user. | `fishing_df[fishing_df["in_mpa"]]` |
 | 6 | **Fleet composition by vessel class** | Fleet Overview → Map & Overview | Donut of unique vessels per `vessel_class`. Answers "what kind of fleet are we monitoring?" by descriptive category, orthogonal to the size-based `is_industrial` flag. | `df.drop_duplicates("mmsi")["vessel_class"]` |
-| 7 | **Type mismatch by vessel class** | Vessel Watch → Vessel Summary | Horizontal bar of `vessel_type_mismatch` counts grouped by `vessel_class`, plus a detail table of mismatched vessels showing the specific event-level vs registry-level disagreement. The textbook "irregular vessel information" view from Kpler's Grey Fleet paper. | `df[df["vessel_type_mismatch"]]` grouped by `vessel_class` |
+| 7 | **Type mismatch by vessel class** | Fleet Overview → Vessel Summary | Horizontal bar of `vessel_type_mismatch` counts grouped by `vessel_class`, plus a detail table of mismatched vessels showing the specific event-level vs registry-level disagreement. The textbook "irregular vessel information" view from Kpler's Grey Fleet paper. | `df[df["vessel_type_mismatch"]]` grouped by `vessel_class` |
 
 **Two design rules these plots follow:**
 

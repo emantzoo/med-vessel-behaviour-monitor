@@ -16,13 +16,12 @@ They do NOT care about: academic fisheries science, R packages, MCDA methodology
 
 The app is organised into four top-level tabs (with subtabs grouping related views) sized for a 30-minute demo:
 
-1. **Vessel Watch** — two subtabs that share a single drill flow:
-   - *Vessel Summary* — vessel-level aggregation table with risk bands and compounding multipliers, the four Kpler-aligned flags (industrial profile, multi-behaviour, dark port call candidate, repeat offender), the two vessel-identity columns (`vessel_class` descriptive label + `vessel_type_mismatch` Grey Fleet "irregular vessel information" flag), and a sortable length / GT profile column. Primary Kpler-vocabulary view. Secondary views (type mismatch by class, repeat offenders, encounter analysis / carrier alerts, AIS gap behaviour) in collapsed expanders.
-   - *Vessel Investigation* — three-layer view: framework methodology, structured narrative, per-vessel coloured risk tree. The AQUARIS-style deep dive.
-
-2. **Fleet Overview** — two subtabs covering aggregate fleet views:
-   - *Map & Overview* — Folium map, risk heatmap, daily and monthly trend. Secondary charts (flag breakdown, event types pie, duration distribution) in collapsed expanders.
+1. **Fleet Overview** — three subtabs covering all fleet-level views:
+   - *Vessel Summary* — vessel-level aggregation table with pill filters, risk bands and compounding multipliers, the four Kpler-aligned flags (industrial profile, multi-behaviour, dark port call candidate, repeat offender), the two vessel-identity columns (`vessel_class` descriptive label + `vessel_type_mismatch` Grey Fleet "irregular vessel information" flag), and a sortable length / GT profile column. Primary Kpler-vocabulary view. Secondary views (type mismatch by class, repeat offenders, encounter analysis / carrier alerts, AIS gap behaviour) in collapsed expanders.
+   - *Map & Overview* — risk heatmap, daily and monthly trend. Secondary charts (flag breakdown, event types pie, duration distribution) in collapsed expanders.
    - *Fisheries Context* — FDI overlay, c-square context, species landings. Geographic risk breakdown in an expander.
+
+2. **Vessel Investigation** — three-layer view: framework methodology, structured narrative, per-vessel coloured risk tree. Quick-select table for vessel switching. The AQUARIS-style deep dive.
 
 3. **Reference & Methodology** — risk tree diagram from `risk_tree_framework.yaml`, end-to-end scoring pipeline, risk-band table, and per-multiplier tables. Direct conceptual link to Kpler's April 2026 shadow fleet risk tree blog post.
 
@@ -32,11 +31,11 @@ Related views are grouped one level down via subtabs, and secondary diagnostic c
 
 ## Suggested demo walkthrough (30 minutes)
 
-1. **Fleet Overview -> Map & Overview** — open on the Folium map. The visual hook. Show monthly event-type trend as a direct analogue to Kpler's Graph 4 in the *Turning Tides* whitepaper.
+1. **Fleet Overview -> Map & Overview** — open on the risk heatmap and daily trend. The visual hook. Show monthly event-type trend as a direct analogue to Kpler's Graph 4 in the *Turning Tides* whitepaper.
 
-2. **Vessel Watch -> Vessel Summary** — the Kpler-vocabulary moment. Point out risk bands (Low / Emerging / Elevated / Severe / Critical >=100), the base vs compounded score decomposition, the four Kpler-aligned flags (one structural + three temporal/compound), the vessel_class descriptor + vessel_type_mismatch identity flag (the open-data Grey Fleet "irregular vessel information" indicator -- KOOSHA 4 demos the obvious case, LEONARDO PADRE the subtle case), and the worst actors ranked by total risk.
+2. **Fleet Overview -> Vessel Summary** — the Kpler-vocabulary moment. Point out risk bands (Low / Emerging / Elevated / Severe / Critical >=100), the base vs compounded score decomposition, the four Kpler-aligned flags (one structural + three temporal/compound), the vessel_class descriptor + vessel_type_mismatch identity flag (the open-data Grey Fleet "irregular vessel information" indicator -- KOOSHA 4 demos the obvious case, LEONARDO PADRE the subtle case), and the worst actors ranked by total risk. Use pill filters to narrow the view.
 
-3. **Vessel Watch -> Vessel Investigation** — drill into one high-risk vessel. Walk through the three-layer view. This is the AQUARIS-style narrative in fisheries.
+3. **Vessel Investigation** — drill into one high-risk vessel. Walk through the three-layer view. This is the AQUARIS-style narrative in fisheries.
 
 4. **Reference & Methodology** — step back to the framework. Name the direct link to Kpler's April 2026 shadow fleet risk tree blog post.
 
@@ -329,7 +328,7 @@ investigation.py    → Deterministic vessel investigation (rule-based, no LLM):
                       - Reads all 5 dataframes, applies rule-based logic
                       - Returns structured dict for UI rendering
                       - No API calls, no LLM, instant results
-                      - Used by Vessel Watch -> Vessel Investigation subtab
+                      - Used by the Vessel Investigation top-level tab
                         as a reliable fallback to the LLM-based AI analyst
 
 risk_tree.py        → Med IUU Risk Tree framework rendering:
@@ -352,19 +351,18 @@ tabs.py             → Render functions invoked from the 4 top-level tabs,
                       are preserved even when moved into subtabs/expanders.
 
                       Top-level tabs (defined in app.py):
-                      1. Vessel Watch — drill flow with two subtabs:
+                      1. Fleet Overview — three subtabs:
                          - Vessel Summary: vessel-level aggregation with
-                           risk bands and the four Kpler-aligned flags;
+                           pill filters, risk bands and Kpler-aligned flags;
                            repeat offenders / encounter analysis / gap
                            behaviour in expanders
-                         - Vessel Investigation: per-vessel structured
-                           report + coloured risk tree
-                      2. Fleet Overview — aggregate views with two subtabs:
                          - Map & Overview: risk heatmap + daily/monthly
                            trends; flag breakdown, event types, duration
                            distribution in expanders
                          - Fisheries Context: FDI overlay; geographic
                            risk breakdown in expander
+                      2. Vessel Investigation: per-vessel structured
+                           report + coloured risk tree + quick-select table
                       3. Reference & Methodology — risk tree diagram,
                          scoring pipeline, multiplier tables
                       4. AI Analyst — Gemini 2.5 Flash sandboxed interface

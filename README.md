@@ -25,7 +25,7 @@ Live app: [med-vessel-behaviour-monitor.streamlit.app](https://med-vessel-behavi
 - Classifies final scores into Kpler-aligned risk bands: Low, Emerging, Elevated, Severe, Critical
 - Aggregates events to vessel level with base vs compounded score decomposition
 - Computes four display-only Kpler-aligned vessel-level flags: industrial profile (>=24m or >=100 GT, the only structural flag of the four), multi-behaviour compound indicator, dark port call candidate (loitering within 10 km of shore), and repeat-offender-within-90-days (exposure drift)
-- Visualises results across four top-level tabs (Vessel Watch, Fleet Overview, Reference & Methodology, AI Analyst) with related views grouped into subtabs and secondary diagnostics in expanders
+- Visualises results across four top-level tabs (Fleet Overview, Vessel Investigation, Reference & Methodology, AI Analyst) with related views grouped into subtabs and secondary diagnostics in expanders
 
 ---
 
@@ -120,12 +120,11 @@ Eight-module Streamlit application:
 
 Four top-level tabs, organised for a tight 30-minute demo (tab order as rendered in `app.py`):
 
-1. **Vessel Watch** -- two subtabs that share a single drill flow:
-   - *Vessel Summary* -- vessel-level aggregation table with risk bands, base vs compounded score decomposition, and the four display-only Kpler-aligned flags (industrial profile, multi-behaviour, dark port call candidate, repeat offender) plus a sortable length / GT profile column. Click a row to pre-select that vessel in the Investigation subtab. Secondary views (repeat offenders, encounter/carrier alerts, AIS gap behaviour) in collapsed expanders.
-   - *Vessel Investigation* -- three-layer deep dive for the selected vessel: structured narrative from `investigation.py`, per-branch expander cards over the risk tree trace, an interactive Plotly icicle (click a branch to drill in), the full Graphviz framework diagram in a collapsed expander, and a dedicated Behavioural Flags step (industrial, multi-behaviour, dark port call candidate, repeat offender).
-2. **Fleet Overview** -- two subtabs covering aggregate fleet views:
-   - *Map & Overview* -- Folium map (dashed amber overlay for dark port call candidates), risk heatmap, daily and monthly event-type trend, and sidebar tiles for the four Kpler-aligned vessel-level flags. Secondary charts (flag breakdown, event types, duration distribution) in collapsed expanders.
+1. **Fleet Overview** -- three subtabs covering all fleet-level views:
+   - *Vessel Summary* -- vessel-level aggregation table with pill filters (event type, risk band, flag state, vessel class), risk bands, base vs compounded score decomposition, and the four display-only Kpler-aligned flags (industrial profile, multi-behaviour, dark port call candidate, repeat offender) plus a sortable length / GT profile column. Secondary views (repeat offenders, encounter/carrier alerts, AIS gap behaviour) in collapsed expanders that cascade from pill filters.
+   - *Map & Overview* -- risk heatmap, daily and monthly event-type trend. Secondary charts (flag breakdown, event types, duration distribution) in collapsed expanders.
    - *Fisheries Context* -- FDI overlay, c-square context, species landings. Geographic risk breakdown in an expander.
+2. **Vessel Investigation** -- three-layer deep dive for the selected vessel: structured narrative from `investigation.py`, per-branch expander cards over the risk tree trace, an interactive Plotly icicle (click a branch to drill in), the full Graphviz framework diagram in a collapsed expander, and a dedicated Behavioural Flags step. Quick-select table for vessel switching.
 3. **Reference & Methodology** -- generic framework documentation: risk tree diagram from `data/risk_tree_framework.yaml`, risk formula, **end-to-end scoring pipeline diagram** (one AIS event to vessel-level risk band, with a dashed side-chain showing the four display-only Kpler-aligned flags), risk-band table, and per-multiplier tables (flag, IUU, ICCAT, OFAC).
 4. **AI Analyst** -- Google Gemini 2.5 Flash interface with RAG knowledge base and sandboxed pandas/plotly code execution.
 
