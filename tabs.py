@@ -2145,7 +2145,7 @@ def render_vessel_investigation(df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_l
                     pathbar=dict(textfont=dict(size=16)),
                 ))
                 fig_icicle.update_layout(
-                    height=620,
+                    height=750,
                     margin=dict(l=0, r=0, t=40, b=0),
                     uniformtext=dict(minsize=14, mode="hide"),
                     title=dict(
