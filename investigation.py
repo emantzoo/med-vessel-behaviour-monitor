@@ -51,6 +51,9 @@ def investigate_vessel(vessel_identifier, df, iuu_df, iccat_df, ofac_df, fdi_eff
         "imo": imo_val,
         "flag": flag,
         "vessel_type": primary.get("vessel_type", ""),
+        "shiptypes": primary.get("shiptypes", ""),
+        "vessel_class": primary.get("vessel_class", ""),
+        "vessel_type_mismatch": bool(primary.get("vessel_type_mismatch", False)),
         "events_in_dataset": len(vessel_events),
         "date_range": (vessel_events["date"].min(), vessel_events["date"].max()),
     }
@@ -74,6 +77,30 @@ def investigate_vessel(vessel_identifier, df, iuu_df, iccat_df, ofac_df, fdi_eff
         "branch_id": "identity", "question_id": "name_history",
         "answer": "unknown", "severity": "none", "rule_fired": False,
         "note": "Name change history requires historical data (not available in current dataset)",
+    })
+
+    # Identity misrepresentation: vessel_type (event-level) vs shiptypes
+    # (registry) class disagreement. Class-level comparison so spelling
+    # variants ("TRAWLER" vs "FISHING") do not trigger the flag.
+    type_mismatch = bool(primary.get("vessel_type_mismatch", False))
+    if type_mismatch:
+        evt_type = str(primary.get("vessel_type", "")).strip() or "(empty)"
+        reg_type = str(primary.get("shiptypes", "")).strip() or "(empty)"
+        vc = str(primary.get("vessel_class", "")).strip() or "(unknown)"
+        mis_note = (
+            f"Event-level vessel_type ({evt_type}) and registry shiptypes "
+            f"({reg_type}) map to different canonical classes "
+            f"(registry says: {vc}). Irregular vessel information signal "
+            f"-- Kpler Grey Fleet equivalent."
+        )
+    else:
+        mis_note = "vessel_type and shiptypes agree (or one is missing)"
+    trace.append({
+        "branch_id": "identity", "question_id": "identity_misrepresentation",
+        "answer": "yes" if type_mismatch else "no",
+        "severity": "medium" if type_mismatch else "none",
+        "rule_fired": type_mismatch,
+        "note": mis_note,
     })
 
     # ===== Step 2: IUU =====

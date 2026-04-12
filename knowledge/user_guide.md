@@ -30,6 +30,7 @@ The single most important table in the app. One row per vessel, sorted by compou
 - **Risk band** — the Kpler *Turning Tides* classification: Low (<50), Emerging (50–60), Elevated (60–80), Severe (80–100), Critical (≥100). Cell background colour matches the map markers.
 - **Compound multiplier** — `risk_score_total / base_score_total`. A value of 1.0x means the vessel's risk is purely behavioural; values above 2x mean structural lookups (IUU, ICCAT, OFAC) dominate.
 - **Four behavioural flags** (Industrial / Multi-behaviour / Dark port call / Repeat offender) — display-only, never multiplied into the score. See the "How to read this table" expander for definitions.
+- **Two vessel-identity columns** (Vessel class / Type mismatch) — `vessel_class` is a descriptive category (industrial_fishing / artisanal_fishing / carrier / tanker / cargo / support / passenger / other) derived from the GFW Vessels API `shiptypes` field. `type_mismatch` fires when the event-level `vessel_type` and the registry `shiptypes` map to **different** canonical classes — the open-data equivalent of Kpler's "irregular vessel information" Grey Fleet indicator. Both display-only, never scored.
 - **MPA intersection + tier** — sourced from GFW's `regions.mpa` field (WDPA point-in-polygon, server-side). Unlike the four flags, MPA tier *is* multiplied into the base score.
 - **Fishing-in-MPA events / hours** — pre-joined from a separate GFW fishing-events query. Display-only.
 
@@ -42,6 +43,7 @@ The single most important table in the app. One row per vessel, sorted by compou
 | Risk band distribution | Bar chart of vessel count per band, coloured by band | "What's the shape of the fleet?" |
 | Base vs structural-amplifier decomposition | Stacked horizontal bar (fleet total) split into behavioural base and structural amplifier delta | "How does the scoring methodology work, on this data?" |
 | Top vessels: base vs structural amplifier | Top-10 horizontal bars, each split base + amplifier | "Who are the worst actors and why?" |
+| Type mismatch by vessel class | Horizontal bar of `vessel_type_mismatch` counts grouped by `vessel_class` + table of mismatched vessels | "Whose AIS identity disagrees with their registry?" (Kpler Grey Fleet "irregular vessel information") |
 | Repeat offenders | Bar of vessels with ≥2 events + timeline of top-3 | "Who keeps coming back?" |
 | Encounter analysis | Scatter of encounter distance vs duration + carrier alert | "Who's transshipping with whom?" |
 | AIS gap behaviour | Distribution + geographic scatter of GAP events | "Who's going dark?" |
@@ -70,6 +72,7 @@ Aggregate fleet view. The two main charts at the top are:
 | Expander | Chart |
 |---|---|
 | Risk exposure by MPA tier | Donut of total risk split by GFCM-FRA / EU-site / Other WDPA / Outside MPA |
+| Fleet composition by vessel class | Donut of unique vessels per `vessel_class` (industrial_fishing / artisanal_fishing / carrier / tanker / cargo / support / passenger / other). Descriptive — orthogonal to the size-based `is_industrial` flag. |
 | Flag breakdown | Horizontal bar of risk per flag + stacked variant + IUU/ICCAT/OFAC summary tables |
 | Event type distribution | Pie of risk share + summary table + event-level band distribution |
 | Event duration distribution | Histogram of durations + duration vs risk scatter |
@@ -135,4 +138,6 @@ Gemini 2.5 Flash with a sandboxed code-execution environment. The system prompt 
 
 2. **The four behavioural flags are display-only.** `is_industrial`, `multi_behaviour_flag`, `dark_port_call_candidate`, and `repeat_offender_90d` are parallel indicators, not score amplifiers. They show up in the Vessel Summary table and fire rules in the risk tree, but they are never multiplied into `risk_score` because the underlying signals are already captured at the event level (flag risk, MPA tier, shore distance, event weight).
 
-Both rules exist to avoid double-counting and to keep the score interpretable as `behavioural_observation × structural_lookup`.
+3. **The two vessel-identity columns are also display-only.** `vessel_class` (descriptive label) and `vessel_type_mismatch` (event-level vs registry-level disagreement) are derived from the GFW Vessels API `shiptypes` field. `vessel_type_mismatch` fires the `identity_misrepresentation` leaf in the risk tree at medium severity, but it is never multiplied into `risk_score`. It is the Kpler Grey Fleet "irregular vessel information" indicator on open data.
+
+All three rules exist to avoid double-counting and to keep the score interpretable as `behavioural_observation × structural_lookup`.

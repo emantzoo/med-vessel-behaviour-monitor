@@ -28,6 +28,7 @@ from tabs import (
     render_base_vs_compound_decomposition, render_risk_band_distribution,
     render_mpa_tier_exposure, render_top_vessels_segmented,
     render_fishing_in_mpa_map,
+    render_vessel_class_composition, render_type_mismatch_by_class,
 )
 from ai_analyst import render_ai_analyst
 
@@ -631,6 +632,9 @@ with tab_watch:
         with st.expander("Top vessels: base vs structural amplifier", expanded=False):
             render_top_vessels_segmented(df_filtered, top_n=10)
 
+        with st.expander("Type mismatch by vessel class", expanded=False):
+            render_type_mismatch_by_class(df_filtered)
+
         with st.expander("Repeat offenders -- IUU and ICCAT detail"):
             render_repeat_offenders(df_filtered)
 
@@ -656,6 +660,9 @@ with tab_overview:
 
         with st.expander("Risk exposure by MPA tier", expanded=False):
             render_mpa_tier_exposure(df_filtered)
+
+        with st.expander("Fleet composition by vessel class", expanded=False):
+            render_vessel_class_composition(df_filtered)
 
         with st.expander("Flag breakdown"):
             render_flag_breakdown(df_filtered)

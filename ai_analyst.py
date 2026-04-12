@@ -54,6 +54,7 @@ def build_system_prompt(df, knowledge_base, fdi_effort=None, fdi_landings=None, 
         "is_industrial", "length_m", "tonnage_gt",
         "multi_behaviour_flag", "dark_port_call_candidate", "repeat_offender_90d",
         "fishing_in_mpa_count", "base_risk_score", "risk_band",
+        "vessel_class", "vessel_type_mismatch", "shiptypes",
     ] if c in df.columns]
 
     schema = f"""DATAFRAME SCHEMA (variable name: df)
@@ -138,6 +139,13 @@ Vessel-level Kpler-aligned flags (on df, propagated per vessel):
 - repeat_offender_90d (bool): two or more events within any 90-day window.
 - Supporting metadata: length_m, tonnage_gt, shiptypes (from GFW Vessels API).
 - CRITICAL: these four flags are DISPLAY-ONLY. Never multiply or add them into risk_score. They are parallel indicators, not score amplifiers.
+
+Vessel identity descriptors (on df, derived from vessel_type and shiptypes via VESSEL_CLASS_PATTERNS):
+- vessel_class (str): canonical descriptive class -- one of "industrial_fishing" | "artisanal_fishing" | "carrier" | "tanker" | "cargo" | "support" | "passenger" | "other" | "". Prefers the registry shiptypes over event-level vessel_type when both are present. Display-only.
+- vessel_type_mismatch (bool): fires when the event-level vessel_type and the registry shiptypes BOTH map to a non-empty class AND those classes DIFFER. The comparison is class-level (after normalisation through the pattern table), NOT string-level. So "TRAWLER" vs "FISHING" does NOT fire (both -> industrial_fishing); "FISHING" vs "CARGO" does fire (industrial_fishing vs cargo).
+- This is the open-data equivalent of the Kpler Grey Fleet "irregular vessel information" indicator -- a vessel broadcasting one identity in AIS while its registry record says another.
+- vessel_class is ORTHOGONAL to is_industrial. is_industrial is size-based (>=24m OR >=100GT, EU regulatory threshold). vessel_class is category-based (what kind of vessel). A small artisanal trawler is vessel_class=industrial_fishing AND is_industrial=False -- both columns are useful and neither substitutes for the other.
+- CRITICAL: vessel_type_mismatch is DISPLAY-ONLY. Never multiply or add it into risk_score. It fires the identity_misrepresentation leaf in the risk tree at medium severity. Static demo seeds two examples: KOOSHA 4 (Iranian, IUU-listed, FISHING vs cargo -- the obvious case) and LEONARDO PADRE (Italian, ICCAT-authorised artisanal, FISHING vs carrier -- the subtle case).
 
 Fishing events (separate dataframe: fishing_df):
 - fishing_df is a SEPARATE dataframe of GFW FISHING events (Kroodsma 2018 CNN classification). It is NOT part of df. Join on mmsi if you need to cross-reference.
@@ -361,6 +369,7 @@ def render_ai_analyst(df_filtered, fdi_effort, fdi_landings, knowledge_base, gem
         # New vessel-intelligence layer questions (MPA + flags + base/compound)
         "Which vessels had fishing activity inside a GFCM Fisheries Restricted Area? Show their flag, their base vs compounded risk scores, and the FRA name.",
         "How many industrial-class vessels (is_industrial=True) had multi-behaviour flags, and what's their flag state distribution?",
+        "Which vessels have a vessel_type_mismatch (event-level vessel_type vs registry shiptypes disagreement)? Show their vessel_class, vessel_type, shiptypes, and IUU/ICCAT/OFAC status.",
         # Cross-source intelligence (the differentiator)
         "Show me IUU-listed vessels in c-squares with high swordfish landings",
         "Which OFAC-sanctioned vessels appear in the data and what's their pattern?",

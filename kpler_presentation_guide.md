@@ -17,7 +17,7 @@ They do NOT care about: academic fisheries science, R packages, MCDA methodology
 The app is organised into four top-level tabs (with subtabs grouping related views) sized for a 30-minute demo:
 
 1. **Vessel Watch** — two subtabs that share a single drill flow:
-   - *Vessel Summary* — vessel-level aggregation table with risk bands and compounding multipliers, the four Kpler-aligned flags (industrial profile, multi-behaviour, dark port call candidate, repeat offender), and a sortable length / GT profile column. Primary Kpler-vocabulary view. Secondary views (repeat offenders, encounter analysis / carrier alerts, AIS gap behaviour) in collapsed expanders.
+   - *Vessel Summary* — vessel-level aggregation table with risk bands and compounding multipliers, the four Kpler-aligned flags (industrial profile, multi-behaviour, dark port call candidate, repeat offender), the two vessel-identity columns (`vessel_class` descriptive label + `vessel_type_mismatch` Grey Fleet "irregular vessel information" flag), and a sortable length / GT profile column. Primary Kpler-vocabulary view. Secondary views (type mismatch by class, repeat offenders, encounter analysis / carrier alerts, AIS gap behaviour) in collapsed expanders.
    - *Vessel Investigation* — three-layer view: framework methodology, structured narrative, per-vessel coloured risk tree. The AQUARIS-style deep dive.
 
 2. **Fleet Overview** — two subtabs covering aggregate fleet views:
@@ -34,7 +34,7 @@ Related views are grouped one level down via subtabs, and secondary diagnostic c
 
 1. **Fleet Overview -> Map & Overview** — open on the Folium map. The visual hook. Show monthly event-type trend as a direct analogue to Kpler's Graph 4 in the *Turning Tides* whitepaper.
 
-2. **Vessel Watch -> Vessel Summary** — the Kpler-vocabulary moment. Point out risk bands (Low / Emerging / Elevated / Severe / Critical >=100), the base vs compounded score decomposition, the four Kpler-aligned flags (one structural + three temporal/compound), and the worst actors ranked by total risk.
+2. **Vessel Watch -> Vessel Summary** — the Kpler-vocabulary moment. Point out risk bands (Low / Emerging / Elevated / Severe / Critical >=100), the base vs compounded score decomposition, the four Kpler-aligned flags (one structural + three temporal/compound), the vessel_class descriptor + vessel_type_mismatch identity flag (the open-data Grey Fleet "irregular vessel information" indicator -- KOOSHA 4 demos the obvious case, LEONARDO PADRE the subtle case), and the worst actors ranked by total risk.
 
 3. **Vessel Watch -> Vessel Investigation** — drill into one high-risk vessel. Walk through the three-layer view. This is the AQUARIS-style narrative in fisheries.
 
@@ -69,6 +69,19 @@ This demonstrates: multi-source cross-referencing, identity matching, risk compo
 Click on a blue marker (FRIO NARUTO). "This vessel is ICCAT-authorized as a carrier — meaning it's legally permitted to transship tuna in the Med. It appeared in an encounter event. The risk model gives it a 1.4x multiplier because authorized carriers have the infrastructure and cover to launder unauthorized catch through legitimate channels. The question an analyst should ask is: was this transshipment under ICCAT Regional Observer Programme coverage? If not, why not?"
 
 This demonstrates: understanding that authorization is an opportunity indicator, not exoneration. This is a nuanced analytical point that shows domain depth.
+
+### Show the vessel-type-mismatch flag (60 seconds — the Grey Fleet beat)
+
+Open the **Vessel Summary** subtab. Sort by the `type_mismatch` column. Two vessels surface in the static demo:
+
+- **KOOSHA 4** — Iranian-flagged, IUU-listed (already covered in the IUU walkthrough). Event-level `vessel_type` says FISHING, registry `shiptypes` says cargo. The obvious case: a deceptive vessel broadcasting one identity in AIS while its registry record says another.
+- **LEONARDO PADRE** — Italian-flagged, ICCAT-authorised artisanal vessel. Event-level `vessel_type` says FISHING, registry `shiptypes` says carrier. The subtle case: a vessel that passes IUU, OFAC, and ICCAT cross-reference cleanly, but whose two self-reported identity fields disagree at the class level.
+
+"This is the Kpler *Grey Fleet* paper's 'irregular vessel information' indicator on open data. The event-level `vessel_type` comes from the GFW Events API — often AIS self-reported. The registry `shiptypes` comes from the GFW Vessels API — `registry_info` and `self_reported_info`. Both fields are normalised through the same canonical class taxonomy, and the flag fires only when both are populated and map to **different** classes. So `TRAWLER` versus `FISHING` does not trigger — both map to `industrial_fishing`. `FISHING` versus `CARGO` does. The class-level comparison is what makes the flag actually useful — string-level would drown in spelling-variant false positives."
+
+Open the **Type mismatch by vessel class** expander. The horizontal bar visualises the two mismatches grouped by their registry-side class, and a small detail table lists exactly which event-level vs registry-level disagreement fired. "Display-only — never multiplied into the risk score, fires the `identity_misrepresentation` leaf in the risk tree at medium severity. Same family as the four other Kpler-aligned flags."
+
+This demonstrates: open-data parity with a Kpler proprietary indicator, careful design that avoids false positives, awareness that Grey Fleet vocabulary applies to fisheries as much as to oil tankers.
 
 ### Show the Fisheries Context tab (60 seconds)
 

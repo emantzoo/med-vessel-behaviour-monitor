@@ -116,3 +116,40 @@ Any entity (port, company, financial institution) engaging in business
 with an OFAC-sanctioned vessel risks exposure to US secondary sanctions.
 This makes OFAC matches a concern for port authorities, insurers, and
 flag state registries in addition to fisheries enforcement.
+
+## Vessel Identity Misrepresentation (Grey Fleet equivalent)
+
+Beyond the four list-based cross-references above (IUU, ICCAT, OFAC,
+plus the FDI baseline), the app surfaces a fifth identity-layer
+indicator: a class-level disagreement between event-level vessel_type
+and registry shiptypes.
+
+The event-level `vessel_type` is what GFW returns on the events feed
+(`vessel.type`), often AIS self-reported. The registry `shiptypes` is
+what the GFW Vessels API returns from `registry_info` /
+`self_reported_info`, harvested during the same MMSI-to-IMO enrichment
+that resolves length and tonnage. Both are normalised through the same
+canonical class taxonomy (industrial_fishing / artisanal_fishing /
+carrier / tanker / cargo / support / passenger / other), and the
+`vessel_type_mismatch` flag fires only when both fields are populated
+and map to different classes.
+
+The class-level comparison matters: a vessel_type of "TRAWLER" against
+a shiptypes of "FISHING" both map to `industrial_fishing` and the flag
+does not fire. A vessel_type of "FISHING" against a shiptypes of
+"CARGO" does fire -- that is the irregular vessel information signal.
+
+This is the open-data equivalent of Kpler's "irregular vessel
+information" indicator from the *Grey Fleet* paper (March 2025): a
+vessel broadcasting one identity in AIS while its registry record says
+something different. Like the four Kpler-aligned behavioural flags, it
+is display-only and never multiplied into the risk score -- it fires a
+medium-severity rule in the risk tree's identity branch
+(`identity_misrepresentation` leaf) and is shown in the Vessel Summary
+table next to `vessel_class`.
+
+A clean ICCAT-authorised artisanal vessel that suddenly registers as
+a carrier in the GFW Vessels API is exactly the case the flag is
+designed to surface -- not picked up by IUU lists, OFAC screening, or
+ICCAT cross-reference, but visible the moment you compare the two
+self-reported identity fields side by side.

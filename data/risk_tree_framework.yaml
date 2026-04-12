@@ -40,6 +40,26 @@ framework:
         - id: name_history
           text: "Has the vessel changed names more than twice?"
           escalation: "Multiple name changes are a classic identity-laundering indicator."
+        - id: identity_misrepresentation
+          text: "Does the vessel's event-level vessel_type disagree with its registry shiptypes (vessel_type_mismatch)?"
+          weight: medium
+          note: >
+            Identity misrepresentation signal. The event-level vessel_type
+            comes from the GFW Events API (vessel.type, often AIS
+            self-reported); the registry shiptypes comes from the GFW
+            Vessels API (registry_info / self_reported_info). Both fields
+            are normalised through VESSEL_CLASS_PATTERNS into a canonical
+            class (industrial_fishing / artisanal_fishing / carrier /
+            tanker / cargo / support / passenger / other) and the flag
+            fires only when both fields are populated AND map to
+            different classes -- so "TRAWLER" vs "FISHING" does not
+            trigger (both -> industrial_fishing) but "FISHING" vs "CARGO"
+            does. This mirrors Kpler's Grey Fleet "irregular vessel
+            information" indicator: a vessel broadcasting one identity
+            in AIS while its registry record says another. Display-only
+            signal: never multiplied into the score, never feeds the
+            multiplicative chain. Surfaces in Vessel Summary alongside
+            vessel_class.
       gate_rule: "If IMO is missing AND name has changed multiple times, escalate to High regardless of other branches."
 
     - id: flag_risk
@@ -223,6 +243,7 @@ framework:
       - "Three or more additive flags raised -> escalate one tier"
       - "GFW-classified fishing inside an MPA -> Elevated minimum (GFW ground-truth signal, not inference)"
       - "Industrial vessel profile (>=24m or >=100GT) AND (in_mpa OR iuu_listed) -> escalate one tier"
+      - "Identity misrepresentation (vessel_type_mismatch) AND any behavioural flag -> escalate one tier (irregular vessel information indicator from Kpler Grey Fleet)"
       - "No flags raised -> Low"
 
   notes:

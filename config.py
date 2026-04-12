@@ -15,6 +15,79 @@ FLAG_RISKS = {
 
 TRANSSHIPMENT_VESSEL_TYPES = {"CARRIER", "TANKER"}
 
+# ========================= VESSEL TYPE NORMALISATION =========================
+# Two vessel-type fields exist on every event row in `df`:
+#
+#   - vessel_type   event-level metadata from the GFW Events API
+#                   (vessel.type on the event payload, often AIS self-reported)
+#   - shiptypes     registry-level metadata from the GFW Vessels API
+#                   (registry_info / self_reported_info, lowercase, may be
+#                    a comma-joined list)
+#
+# Both fields are mapped through VESSEL_CLASS_PATTERNS into one of the
+# canonical descriptive classes below. The result is the `vessel_class`
+# column on `df`. Comparing the two derived classes (not the raw strings)
+# is what produces the `vessel_type_mismatch` flag -- so a vessel_type of
+# "TRAWLER" and a shiptypes of "FISHING" both map to industrial_fishing
+# and the mismatch flag does not fire on the spelling difference.
+#
+# Mismatch fires when both fields are populated AND map to different
+# classes. Absence of one field is not a mismatch.
+#
+# Order matters: first match wins. Put more specific patterns first
+# (artisanal before fishing, carrier before cargo, etc.). Patterns are
+# substring-matched against the lowercased input.
+
+VESSEL_CLASS_PATTERNS = [
+    ("artisanal_fishing", ["artisanal", "small_scale", "small scale"]),
+    ("industrial_fishing", ["trawler", "fish_factory", "fish factory",
+                            "purse_seine", "purse seiner", "purse_seiner",
+                            "longliner", "long_liner", "drifter", "seiner",
+                            "gillnetter", "fishing"]),
+    ("carrier", ["reefer", "refrigerated_cargo", "refrigerated cargo",
+                 "fish_carrier", "fish carrier", "carrier"]),
+    ("tanker", ["oil_tanker", "oil tanker", "chemical_tanker", "tanker"]),
+    ("cargo", ["bulk_carrier", "general_cargo", "general cargo",
+               "container", "cargo"]),
+    ("support", ["bunker", "supply", "support", "tug", "service"]),
+    ("passenger", ["passenger", "ferry", "cruise"]),
+]
+
+
+def derive_vessel_class(value):
+    """Map a free-form vessel-type string to a canonical descriptive class.
+
+    Returns one of artisanal_fishing / industrial_fishing / carrier /
+    tanker / cargo / support / passenger / other, or "" for null inputs.
+
+    Used twice per row in compute_vessel_flags(): once on the event-level
+    `vessel_type` and once on the registry-level `shiptypes`. The two
+    results are then compared to produce `vessel_type_mismatch`.
+
+    Patterns are config-driven via VESSEL_CLASS_PATTERNS so adjusting the
+    taxonomy does not require touching the derivation logic. Substring
+    matching means "trawler" and "Industrial Trawler" both classify the
+    same way without needing exact-string entries.
+
+    NB: this is a pure descriptor. The is_industrial flag remains size-
+    based (>=24m or >=100GT) for EU regulatory alignment. vessel_class
+    is orthogonal -- a small artisanal trawler classifies as
+    artisanal_fishing here but is_industrial=False on the size axis.
+    """
+    if value is None:
+        return ""
+    s = str(value).strip()
+    if not s or s.lower() in {"none", "nan", "null"}:
+        return ""
+    # shiptypes may be a comma-joined list -- the first part wins
+    parts = [p.strip().lower() for p in s.split(",") if p.strip()]
+    for part in parts:
+        for canonical, patterns in VESSEL_CLASS_PATTERNS:
+            if any(p in part for p in patterns):
+                return canonical
+    return "other"
+
+
 IUU_MULTIPLIERS = {"GFCM": 3.0, "OTHER_RFMO": 2.0}
 
 ICCAT_MULTIPLIERS = {

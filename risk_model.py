@@ -6,6 +6,7 @@ from config import (
     TRANSSHIPMENT_VESSEL_TYPES, SPECIES_NAMES,
     IUU_MULTIPLIERS, ICCAT_MULTIPLIERS, OFAC_MULTIPLIER,
     MPA_MULTIPLIERS,
+    derive_vessel_class,
 )
 
 
@@ -428,11 +429,11 @@ def match_ofac_vessels(df, ofac_df):
 # ========================= KPLER-ALIGNED VESSEL FLAGS =========================
 
 def compute_vessel_flags(df):
-    """Compute Kpler-aligned vessel-level behavioural flags.
+    """Compute vessel-level flags and descriptive labels.
 
-    Display-only signals -- these do not multiply into the risk score. They
-    mirror four inputs from Kpler's October 2025 Deceptive Shipping Practices
-    predictive model that can be derived from GFW event/registry data alone:
+    Two families of columns are produced here:
+
+    Behavioural display-only flags -- never multiplied into risk_score:
 
     - is_industrial               vessel is >= 24m LOA or >= 100 GT
                                   (structural; ICCAT industrial / EU 1224/2009 threshold)
@@ -440,11 +441,25 @@ def compute_vessel_flags(df):
     - dark_port_call_candidate    loitering event within 10 km of shore
     - repeat_offender_90d         vessel has >= 2 events in any 90-day window
 
-    is_industrial is the only structural flag of the four (vessel characteristic
-    rather than temporal/behavioural). Length and tonnage come from the GFW
-    Vessels API registry/self-reported metadata in live mode and from the
-    static CSV in demo mode. The flag fires whenever EITHER threshold is met,
-    so a vessel with only one of the two metrics resolved still classifies.
+    Descriptive vessel-type columns -- never enter the risk score:
+
+    - vessel_class                descriptive label combining shiptypes with
+                                  is_industrial. industrial_fishing /
+                                  artisanal_fishing / carrier / tanker / cargo
+                                  / support / other.
+    - vessel_type_mismatch        bool. True iff the event-level vessel_type
+                                  field (often AIS self-reported) and the
+                                  registry-level shiptypes field (GFW Vessels
+                                  API) normalise to different canonical
+                                  classes. Misrepresentation signal aligned
+                                  with Kpler's "irregular vessel information"
+                                  indicator from the Grey Fleet paper.
+
+    Length and tonnage come from the GFW Vessels API registry / self-reported
+    metadata in live mode and from the static CSV in demo mode. is_industrial
+    fires whenever EITHER size threshold is met. vessel_type_mismatch only
+    fires when BOTH fields are populated and disagree -- absence of one field
+    is not treated as a mismatch.
 
     Called from app.py after all scoring and matching is complete.
     """
@@ -453,6 +468,8 @@ def compute_vessel_flags(df):
         df["multi_behaviour_flag"] = False
         df["dark_port_call_candidate"] = False
         df["repeat_offender_90d"] = False
+        df["vessel_class"] = ""
+        df["vessel_type_mismatch"] = False
         return df
 
     # 1. Industrial vessel profile -- structural, vessel-level.
@@ -500,5 +517,27 @@ def compute_vessel_flags(df):
             if (deltas <= 90).any():
                 repeat_mmsi.add(mmsi)
     df["repeat_offender_90d"] = df["mmsi"].isin(repeat_mmsi)
+
+    # 5. Vessel class -- descriptive label derived from registry shiptypes.
+    # Falls back to event-level vessel_type when shiptypes is empty so the
+    # column is still useful in static demo mode and for vessels that don't
+    # resolve in the GFW Vessels API. Class-level, not size-level: a small
+    # trawler is artisanal_fishing here but is_industrial=False on the size
+    # axis -- both axes can disagree and that is by design.
+    shiptypes_series = df["shiptypes"] if "shiptypes" in df.columns else pd.Series("", index=df.index)
+    vessel_type_series = df["vessel_type"] if "vessel_type" in df.columns else pd.Series("", index=df.index)
+    shiptypes_class = shiptypes_series.apply(derive_vessel_class)
+    vessel_type_class = vessel_type_series.apply(derive_vessel_class)
+    # Prefer shiptypes (registry, more authoritative) when present
+    df["vessel_class"] = shiptypes_class.where(shiptypes_class != "", vessel_type_class)
+
+    # 6. Vessel type mismatch -- registry vs event-level disagreement.
+    # Fires only when BOTH fields normalise to a non-empty class AND those
+    # classes differ. Class-level comparison (not string-level) so that
+    # "TRAWLER" vs "FISHING" does not fire -- both map to industrial_fishing.
+    # A "FISHING" event-level vessel that the registry calls "CARGO" is
+    # the textbook misrepresentation case from the Kpler Grey Fleet paper.
+    both_present = (shiptypes_class != "") & (vessel_type_class != "")
+    df["vessel_type_mismatch"] = both_present & (shiptypes_class != vessel_type_class)
 
     return df

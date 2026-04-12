@@ -161,7 +161,7 @@ From *How Deception Detection Works* and the Dec 2025 "Turning Tides" paper:
 | 3. Associative risk | — | **Gap — Maritime 2.0 plugs in here** |
 | 4. Geographic risk | GSA zoning, shore factor, Libya/Tunisia hotspots, **MPA intersection (GFW `regions.mpa`, tiered)** | **Implemented** |
 | 5. Cargo risk | ICCAT species tiers (carrier 1.4× / BFT 1.3× / SWO-ALB 1.2×) | **Implemented (fisheries-cargo equivalent)** |
-| 6. Ownership opacity | `flag_multiplier` only (FoC proxy) | **Partial — beneficial ownership missing** |
+| 6. Ownership opacity | `flag_multiplier` only (FoC proxy) + `vessel_type_mismatch` (Grey Fleet "irregular vessel information") | **Partial — beneficial ownership missing, identity-misrepresentation in place** |
 
 **Four of six implemented. The two named gaps — associative risk and beneficial ownership — are exactly the layers where Kpler's Maritime 2.0 ownership graph and fleet-association data add value on top of an open-source stack.**
 
@@ -229,6 +229,7 @@ The risk-tree view is the **compound-logic** counterpart to the multiplicative s
 ## What's also in the app (not scored, shown as context)
 
 - **Four display-only Kpler-aligned vessel-level flags**: industrial profile (≥24m or ≥100 GT, the only structural flag of the four — the ICCAT industrial / EU Control Reg 1224/2009 reporting threshold), multi-behaviour, dark-port-call candidate, repeat-offender 90d. Length and tonnage harvested from the GFW Vessels API registry / self-reported metadata during MMSI-to-IMO enrichment — no new data source. Mirrors four of the six inputs in Kpler's Oct 2025 Deceptive Shipping Practices model
+- **Vessel class + identity-misrepresentation flag** (`vessel_class`, `vessel_type_mismatch`). Both derived from the GFW Vessels API `shiptypes` field already harvested during MMSI-to-IMO enrichment (no new data source). `vessel_class` is a descriptive label (industrial_fishing / artisanal_fishing / carrier / tanker / cargo / support / passenger / other) — orthogonal to the size-based `is_industrial` flag. `vessel_type_mismatch` fires when the event-level `vessel_type` (often AIS self-reported) and the registry `shiptypes` map to **different** canonical classes (class-level comparison, so spelling variants like TRAWLER vs FISHING do not trigger). This is the open-data equivalent of Kpler's "irregular vessel information" indicator from the *Grey Fleet* paper (March 2025) — a vessel broadcasting one identity in AIS while its registry record says another. Display-only, never multiplied into the score, fires a medium-severity rule on the risk tree's identity branch (`identity_misrepresentation` leaf).
 - **FDI gear mix per c-square** (27 FAO gear codes, top-5 shown) — spatial context, feeds the planned gear-consistency check (does the vessel's movement match the local fleet profile?)
 - **AI Maritime Analyst** (Google Gemini 2.5 Flash) with RAG over 5 methodology/IUU context documents and sandboxed code execution — conceptually similar to Kpler's MCP beta (LLM layered over structured risk data), though mine is embedded in the app rather than exposed as an external server
 - **Per-vessel Investigation tab** with a coloured risk-tree path — structurally similar to the tiered Yellow/Orange/Red flag layout in Kpler's R&C product UI, but rendered as a continuous trace per vessel

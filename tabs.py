@@ -684,6 +684,22 @@ metadata in live mode and from the static profile in demo mode.
   separate GFW `public-global-fishing-events` query. Display-only:
   legitimate fishing outside MPAs is normal commercial activity, so
   only fishing inside protected zones is the actionable IUU signal.
+
+**Two vessel-identity columns** sit alongside the size profile:
+
+- **Vessel class** -- descriptive label derived from the GFW Vessels
+  API `shiptypes` field, falling back to the event-level `vessel_type`
+  when shiptypes is empty. One of `industrial_fishing`,
+  `artisanal_fishing`, `carrier`, `tanker`, `cargo`, `support`,
+  `passenger`, or `other`. *Orthogonal* to `is_industrial`: a small
+  trawler is `artisanal_fishing` here but `is_industrial=False` on
+  the size axis.
+- **Type mismatch** -- True when both the event-level `vessel_type`
+  (often AIS self-reported) and the registry-level `shiptypes` (GFW
+  Vessels API) are populated and normalise to *different* canonical
+  classes. Misrepresentation signal aligned with Kpler's "irregular
+  vessel information" indicator. Class-level comparison so trivial
+  spelling differences (`TRAWLER` vs `FISHING`) do not fire.
             """
         )
     if df.empty:
@@ -750,12 +766,28 @@ metadata in live mode and from the static profile in demo mode.
         else:
             profile_str = "—"
 
+        # Vessel class -- propagated identically to every event row, take the
+        # first non-empty value. Mismatch flag is True if any event row marks it.
+        vessel_class_val = ""
+        if "vessel_class" in g.columns:
+            vc_series = g["vessel_class"].dropna().astype(str)
+            vc_series = vc_series[vc_series != ""]
+            if len(vc_series):
+                vessel_class_val = vc_series.iloc[0]
+        type_mismatch = (
+            bool(g["vessel_type_mismatch"].any())
+            if "vessel_type_mismatch" in g.columns
+            else False
+        )
+
         rows.append({
             "mmsi": mmsi,
             "vessel_name": _first(g["vessel_name"]) if "vessel_name" in g.columns else "",
             "flag": _first(g["flag"]) if "flag" in g.columns else "",
             "event_count": int(len(g)),
             "event_types": ", ".join(sorted(g["event_type"].dropna().unique())),
+            "vessel_class": vessel_class_val,
+            "type_mismatch": type_mismatch,
             "is_industrial": bool(g["is_industrial"].any()) if "is_industrial" in g.columns else False,
             "length_m": length_m_val,
             "profile": profile_str,
@@ -1428,6 +1460,157 @@ def render_fishing_in_mpa_map(df, fishing_df):
             f"**Total fishing-in-MPA hours:** {total_h:.1f}h across "
             f"**{n_events} events** from **{n_vessels} vessels**."
         )
+
+
+def render_vessel_class_composition(df):
+    """Donut of unique vessels per descriptive vessel_class.
+
+    The fleet shape at a glance: how many of the vessels in the current
+    filter window are industrial fishing, artisanal fishing, carriers,
+    tankers, cargo, support, etc. Class is derived from registry shiptypes
+    falling back to event-level vessel_type. Empty classes are folded into
+    `other`.
+    """
+    st.subheader("Fleet composition by vessel class")
+    st.caption(
+        "Distribution of unique vessels by descriptive vessel class. "
+        "Class is derived from the GFW Vessels API `shiptypes` field "
+        "(falling back to event-level `vessel_type` when shiptypes is empty)."
+    )
+    with st.expander("How to read this chart", expanded=False):
+        st.markdown(
+            """
+- One slice per **vessel_class**: industrial_fishing, artisanal_fishing,
+  carrier, tanker, cargo, support, passenger, other.
+- Slice value = unique vessel count (deduplicated by `mmsi`).
+- This is **descriptive** -- it does not contribute to the risk score.
+  It exists to give context: a fleet dominated by carriers tells a
+  different story from one dominated by industrial fishing vessels.
+- `industrial_fishing` here is *category-based* (gear/type), not
+  *size-based*. A small vessel can still classify as industrial fishing
+  on this axis while being `is_industrial=False` on the size axis.
+            """
+        )
+    if df.empty or "vessel_class" not in df.columns:
+        st.info("Vessel class column not available in current dataset.")
+        return
+
+    per_vessel = df.drop_duplicates("mmsi")
+    counts = per_vessel["vessel_class"].fillna("").replace("", "other").value_counts()
+    if counts.empty:
+        st.info("No vessel-class data in current filter window.")
+        return
+
+    class_colors = {
+        "industrial_fishing": "#1f77b4",
+        "artisanal_fishing":  "#aec7e8",
+        "carrier":            "#d62728",
+        "tanker":             "#ff7f0e",
+        "cargo":              "#9467bd",
+        "support":            "#8c564b",
+        "passenger":          "#e377c2",
+        "other":              "#7f7f7f",
+    }
+    colors = [class_colors.get(c, "#888") for c in counts.index]
+
+    fig = go.Figure(data=[go.Pie(
+        labels=counts.index.tolist(),
+        values=counts.values,
+        hole=0.55,
+        marker=dict(colors=colors),
+        textinfo="label+percent",
+        hovertemplate="<b>%{label}</b><br>Vessels: %{value}<br>Share: %{percent}<extra></extra>",
+        sort=False,
+    )])
+    fig.update_layout(
+        height=380,
+        title=f"Fleet composition ({int(counts.sum())} unique vessels)",
+        margin=dict(l=20, r=20, t=50, b=20),
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+
+def render_type_mismatch_by_class(df):
+    """Horizontal bar of vessel_type_mismatch counts grouped by vessel_class.
+
+    Surfaces where misrepresentation concentrates. If all the mismatches sit
+    in one class (e.g. cargo vessels misreporting as fishing) that's the
+    headline. If they're spread across classes, that's a different and
+    weaker pattern. Either way the chart answers the question.
+    """
+    st.subheader("Vessel type misrepresentation by class")
+    st.caption(
+        "How many vessels in each class have a mismatch between their "
+        "event-level `vessel_type` (often AIS self-reported) and their "
+        "registry-level `shiptypes` (GFW Vessels API)."
+    )
+    with st.expander("How to read this chart", expanded=False):
+        st.markdown(
+            """
+- Each bar = number of unique vessels in that **vessel_class** with
+  `vessel_type_mismatch == True`.
+- A mismatch fires only when both fields are populated *and* normalise
+  to different canonical classes -- spelling differences ("TRAWLER" vs
+  "FISHING") do not fire because comparison is class-level, not
+  string-level.
+- A mismatch is the textbook **misrepresentation signal** from Kpler's
+  Grey Fleet paper: a vessel that broadcasts one identity in AIS while
+  the registry records another. Common shadow-fleet tactic to evade
+  port-state controls.
+- In static demo mode you should see exactly two mismatches: one in
+  `cargo` (the obvious IUU case) and one in `carrier` (the subtle
+  ICCAT-authorised case). In live mode the picture will depend on
+  what GFW resolves for each MMSI.
+- **Cross-reference**: vessels with mismatch=True should also appear
+  with the type-mismatch flag set in the Vessel Summary table.
+            """
+        )
+    if df.empty or "vessel_type_mismatch" not in df.columns or "vessel_class" not in df.columns:
+        st.info("Vessel type-mismatch columns not available in current dataset.")
+        return
+
+    per_vessel = df.drop_duplicates("mmsi")
+    n_mm = int(per_vessel["vessel_type_mismatch"].fillna(False).astype(bool).sum())
+    if n_mm == 0:
+        st.info(
+            "No vessel-type mismatches in current filter window. "
+            "In static demo mode you should normally see two -- if you've "
+            "filtered them out via the date range, widen the window."
+        )
+        return
+
+    mm_by_class = (
+        per_vessel[per_vessel["vessel_type_mismatch"].fillna(False).astype(bool)]
+        .groupby("vessel_class")
+        .size()
+        .sort_values(ascending=True)
+    )
+
+    fig = go.Figure(data=[go.Bar(
+        x=mm_by_class.values,
+        y=mm_by_class.index.tolist(),
+        orientation="h",
+        marker_color="#E45756",
+        text=mm_by_class.values,
+        textposition="outside",
+        hovertemplate="<b>%{y}</b><br>Mismatched vessels: %{x}<extra></extra>",
+    )])
+    fig.update_layout(
+        height=max(220, 60 * len(mm_by_class) + 80),
+        title=f"Vessel-type mismatches by class ({n_mm} total mismatched vessels)",
+        xaxis_title="Mismatched vessel count",
+        margin=dict(l=20, r=20, t=50, b=20),
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+    # Show the actual mismatched vessels for context
+    detail = per_vessel[per_vessel["vessel_type_mismatch"].fillna(False).astype(bool)][
+        [c for c in ["vessel_name", "flag", "vessel_type", "shiptypes", "vessel_class"]
+         if c in per_vessel.columns]
+    ].reset_index(drop=True)
+    if not detail.empty:
+        st.caption("Mismatched vessels in current filter window:")
+        st.dataframe(detail, use_container_width=True)
 
 
 def render_vessel_investigation(df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_landings, fishing_df=None):

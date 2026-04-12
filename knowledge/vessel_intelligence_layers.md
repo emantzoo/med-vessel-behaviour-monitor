@@ -86,7 +86,7 @@ Four vessel-level flags are computed per vessel after scoring, displayed in Vess
 
 - `length_m` (float or None) — vessel length in metres from GFW Vessels API
 - `tonnage_gt` (float or None) — gross tonnage from GFW Vessels API
-- `shiptypes` (str or None) — GFW-registered vessel type (extracted but not yet displayed)
+- `shiptypes` (str or None) — GFW-registered vessel type from `registry_info` / `self_reported_info`. Used to derive `vessel_class` and `vessel_type_mismatch` (Section 7).
 
 **Usage notes for queries:**
 
@@ -136,6 +136,40 @@ Intervals are half-open (the upper bound belongs to the next band). Use `risk_ba
 
 ---
 
+## 7. Vessel class and identity misrepresentation
+
+Two descriptive columns derived from `shiptypes` (registry-level, GFW Vessels API) and `vessel_type` (event-level, GFW Events API). Both fields are normalised through the same `VESSEL_CLASS_PATTERNS` table in `config.py` (substring match against the lowercased input, first match wins, ordered list with `artisanal_fishing` before `industrial_fishing` and `carrier` before `cargo`). The output is one of `industrial_fishing`, `artisanal_fishing`, `carrier`, `tanker`, `cargo`, `support`, `passenger`, or `other`.
+
+**Columns on `df`:**
+
+- `vessel_class` (str) — canonical descriptive class. Prefers the registry value (`shiptypes`) when present, falling back to the event-level (`vessel_type`) otherwise. Display-only.
+- `vessel_type_mismatch` (bool) — fires only when **both** fields are populated **and** map to **different** canonical classes. Class-level comparison is what makes this useful: a `vessel_type` of `TRAWLER` and a `shiptypes` of `FISHING` both map to `industrial_fishing` and the flag does not fire on the spelling difference. A `vessel_type` of `FISHING` against a `shiptypes` of `CARGO` does fire — that is the irregular vessel information signal.
+
+**Why this is the Kpler Grey Fleet equivalent:**
+
+The Kpler *Grey Fleet* paper (March 2025) lists "irregular vessel information" as one of the indicators that distinguishes deceptive vessels — a vessel broadcasting one identity in AIS while its registry record says something different. `vessel_type_mismatch` operationalises that exact indicator on open data: AIS-self-reported type (event-level) vs the GFW Vessels API registry record. Like the four Kpler-aligned behavioural flags, it is **never multiplied into the risk score** — it is a parallel indicator that fires a rule in the risk tree (`identity_misrepresentation` leaf, medium severity) and shows up in the Vessel Summary table.
+
+**`vessel_class` is orthogonal to `is_industrial`:**
+
+- `is_industrial` is **size-based** (length ≥ 24 m or GT ≥ 100), aligned with the EU Control Regulation 1224/2009 and ICCAT industrial classification. It is a regulatory threshold.
+- `vessel_class` is **category-based** (what kind of vessel is this). It is a descriptive label.
+
+A small artisanal trawler classifies as `vessel_class=industrial_fishing` (because it is a trawler) and `is_industrial=False` (because it is below 24 m). Both columns are useful; neither is a substitute for the other.
+
+**Static demo seeded examples:**
+
+- `KOOSHA 4` (Iranian, IUU-listed): event-level `vessel_type=FISHING`, registry `shiptypes=cargo`. Obvious mismatch tied to a known IUU listing — illustrates the pattern where a deceptive vessel broadcasts one identity in AIS while the registry says another.
+- `LEONARDO PADRE` (Italian, ICCAT-authorised artisanal): event-level `vessel_type=FISHING`, registry `shiptypes=carrier`. Subtle mismatch on a clean ICCAT vessel — shows that the flag catches anomalies that other layers (IUU, OFAC, MPA) would miss entirely.
+
+**Usage notes for queries:**
+
+- Vessels with mismatched identity: `df[df["vessel_type_mismatch"]]`
+- Mismatch counts grouped by registry class: `df[df["vessel_type_mismatch"]].drop_duplicates("mmsi").groupby("vessel_class").size()`
+- Composition of the fleet by descriptive class: `df.drop_duplicates("mmsi")["vessel_class"].value_counts()`
+- IMPORTANT: when answering misrepresentation queries, always state explicitly that the comparison is class-level (after normalisation), not string-level — otherwise users will assume the flag fires on every spelling difference.
+
+---
+
 ## Quick reference — column glossary
 
 | Column | Dataframe | Type | Meaning |
@@ -159,12 +193,14 @@ Intervals are half-open (the upper bound belongs to the next band). Use `risk_ba
 | `dark_port_call_candidate` | df | bool | Loitering within 10km of shore |
 | `repeat_offender_90d` | df, vessel summary | bool | Two or more events within 90 days |
 | `fishing_in_mpa_count` | vessel summary | int | Count of fishing events inside MPAs |
+| `vessel_class` | df, vessel summary | str | Canonical descriptive class derived from shiptypes/vessel_type via VESSEL_CLASS_PATTERNS |
+| `vessel_type_mismatch` | df, vessel summary | bool | Event-level vessel_type and registry shiptypes map to different canonical classes |
 
 ---
 
 ## 6. Visualisations that expose these layers
 
-Five plots in the UI surface the vessel intelligence layers visually. They live in expanders inside the existing four-tab layout, never as a separate tab. Each plot has a "How to read this chart" expander immediately above it.
+Seven plots in the UI surface the vessel intelligence layers visually. They live in expanders inside the existing four-tab layout, never as a separate tab. Each plot has a "How to read this chart" expander immediately above it.
 
 | # | Plot | Tab location | Purpose | Reads from |
 |---|---|---|---|---|
@@ -173,6 +209,8 @@ Five plots in the UI surface the vessel intelligence layers visually. They live 
 | 3 | **Top vessels: base vs structural amplifier** | Vessel Watch → Vessel Summary | Vessel-centric counterpart to plot #1. Top-10 horizontal bars segmented into base + structural delta. Answers "who is worst?" while #1 answers "how does scoring work?". | `df.groupby("mmsi")` of `base_risk_score` and `risk_score` |
 | 4 | **Risk exposure by MPA tier** | Fleet Overview → Map & Overview | Donut split of total risk by `mpa_tier`. Quantifies the spatial-regulatory layer in one glance. | `df.groupby("mpa_tier")["risk_score"].sum()` |
 | 5 | **Fishing activity inside MPAs** | Fleet Overview → Fisheries Context | Scatter map of `fishing_df[in_mpa==True]` sized by `fishing_hours`, coloured by `mpa_tier`. Display-only context. Gracefully handles small-N in static demo mode by warning the user. | `fishing_df[fishing_df["in_mpa"]]` |
+| 6 | **Fleet composition by vessel class** | Fleet Overview → Map & Overview | Donut of unique vessels per `vessel_class`. Answers "what kind of fleet are we monitoring?" by descriptive category, orthogonal to the size-based `is_industrial` flag. | `df.drop_duplicates("mmsi")["vessel_class"]` |
+| 7 | **Type mismatch by vessel class** | Vessel Watch → Vessel Summary | Horizontal bar of `vessel_type_mismatch` counts grouped by `vessel_class`, plus a detail table of mismatched vessels showing the specific event-level vs registry-level disagreement. The textbook "irregular vessel information" view from Kpler's Grey Fleet paper. | `df[df["vessel_type_mismatch"]]` grouped by `vessel_class` |
 
 **Two design rules these plots follow:**
 
