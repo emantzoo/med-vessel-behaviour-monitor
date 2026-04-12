@@ -1077,19 +1077,70 @@ def render_base_vs_compound_decomposition(df):
 
     compound_mult = risk_total / base_total if base_total > 0 else 1.0
 
+    # --- Break down the structural amplifier by source ---
+    # For each event, estimate the contribution of each lookup stage.
+    # The multipliers compound: base -> IUU -> ICCAT -> OFAC, so we
+    # attribute each stage's delta to the lookup that caused it.
+    iuu_delta = 0.0
+    iccat_delta = 0.0
+    ofac_delta = 0.0
+    has_iuu = "iuu_matched" in df.columns and "iuu_multiplier" in df.columns
+    has_iccat = "iccat_authorized" in df.columns and "iccat_multiplier" in df.columns
+    has_ofac = "ofac_sanctioned" in df.columns and "ofac_multiplier" in df.columns
+
+    for _, row in df.iterrows():
+        base_r = float(row.get("base_risk_score", 0))
+        if base_r <= 0:
+            continue
+        # IUU: base * (iuu_mult - 1)
+        iuu_m = float(row.get("iuu_multiplier", 1.0)) if has_iuu and row.get("iuu_matched") else 1.0
+        after_iuu = base_r * iuu_m
+        iuu_delta += after_iuu - base_r
+        # ICCAT: after_iuu * (iccat_mult - 1)
+        iccat_m = float(row.get("iccat_multiplier", 1.0)) if has_iccat and row.get("iccat_authorized") else 1.0
+        after_iccat = after_iuu * iccat_m
+        iccat_delta += after_iccat - after_iuu
+        # OFAC: after_iccat * (ofac_mult - 1)
+        ofac_m = float(row.get("ofac_multiplier", 1.0)) if has_ofac and row.get("ofac_sanctioned") else 1.0
+        after_ofac = after_iccat * ofac_m
+        ofac_delta += after_ofac - after_iccat
+
     fig = go.Figure()
     fig.add_trace(go.Bar(
         y=["Fleet total"], x=[base_total], name="Behavioural base",
         orientation="h", marker_color="#4C78A8",
         hovertemplate="Behavioural base: %{x:.1f}<extra></extra>",
     ))
-    fig.add_trace(go.Bar(
-        y=["Fleet total"], x=[structural_delta], name="Structural amplifier (IUU/ICCAT/OFAC)",
-        orientation="h", marker_color="#E45756",
-        hovertemplate="Structural amplifier: %{x:.1f}<extra></extra>",
-    ))
+    if iuu_delta > 0:
+        fig.add_trace(go.Bar(
+            y=["Fleet total"], x=[iuu_delta], name="IUU listing",
+            orientation="h", marker_color="#2d2d2d",
+            hovertemplate="IUU listing: +%{x:.1f}<extra></extra>",
+        ))
+    if iccat_delta > 0:
+        fig.add_trace(go.Bar(
+            y=["Fleet total"], x=[iccat_delta], name="ICCAT authorization",
+            orientation="h", marker_color="#4169E1",
+            hovertemplate="ICCAT authorization: +%{x:.1f}<extra></extra>",
+        ))
+    if ofac_delta > 0:
+        fig.add_trace(go.Bar(
+            y=["Fleet total"], x=[ofac_delta], name="OFAC sanctions",
+            orientation="h", marker_color="#8B0000",
+            hovertemplate="OFAC sanctions: +%{x:.1f}<extra></extra>",
+        ))
+    # If there's unexplained residual (rounding), lump it
+    explained = iuu_delta + iccat_delta + ofac_delta
+    residual = structural_delta - explained
+    if residual > 0.5:
+        fig.add_trace(go.Bar(
+            y=["Fleet total"], x=[residual], name="Other structural",
+            orientation="h", marker_color="#E45756",
+            hovertemplate="Other structural: +%{x:.1f}<extra></extra>",
+        ))
+
     fig.update_layout(
-        barmode="stack", height=180,
+        barmode="stack", height=200,
         title=f"Total risk = {risk_total:.0f}  ({compound_mult:.2f}x compound multiplier over base {base_total:.0f})",
         xaxis_title="Risk score",
         showlegend=True,
@@ -1097,12 +1148,19 @@ def render_base_vs_compound_decomposition(df):
         margin=dict(l=20, r=20, t=50, b=20),
     )
     st.plotly_chart(fig, use_container_width=True)
+
+    # Summary breakdown
+    parts = [f"**{base_total:.0f}** behavioural base"]
+    if iuu_delta > 0:
+        parts.append(f"**+{iuu_delta:.0f}** IUU listing")
+    if iccat_delta > 0:
+        parts.append(f"**+{iccat_delta:.0f}** ICCAT authorization")
+    if ofac_delta > 0:
+        parts.append(f"**+{ofac_delta:.0f}** OFAC sanctions")
     st.markdown(
-        f"**Read:** the fleet-wide compound multiplier is **{compound_mult:.2f}x** -- "
-        f"i.e. structural list lookups added **{structural_delta:.0f} points** "
-        f"({structural_delta / risk_total * 100:.0f}% of total) on top of the "
-        f"**{base_total:.0f}-point** behavioural base. "
-        "MPA tier multipliers live in the *base* segment because they describe "
+        f"**Read:** {' | '.join(parts)} = **{risk_total:.0f}** total "
+        f"(**{compound_mult:.2f}x** compound multiplier). "
+        "MPA tier multipliers live in the base segment because they describe "
         "where the event happened, not who the vessel is."
     )
 

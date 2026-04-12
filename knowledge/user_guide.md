@@ -9,8 +9,8 @@ A short field guide to the four-tab UI, what each chart shows, and how to read i
 The app uses four top-level tabs, ordered **investigate → fleet → explain → ask**:
 
 1. **Vessel Investigation** — per-vessel structured report with coloured risk-tree path and quick-select table
-2. **Fleet Analytics** — fleet-level aggregate views
-   - Subtab *Risk Table*: ranked vessel table with pill filters + fleet-level plots
+2. **Fleet Analytics** — fleet-level aggregate views. Pill filters (event type, risk band, flag state, vessel class) sit above the subtabs and cascade to all three:
+   - Subtab *Risk Table*: ranked vessel table + fleet-level plots
    - Subtab *Trends & Patterns*: heatmaps, daily trends, MPA tier exposure
    - Subtab *Fisheries Context*: FDI overlay, fishing-in-MPA scatter
 3. **Reference & Methodology** — explain: scoring framework, multiplier tables, methodology diagram
@@ -33,14 +33,14 @@ The single most important table in the app. One row per vessel, sorted by compou
 - **MPA intersection + tier** — sourced from GFW's `regions.mpa` field (WDPA point-in-polygon, server-side). Unlike the four flags, MPA tier *is* multiplied into the base score.
 - **Fishing-in-MPA events / hours** — pre-joined from a separate GFW fishing-events query. Display-only.
 
-**Pill filters** at the top of this subtab let you narrow by event type, risk band, flag state, or vessel class. All expander charts below cascade from the filtered data. Switch to the **Vessel Investigation** tab for per-vessel drill-down.
+**Pill filters** sit above the subtabs and cascade to all three Fleet Analytics subtabs (Risk Table, Trends & Patterns, Fisheries Context). Narrow by event type, risk band, flag state, or vessel class. Switch to the **Vessel Investigation** tab for per-vessel drill-down.
 
 ### Plots in the Risk Table expanders
 
 | Expander | Chart | Reads |
 |---|---|---|
 | Risk band distribution | Bar chart of vessel count per band, coloured by band | "What's the shape of the fleet?" |
-| Base vs structural-amplifier decomposition | Stacked horizontal bar (fleet total) split into behavioural base and structural amplifier delta | "How does the scoring methodology work, on this data?" |
+| Base vs structural-amplifier decomposition | Stacked horizontal bar (fleet total) split into behavioural base + IUU (black) + ICCAT (blue) + OFAC (dark red) segments | "How does the scoring methodology work, on this data?" |
 | Top vessels: base vs structural amplifier | Top-10 horizontal bars, each split base + amplifier | "Who are the worst actors and why?" |
 | Type mismatch by vessel class | Horizontal bar of `vessel_type_mismatch` counts grouped by `vessel_class` + table of mismatched vessels | "Whose AIS identity disagrees with their registry?" (Kpler Grey Fleet "irregular vessel information") |
 | Repeat offenders | Bar of vessels with ≥2 events + timeline of top-3 | "Who keeps coming back?" |

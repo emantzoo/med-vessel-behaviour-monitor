@@ -103,7 +103,7 @@ Red alert banner if any event involves an IUU-listed vessel. Expandable table wi
 - MPA intersection: `in_mpa`, `mpa_tier`, `fishing_in_mpa_events`, `fishing_in_mpa_hours`.
 - Listing booleans: `iuu_matched`, `iccat_authorized`, `ofac_sanctioned`.
 
-**Pill filters:** Event type, risk band, flag state, vessel class. All expander charts below cascade from the pill-filtered data.
+**Pill filters:** Event type, risk band, flag state, vessel class. Sit above the subtabs and cascade to all three Fleet Analytics subtabs (Risk Table, Trends & Patterns, Fisheries Context).
 
 **Interactions:** Use the slider to control how many vessels appear. Use pill filters to narrow the fleet view. Switch to **Vessel Investigation** tab for per-vessel drill-down.
 
@@ -112,7 +112,7 @@ Red alert banner if any event involves an IUU-listed vessel. Expandable table wi
 | Expander | Chart | What it answers |
 |----------|-------|-----------------|
 | Risk band distribution | Bar chart of vessel count per band | What's the shape of the fleet? |
-| Base vs structural-amplifier decomposition | Stacked horizontal bar (fleet total): behavioural base + structural delta | How does the scoring split between behaviour and lookups? |
+| Base vs structural-amplifier decomposition | Stacked horizontal bar (fleet total): behavioural base + IUU (black) + ICCAT (blue) + OFAC (dark red) segments | How does the scoring split between behaviour and each lookup source? |
 | Top vessels: base vs structural amplifier | Top-10 horizontal bars, each split base + amplifier | Who are the worst actors and why? |
 | Type mismatch by vessel class | Horizontal bar of mismatch counts by class + detail table | Whose AIS identity disagrees with their registry? |
 | Repeat offenders | Bar of vessels with >=2 events + top-3 timeline | Who keeps coming back? |
