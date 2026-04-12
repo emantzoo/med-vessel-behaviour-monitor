@@ -634,18 +634,18 @@ if not df_filtered.empty and "iuu_matched" in df_filtered.columns:
             )
 
 # ========================= TABS =========================
-# Four top-level tabs: Fleet Overview (all fleet-level views),
-# Vessel Investigation (per-vessel drill-down), Reference, AI Analyst.
-tab_overview, tab_investigation, tab_reference, tab_ai = st.tabs([
-    "Fleet Overview",
+# Four top-level tabs: Investigation first (analyst's primary view),
+# Fleet Analytics (aggregate fleet views), Reference, AI Analyst.
+tab_investigation, tab_overview, tab_reference, tab_ai = st.tabs([
     "Vessel Investigation",
+    "Fleet Analytics",
     "Reference & Methodology",
     "AI Analyst",
 ])
 
 with tab_overview:
     sub_summary, sub_map, sub_fisheries = st.tabs([
-        "Vessel Summary", "Map & Overview", "Fisheries Context",
+        "Risk Table", "Trends & Patterns", "Fisheries Context",
     ])
 
     with sub_summary:

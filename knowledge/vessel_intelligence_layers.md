@@ -70,7 +70,7 @@ A separate dataframe `fishing_df` is loaded from the GFW `public-global-fishing-
 
 ## 3. Kpler-aligned vessel-level behavioural flags
 
-Four vessel-level flags are computed per vessel after scoring, displayed in Vessel Summary alongside the risk band, and fire rules in the risk tree framework. They are **never multiplied into the risk score** — they are parallel indicators, not score amplifiers. This avoids double-counting with signals already captured in `compute_risk_score()`.
+Four vessel-level flags are computed per vessel after scoring, displayed in the Risk Table alongside the risk band, and fire rules in the risk tree framework. They are **never multiplied into the risk score** — they are parallel indicators, not score amplifiers. This avoids double-counting with signals already captured in `compute_risk_score()`.
 
 **Columns on `df` (propagated from vessel-level aggregation):**
 
@@ -147,7 +147,7 @@ Two descriptive columns derived from `shiptypes` (registry-level, GFW Vessels AP
 
 **Why this is the Kpler Grey Fleet equivalent:**
 
-The Kpler *Grey Fleet* paper (March 2025) lists "irregular vessel information" as one of the indicators that distinguishes deceptive vessels — a vessel broadcasting one identity in AIS while its registry record says something different. `vessel_type_mismatch` operationalises that exact indicator on open data: AIS-self-reported type (event-level) vs the GFW Vessels API registry record. Like the four Kpler-aligned behavioural flags, it is **never multiplied into the risk score** — it is a parallel indicator that fires a rule in the risk tree (`identity_misrepresentation` leaf, medium severity) and shows up in the Vessel Summary table.
+The Kpler *Grey Fleet* paper (March 2025) lists "irregular vessel information" as one of the indicators that distinguishes deceptive vessels — a vessel broadcasting one identity in AIS while its registry record says something different. `vessel_type_mismatch` operationalises that exact indicator on open data: AIS-self-reported type (event-level) vs the GFW Vessels API registry record. Like the four Kpler-aligned behavioural flags, it is **never multiplied into the risk score** — it is a parallel indicator that fires a rule in the risk tree (`identity_misrepresentation` leaf, medium severity) and shows up in the Risk Table.
 
 **`vessel_class` is orthogonal to `is_industrial`:**
 
@@ -204,13 +204,13 @@ Seven plots in the UI surface the vessel intelligence layers visually. They live
 
 | # | Plot | Tab location | Purpose | Reads from |
 |---|---|---|---|---|
-| 1 | **Base vs structural-amplifier decomposition** | Fleet Overview → Vessel Summary | Fleet-wide methodology illustration. One stacked horizontal bar showing the base contribution and the structural amplifier delta. | `df["base_risk_score"]`, `df["risk_score"]` |
-| 2 | **Risk band distribution** | Fleet Overview → Vessel Summary | Vessel count per Kpler *Turning Tides* band. The single chart that lands fastest because it uses the recognised vocabulary verbatim. | `df.groupby("mmsi")["risk_score"].sum()` then `classify_risk_band()` |
-| 3 | **Top vessels: base vs structural amplifier** | Fleet Overview → Vessel Summary | Vessel-centric counterpart to plot #1. Top-10 horizontal bars segmented into base + structural delta. Answers "who is worst?" while #1 answers "how does scoring work?". | `df.groupby("mmsi")` of `base_risk_score` and `risk_score` |
-| 4 | **Risk exposure by MPA tier** | Fleet Overview → Map & Overview | Donut split of total risk by `mpa_tier`. Quantifies the spatial-regulatory layer in one glance. | `df.groupby("mpa_tier")["risk_score"].sum()` |
-| 5 | **Fishing activity inside MPAs** | Fleet Overview → Fisheries Context | Scatter map of `fishing_df[in_mpa==True]` sized by `fishing_hours`, coloured by `mpa_tier`. Display-only context. Gracefully handles small-N in static demo mode by warning the user. | `fishing_df[fishing_df["in_mpa"]]` |
-| 6 | **Fleet composition by vessel class** | Fleet Overview → Map & Overview | Donut of unique vessels per `vessel_class`. Answers "what kind of fleet are we monitoring?" by descriptive category, orthogonal to the size-based `is_industrial` flag. | `df.drop_duplicates("mmsi")["vessel_class"]` |
-| 7 | **Type mismatch by vessel class** | Fleet Overview → Vessel Summary | Horizontal bar of `vessel_type_mismatch` counts grouped by `vessel_class`, plus a detail table of mismatched vessels showing the specific event-level vs registry-level disagreement. The textbook "irregular vessel information" view from Kpler's Grey Fleet paper. | `df[df["vessel_type_mismatch"]]` grouped by `vessel_class` |
+| 1 | **Base vs structural-amplifier decomposition** | Fleet Analytics → Risk Table | Fleet-wide methodology illustration. One stacked horizontal bar showing the base contribution and the structural amplifier delta. | `df["base_risk_score"]`, `df["risk_score"]` |
+| 2 | **Risk band distribution** | Fleet Analytics → Risk Table | Vessel count per Kpler *Turning Tides* band. The single chart that lands fastest because it uses the recognised vocabulary verbatim. | `df.groupby("mmsi")["risk_score"].sum()` then `classify_risk_band()` |
+| 3 | **Top vessels: base vs structural amplifier** | Fleet Analytics → Risk Table | Vessel-centric counterpart to plot #1. Top-10 horizontal bars segmented into base + structural delta. Answers "who is worst?" while #1 answers "how does scoring work?". | `df.groupby("mmsi")` of `base_risk_score` and `risk_score` |
+| 4 | **Risk exposure by MPA tier** | Fleet Analytics → Trends & Patterns | Donut split of total risk by `mpa_tier`. Quantifies the spatial-regulatory layer in one glance. | `df.groupby("mpa_tier")["risk_score"].sum()` |
+| 5 | **Fishing activity inside MPAs** | Fleet Analytics → Fisheries Context | Scatter map of `fishing_df[in_mpa==True]` sized by `fishing_hours`, coloured by `mpa_tier`. Display-only context. Gracefully handles small-N in static demo mode by warning the user. | `fishing_df[fishing_df["in_mpa"]]` |
+| 6 | **Fleet composition by vessel class** | Fleet Analytics → Trends & Patterns | Donut of unique vessels per `vessel_class`. Answers "what kind of fleet are we monitoring?" by descriptive category, orthogonal to the size-based `is_industrial` flag. | `df.drop_duplicates("mmsi")["vessel_class"]` |
+| 7 | **Type mismatch by vessel class** | Fleet Analytics → Risk Table | Horizontal bar of `vessel_type_mismatch` counts grouped by `vessel_class`, plus a detail table of mismatched vessels showing the specific event-level vs registry-level disagreement. The textbook "irregular vessel information" view from Kpler's Grey Fleet paper. | `df[df["vessel_type_mismatch"]]` grouped by `vessel_class` |
 
 **Two design rules these plots follow:**
 

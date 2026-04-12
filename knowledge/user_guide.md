@@ -6,13 +6,13 @@ A short field guide to the four-tab UI, what each chart shows, and how to read i
 
 ## The four top-level tabs
 
-The app uses four top-level tabs, ordered **fleet → drill → explain → ask**:
+The app uses four top-level tabs, ordered **investigate → fleet → explain → ask**:
 
-1. **Fleet Overview** — fleet-level aggregate views
-   - Subtab *Vessel Summary*: ranked vessel table with pill filters + fleet-level plots
-   - Subtab *Map & Overview*: heatmaps, daily trends, MPA tier exposure
+1. **Vessel Investigation** — per-vessel structured report with coloured risk-tree path and quick-select table
+2. **Fleet Analytics** — fleet-level aggregate views
+   - Subtab *Risk Table*: ranked vessel table with pill filters + fleet-level plots
+   - Subtab *Trends & Patterns*: heatmaps, daily trends, MPA tier exposure
    - Subtab *Fisheries Context*: FDI overlay, fishing-in-MPA scatter
-2. **Vessel Investigation** — per-vessel structured report with coloured risk-tree path and quick-select table
 3. **Reference & Methodology** — explain: scoring framework, multiplier tables, methodology diagram
 4. **AI Analyst** — ask: Gemini 2.5 Flash sandboxed code interface
 
@@ -20,7 +20,7 @@ The Map and the OFAC/IUU alert boxes sit *above* the tabs because they are the h
 
 ---
 
-## Fleet Overview → Vessel Summary
+## Fleet Analytics → Risk Table
 
 The single most important table in the app. One row per vessel, sorted by compounded `risk_score_total` descending.
 
@@ -35,7 +35,7 @@ The single most important table in the app. One row per vessel, sorted by compou
 
 **Pill filters** at the top of this subtab let you narrow by event type, risk band, flag state, or vessel class. All expander charts below cascade from the filtered data. Switch to the **Vessel Investigation** tab for per-vessel drill-down.
 
-### Plots in the Vessel Summary expanders
+### Plots in the Risk Table expanders
 
 | Expander | Chart | Reads |
 |---|---|---|
@@ -51,14 +51,14 @@ Every plot has a **"How to read this chart"** expander immediately above it that
 
 ---
 
-## Fleet Overview → Map & Overview
+## Fleet Analytics → Trends & Patterns
 
 Aggregate fleet view. The two main charts at the top are:
 
 - **Risk Heatmap: Flag State vs Event Type** — bright cells are high-risk (flag, event-type) combinations. Sorted bottom-to-top by total risk.
 - **Daily Behavioral Risk Trend** — total risk per day, with IUU-event dates marked as black dashed verticals. Below it, a stacked area split by event type — the Med analogue of Kpler *Turning Tides* Graph 4.
 
-### Plots in the Map & Overview expanders
+### Plots in the Trends & Patterns expanders
 
 | Expander | Chart |
 |---|---|
@@ -70,7 +70,7 @@ Aggregate fleet view. The two main charts at the top are:
 
 ---
 
-## Fleet Overview → Fisheries Context
+## Fleet Analytics → Fisheries Context
 
 GFW behavioural events overlaid with EU JRC FDI baseline data — fishing effort and species landings aggregated to 0.5° c-squares.
 
@@ -127,7 +127,7 @@ Gemini 2.5 Flash with a sandboxed code-execution environment. The system prompt 
 
 1. **Fishing events are never scored.** GFW's fishing classifier fires on every commercial fishing trip globally. We only display fishing events as context inside MPAs, where the same signal flips from background noise into the strongest publicly available IUU indicator. Do not concatenate `fishing_df` into `df`.
 
-2. **The four behavioural flags are display-only.** `is_industrial`, `multi_behaviour_flag`, `dark_port_call_candidate`, and `repeat_offender_90d` are parallel indicators, not score amplifiers. They show up in the Vessel Summary table and fire rules in the risk tree, but they are never multiplied into `risk_score` because the underlying signals are already captured at the event level (flag risk, MPA tier, shore distance, event weight).
+2. **The four behavioural flags are display-only.** `is_industrial`, `multi_behaviour_flag`, `dark_port_call_candidate`, and `repeat_offender_90d` are parallel indicators, not score amplifiers. They show up in the Risk Table and fire rules in the risk tree, but they are never multiplied into `risk_score` because the underlying signals are already captured at the event level (flag risk, MPA tier, shore distance, event weight).
 
 3. **The two vessel-identity columns are also display-only.** `vessel_class` (descriptive label) and `vessel_type_mismatch` (event-level vs registry-level disagreement) are derived from the GFW Vessels API `shiptypes` field. `vessel_type_mismatch` fires the `identity_misrepresentation` leaf in the risk tree at medium severity, but it is never multiplied into `risk_score`. It is the Kpler Grey Fleet "irregular vessel information" indicator on open data.
 

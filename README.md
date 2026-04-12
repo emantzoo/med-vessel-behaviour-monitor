@@ -25,7 +25,7 @@ Live app: [med-vessel-behaviour-monitor.streamlit.app](https://med-vessel-behavi
 - Classifies final scores into Kpler-aligned risk bands: Low, Emerging, Elevated, Severe, Critical
 - Aggregates events to vessel level with base vs compounded score decomposition
 - Computes four display-only Kpler-aligned vessel-level flags: industrial profile (>=24m or >=100 GT, the only structural flag of the four), multi-behaviour compound indicator, dark port call candidate (loitering within 10 km of shore), and repeat-offender-within-90-days (exposure drift)
-- Visualises results across four top-level tabs (Fleet Overview, Vessel Investigation, Reference & Methodology, AI Analyst) with related views grouped into subtabs and secondary diagnostics in expanders
+- Visualises results across four top-level tabs (Vessel Investigation, Fleet Analytics, Reference & Methodology, AI Analyst) with related views grouped into subtabs and secondary diagnostics in expanders
 
 ---
 
@@ -65,7 +65,7 @@ Final scores are classified into bands aligned with Kpler's R&C vocabulary (*Tur
 
 The `base_risk_score` column preserves the pre-multiplier behavioural score, enabling explicit decomposition of how much of a vessel's risk comes from behaviour versus structural amplifiers.
 
-In addition, four **display-only** vessel-level flags are derived and surfaced in the Vessel Summary subtab, Vessel Investigation subtab, and the Fleet Overview -> Map & Overview subtab. They mirror four of the six core inputs in Kpler's October 2025 *Deceptive Shipping Practices* predictive model but are **not** multiplied into the risk score, because the underlying signal is already captured at the event level (or, for industrial profile, would double-count what the flag-multiplier and event-specific carrier/tanker factors already encode):
+In addition, four **display-only** vessel-level flags are derived and surfaced in the Risk Table subtab, Vessel Investigation tab, and the Fleet Analytics -> Trends & Patterns subtab. They mirror four of the six core inputs in Kpler's October 2025 *Deceptive Shipping Practices* predictive model but are **not** multiplied into the risk score, because the underlying signal is already captured at the event level (or, for industrial profile, would double-count what the flag-multiplier and event-specific carrier/tanker factors already encode):
 
 | Flag | Definition | Source concept |
 |---|---|---|
@@ -120,11 +120,11 @@ Eight-module Streamlit application:
 
 Four top-level tabs, organised for a tight 30-minute demo (tab order as rendered in `app.py`):
 
-1. **Fleet Overview** -- three subtabs covering all fleet-level views:
-   - *Vessel Summary* -- vessel-level aggregation table with pill filters (event type, risk band, flag state, vessel class), risk bands, base vs compounded score decomposition, and the four display-only Kpler-aligned flags (industrial profile, multi-behaviour, dark port call candidate, repeat offender) plus a sortable length / GT profile column. Secondary views (repeat offenders, encounter/carrier alerts, AIS gap behaviour) in collapsed expanders that cascade from pill filters.
-   - *Map & Overview* -- risk heatmap, daily and monthly event-type trend. Secondary charts (flag breakdown, event types, duration distribution) in collapsed expanders.
+1. **Vessel Investigation** -- three-layer deep dive for the selected vessel: structured narrative from `investigation.py`, per-branch expander cards over the risk tree trace, an interactive Plotly icicle (click a branch to drill in), the full Graphviz framework diagram in a collapsed expander, and a dedicated Behavioural Flags step. Quick-select table for vessel switching.
+2. **Fleet Analytics** -- three subtabs covering all fleet-level views:
+   - *Risk Table* -- vessel-level aggregation table with pill filters (event type, risk band, flag state, vessel class), risk bands, base vs compounded score decomposition, and the four display-only Kpler-aligned flags (industrial profile, multi-behaviour, dark port call candidate, repeat offender) plus a sortable length / GT profile column. Secondary views (repeat offenders, encounter/carrier alerts, AIS gap behaviour) in collapsed expanders that cascade from pill filters.
+   - *Trends & Patterns* -- risk heatmap, daily and monthly event-type trend. Secondary charts (flag breakdown, event types, duration distribution) in collapsed expanders.
    - *Fisheries Context* -- FDI overlay, c-square context, species landings. Geographic risk breakdown in an expander.
-2. **Vessel Investigation** -- three-layer deep dive for the selected vessel: structured narrative from `investigation.py`, per-branch expander cards over the risk tree trace, an interactive Plotly icicle (click a branch to drill in), the full Graphviz framework diagram in a collapsed expander, and a dedicated Behavioural Flags step. Quick-select table for vessel switching.
 3. **Reference & Methodology** -- generic framework documentation: risk tree diagram from `data/risk_tree_framework.yaml`, risk formula, **end-to-end scoring pipeline diagram** (one AIS event to vessel-level risk band, with a dashed side-chain showing the four display-only Kpler-aligned flags), risk-band table, and per-multiplier tables (flag, IUU, ICCAT, OFAC).
 4. **AI Analyst** -- Google Gemini 2.5 Flash interface with RAG knowledge base and sandboxed pandas/plotly code execution.
 
