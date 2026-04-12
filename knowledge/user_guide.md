@@ -34,7 +34,7 @@ The single most important table in the app. One row per vessel, sorted by compou
 - **MPA intersection + tier** — sourced from GFW's `regions.mpa` field (WDPA point-in-polygon, server-side). Unlike the four flags, MPA tier *is* multiplied into the base score.
 - **Fishing-in-MPA events / hours** — pre-joined from a separate GFW fishing-events query. Display-only.
 
-**Click a row** to pre-select that vessel for the Vessel Investigation subtab.
+**Click a row** to (a) pre-select that vessel for the Vessel Investigation subtab, and (b) filter the main map (above the tabs) to only that vessel's events. The map auto-zooms to fit the vessel's track. Use the *Clear map filter* button to return to the full fleet view. Fleet-level tabs below are unaffected — they always show the full filtered fleet.
 
 ### Plots in the Vessel Summary expanders
 

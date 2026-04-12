@@ -214,7 +214,37 @@ col1, col2 = st.columns([3, 1])
 with col1:
     st.subheader("Behavioral Risk Map")
     if not df_filtered.empty:
-        m = folium.Map(location=[37.0, 18.0], zoom_start=5, tiles="CartoDB positron")
+        # Vessel-scoped map filter: when the user clicks a row in the
+        # Vessel Summary table (or a marker, or picks from the dropdown),
+        # we stash the vessel name in session state. On the next rerun
+        # we filter the map markers to that vessel only and auto-fit
+        # the viewport to its events. df_filtered itself is left alone
+        # so the fleet-level tabs still show the full picture.
+        focus_vessel = st.session_state.get("map_clicked_vessel")
+        if focus_vessel and focus_vessel in df_filtered["vessel_name"].values:
+            df_map = df_filtered[df_filtered["vessel_name"] == focus_vessel]
+            n_focus = len(df_map)
+            fc1, fc2 = st.columns([5, 1])
+            fc1.info(
+                f"Map filtered to **{focus_vessel}** ({n_focus} event"
+                f"{'s' if n_focus != 1 else ''}). Fleet tabs below still "
+                f"show the full filtered fleet."
+            )
+            if fc2.button("Clear map filter", key="clear_map_filter"):
+                st.session_state.pop("map_clicked_vessel", None)
+                st.rerun()
+        else:
+            df_map = df_filtered
+
+        # Centre + zoom: fit to the focused vessel's events when filtered,
+        # otherwise default to the whole Med basin.
+        if focus_vessel and len(df_map) > 0:
+            centre_lat = float(df_map["lat"].mean())
+            centre_lon = float(df_map["lon"].mean())
+            zoom = 7 if len(df_map) > 1 else 8
+            m = folium.Map(location=[centre_lat, centre_lon], zoom_start=zoom, tiles="CartoDB positron")
+        else:
+            m = folium.Map(location=[37.0, 18.0], zoom_start=5, tiles="CartoDB positron")
 
         # Dual visual encoding:
         #   shape = behaviour (GAP=circle, LOITERING=square, ENCOUNTER=triangle)
@@ -233,7 +263,7 @@ with col1:
         fg_fdi = folium.FeatureGroup(name="FDI Fishing Effort", show=show_fdi_layer)
 
         # FDI fishing effort choropleth layer (only near events)
-        if not fdi_effort.empty and "csq_lon" in df_filtered.columns:
+        if not fdi_effort.empty and "csq_lon" in df_map.columns:
             latest_year = fdi_effort["year"].max()
             fdi_agg = (
                 fdi_effort[fdi_effort["year"] == latest_year]
@@ -241,8 +271,8 @@ with col1:
                 .sum()
                 .reset_index()
             )
-            event_lons = df_filtered["lon"].values
-            event_lats = df_filtered["lat"].values
+            event_lons = df_map["lon"].values
+            event_lats = df_map["lat"].values
             for _, cell in fdi_agg.iterrows():
                 sw_lon = cell["rectangle_lon"]
                 sw_lat = cell["rectangle_lat"]
@@ -300,7 +330,7 @@ with col1:
                 body = f'<circle cx="{half}" cy="{half}" r="{r}" fill="{fill}" stroke="{stroke}" stroke-width="{stroke_w}"{dash_attr}/>'
             return f'<svg width="{s}" height="{s}" xmlns="http://www.w3.org/2000/svg">{body}</svg>'
 
-        for _, row in df_filtered.iterrows():
+        for _, row in df_map.iterrows():
             is_ofac = row.get("ofac_sanctioned", False)
             is_iuu = row.get("iuu_matched", False)
             is_iccat = row.get("iccat_authorized", False)

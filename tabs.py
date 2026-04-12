@@ -844,11 +844,19 @@ metadata in live mode and from the static profile in demo mode.
         if 0 <= picked_idx < len(vessel_df):
             picked_name = vessel_df.iloc[picked_idx]["vessel_name"]
             if picked_name:
+                # Trigger a rerun if the selection has actually changed,
+                # so the map (rendered ABOVE this tab) can pick up the new
+                # vessel on the next pass. Without the rerun the map only
+                # updates after a second user interaction.
+                prev = st.session_state.get("map_clicked_vessel")
                 st.session_state["map_clicked_vessel"] = picked_name
                 st.success(
                     f"Pre-selected **{picked_name}** for the Vessel Investigation subtab. "
-                    "Switch to that subtab to see the full report."
+                    "Switch to that subtab to see the full report. The map above "
+                    "is now filtered to this vessel's events."
                 )
+                if prev != picked_name:
+                    st.rerun()
 
     # Band summary under the table
     band_order = ["Critical", "Severe", "Elevated", "Emerging", "Low"]
