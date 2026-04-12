@@ -668,28 +668,65 @@ Use the slider to control how many vessels appear.
 
 **Collapsed expanders below:** Risk band distribution -- Base vs structural-amplifier decomposition \
 -- Top vessels segmented -- Type mismatch by vessel class -- Repeat offenders -- Encounter analysis -- AIS gap behaviour.""")
-        render_vessel_summary(df_filtered)
+
+        # ---- Pill filters (multi-select, None = show all) ----
+        fc1, fc2, fc3 = st.columns(3)
+        with fc1:
+            event_types_in_data = sorted(df_filtered["event_type"].dropna().unique())
+            pill_events = st.pills(
+                "Event type", event_types_in_data,
+                selection_mode="multi", default=None, key="pill_event_type",
+            )
+        with fc2:
+            band_order = ["Critical", "Severe", "Elevated", "Emerging", "Low"]
+            bands_in_data = [b for b in band_order if b in df_filtered["risk_band"].values]
+            pill_bands = st.pills(
+                "Risk band", bands_in_data,
+                selection_mode="multi", default=None, key="pill_risk_band",
+            )
+        with fc3:
+            flags_in_data = sorted(df_filtered["flag"].dropna().unique())
+            pill_flags = st.pills(
+                "Flag state", flags_in_data,
+                selection_mode="multi", default=None, key="pill_flag",
+            )
+
+        df_tab = df_filtered.copy()
+        if pill_events:
+            df_tab = df_tab[df_tab["event_type"].isin(pill_events)]
+        if pill_bands:
+            df_tab = df_tab[df_tab["risk_band"].isin(pill_bands)]
+        if pill_flags:
+            df_tab = df_tab[df_tab["flag"].isin(pill_flags)]
+
+        if len(df_tab) < len(df_filtered):
+            st.caption(
+                f"Showing {len(df_tab)} of {len(df_filtered)} events "
+                f"({df_tab['mmsi'].nunique()} vessels). Clear pills to reset."
+            )
+
+        render_vessel_summary(df_tab)
 
         with st.expander("Risk band distribution", expanded=False):
-            render_risk_band_distribution(df_filtered)
+            render_risk_band_distribution(df_tab)
 
         with st.expander("Base vs structural-amplifier decomposition", expanded=False):
-            render_base_vs_compound_decomposition(df_filtered)
+            render_base_vs_compound_decomposition(df_tab)
 
         with st.expander("Top vessels: base vs structural amplifier", expanded=False):
-            render_top_vessels_segmented(df_filtered, top_n=10)
+            render_top_vessels_segmented(df_tab, top_n=10)
 
         with st.expander("Type mismatch by vessel class", expanded=False):
-            render_type_mismatch_by_class(df_filtered)
+            render_type_mismatch_by_class(df_tab)
 
         with st.expander("Repeat offenders -- IUU and ICCAT detail"):
-            render_repeat_offenders(df_filtered)
+            render_repeat_offenders(df_tab)
 
         with st.expander("Encounter analysis -- carrier alerts"):
-            render_encounter_analysis(df_filtered)
+            render_encounter_analysis(df_tab)
 
         with st.expander("AIS gap behaviour"):
-            render_gap_behaviour(df_filtered)
+            render_gap_behaviour(df_tab)
 
     with sub_investigation:
         with st.expander("Tab guide", expanded=False):
