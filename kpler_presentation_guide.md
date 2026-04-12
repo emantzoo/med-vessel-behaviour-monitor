@@ -18,9 +18,10 @@ The app is organised into four top-level tabs (with subtabs grouping related vie
 
 1. **Vessel Investigation** — three-layer view: framework methodology, structured narrative, per-vessel coloured risk tree. Quick-select table for vessel switching. The AQUARIS-style deep dive.
 
-2. **Fleet Analytics** — three subtabs covering all fleet-level views:
-   - *Risk Table* — vessel-level aggregation table with pill filters, risk bands and compounding multipliers, the four Kpler-aligned flags (industrial profile, multi-behaviour, dark port call candidate, repeat offender), the two vessel-identity columns (`vessel_class` descriptive label + `vessel_type_mismatch` Grey Fleet "irregular vessel information" flag), and a sortable length / GT profile column. Primary Kpler-vocabulary view. Secondary views (type mismatch by class, repeat offenders, encounter analysis / carrier alerts, AIS gap behaviour) in collapsed expanders.
-   - *Trends & Patterns* — risk heatmap, daily and monthly trend. Secondary charts (flag breakdown, event types pie, duration distribution) in collapsed expanders.
+2. **Fleet Analytics** — four subtabs covering all fleet-level views:
+   - *Ranking* — vessel-level aggregation table with pill filters, risk bands and compounding multipliers, the four Kpler-aligned flags (industrial profile, multi-behaviour, dark port call candidate, repeat offender), the two vessel-identity columns (`vessel_class` descriptive label + `vessel_type_mismatch` Grey Fleet "irregular vessel information" flag), and a sortable length / GT profile column. Primary Kpler-vocabulary view.
+   - *Exploration* — behavioural deep dives: repeat offenders, encounter/carrier alerts, AIS gap behaviour.
+   - *Trends & Patterns* — risk heatmap, daily and monthly trend, type mismatch by vessel class. Secondary charts (flag breakdown, event types pie, duration distribution) in collapsed expanders.
    - *Fisheries Context* — FDI overlay, c-square context, species landings. Geographic risk breakdown in an expander.
 
 3. **Reference & Methodology** — risk tree diagram from `risk_tree_framework.yaml`, end-to-end scoring pipeline, risk-band table, and per-multiplier tables. Direct conceptual link to Kpler's April 2026 shadow fleet risk tree blog post.
@@ -35,7 +36,7 @@ Related views are grouped one level down via subtabs, and secondary diagnostic c
 
 2. **Fleet Analytics -> Trends & Patterns** — open on the risk heatmap and daily trend. The visual hook. Show monthly event-type trend as a direct analogue to Kpler's Graph 4 in the *Turning Tides* whitepaper.
 
-3. **Fleet Analytics -> Risk Table** — the Kpler-vocabulary moment. Point out risk bands (Low / Emerging / Elevated / Severe / Critical >=100), the base vs compounded score decomposition, the four Kpler-aligned flags (one structural + three temporal/compound), the vessel_class descriptor + vessel_type_mismatch identity flag (the open-data Grey Fleet "irregular vessel information" indicator -- KOOSHA 4 demos the obvious case, LEONARDO PADRE the subtle case), and the worst actors ranked by total risk. Use pill filters to narrow the view.
+3. **Fleet Analytics -> Ranking** — the Kpler-vocabulary moment. Point out risk bands (Low / Emerging / Elevated / Severe / Critical >=100), the base vs compounded score decomposition, the four Kpler-aligned flags (one structural + three temporal/compound), the vessel_class descriptor + vessel_type_mismatch identity flag (the open-data Grey Fleet "irregular vessel information" indicator -- KOOSHA 4 demos the obvious case, LEONARDO PADRE the subtle case), and the worst actors ranked by total risk. Use pill filters to narrow the view. The **Exploration** subtab has repeat offenders, encounter analysis, and AIS gap behaviour.
 
 4. **Reference & Methodology** — step back to the framework. Name the direct link to Kpler's April 2026 shadow fleet risk tree blog post.
 
@@ -71,7 +72,7 @@ This demonstrates: understanding that authorization is an opportunity indicator,
 
 ### Show the vessel-type-mismatch flag (60 seconds — the Grey Fleet beat)
 
-Open the **Risk Table** subtab. Sort by the `type_mismatch` column. Two vessels surface in the static demo:
+Open the **Ranking** subtab. Sort by the `type_mismatch` column. Two vessels surface in the static demo:
 
 - **KOOSHA 4** — Iranian-flagged, IUU-listed (already covered in the IUU walkthrough). Event-level `vessel_type` says FISHING, registry `shiptypes` says cargo. The obvious case: a deceptive vessel broadcasting one identity in AIS while its registry record says another.
 - **LEONARDO PADRE** — Italian-flagged, ICCAT-authorised artisanal vessel. Event-level `vessel_type` says FISHING, registry `shiptypes` says carrier. The subtle case: a vessel that passes IUU, OFAC, and ICCAT cross-reference cleanly, but whose two self-reported identity fields disagree at the class level.
@@ -353,11 +354,11 @@ tabs.py             → Render functions invoked from the 4 top-level tabs,
                       Top-level tabs (defined in app.py):
                       1. Vessel Investigation: per-vessel structured
                            report + coloured risk tree + quick-select table
-                      2. Fleet Analytics — three subtabs:
-                         - Risk Table: vessel-level aggregation with
-                           pill filters, risk bands and Kpler-aligned flags;
-                           repeat offenders / encounter analysis / gap
-                           behaviour in expanders
+                      2. Fleet Analytics — four subtabs:
+                         - Ranking: vessel-level aggregation with
+                           pill filters, risk bands and Kpler-aligned flags
+                         - Exploration: repeat offenders / encounter
+                           analysis / gap behaviour
                          - Trends & Patterns: risk heatmap + daily/monthly
                            trends; flag breakdown, event types, duration
                            distribution in expanders

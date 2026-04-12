@@ -88,7 +88,7 @@ Red alert banner if any event involves an IUU-listed vessel. Expandable table wi
 
 ## Tab 2: Fleet Analytics
 
-### Subtab: Risk Table
+### Subtab: Ranking
 
 **What it shows:** One row per vessel, sorted by compounded risk score (highest first). Fleet-level vessel table with pill filters.
 
@@ -103,7 +103,7 @@ Red alert banner if any event involves an IUU-listed vessel. Expandable table wi
 - MPA intersection: `in_mpa`, `mpa_tier`, `fishing_in_mpa_events`, `fishing_in_mpa_hours`.
 - Listing booleans: `iuu_matched`, `iccat_authorized`, `ofac_sanctioned`.
 
-**Pill filters:** Event type, risk band, flag state, vessel class. Sit above the subtabs and cascade to all three Fleet Analytics subtabs (Risk Table, Trends & Patterns, Fisheries Context).
+**Pill filters:** Event type, risk band, flag state, vessel class. Sit above the subtabs and cascade to all four Fleet Analytics subtabs (Ranking, Exploration, Trends & Patterns, Fisheries Context).
 
 **Interactions:** Use the slider to control how many vessels appear. Use pill filters to narrow the fleet view. Switch to **Vessel Investigation** tab for per-vessel drill-down.
 
@@ -114,7 +114,17 @@ Red alert banner if any event involves an IUU-listed vessel. Expandable table wi
 | Risk band distribution | Bar chart of vessel count per band | What's the shape of the fleet? |
 | Base vs structural-amplifier decomposition | Stacked horizontal bar (fleet total): behavioural base + IUU (black) + ICCAT (blue) + OFAC (dark red) segments | How does the scoring split between behaviour and each lookup source? |
 | Top vessels: base vs structural amplifier | Top-10 horizontal bars, each split base + amplifier | Who are the worst actors and why? |
-| Type mismatch by vessel class | Horizontal bar of mismatch counts by class + detail table | Whose AIS identity disagrees with their registry? |
+
+### Subtab: Exploration
+
+**What it shows:** Behavioural deep dives — repeat offenders, encounter patterns, and AIS gap analysis.
+
+**Data:** Same pill-filtered GFW behavioural events as the Ranking subtab.
+
+**Collapsed expanders:**
+
+| Expander | Chart | What it answers |
+|----------|-------|-----------------|
 | Repeat offenders | Bar of vessels with >=2 events + top-3 timeline | Who keeps coming back? |
 | Encounter analysis -- carrier alerts | Scatter (distance vs duration) + carrier alert + flag pairings | Who's transshipping with whom? |
 | AIS gap behaviour | Speed scatter or histogram + geographic scatter | Who's going dark, and how? |
@@ -138,6 +148,7 @@ Red alert banner if any event involves an IUU-listed vessel. Expandable table wi
 |----------|-------|-----------------|
 | Risk exposure by MPA tier | Donut (risk by MPA tier: GFCM-FRA / EU site / Other WDPA / Outside) | Where does MPA risk concentrate? |
 | Fleet composition by vessel class | Donut (unique vessels per class) | What kinds of vessels are in the fleet? |
+| Type mismatch by vessel class | Horizontal bar of mismatch counts by class + detail table | Whose AIS identity disagrees with their registry? |
 | Flag breakdown | Horizontal bars (risk by flag) + stacked bars (by event type) + IUU/ICCAT/OFAC tables | Which flags carry the most risk? |
 | Event type distribution | Pie (risk share) + summary table + band distribution table | Which event types drive risk? |
 | Event duration distribution | Histogram (duration by event type) + scatter (duration vs risk) | How do event durations relate to risk? |
@@ -230,7 +241,7 @@ The model operates on copies. It cannot modify the live data, read/write files, 
 | GFW Events API | Live or `data/med_events_static.csv` (88 demo) | Variable | All tabs |
 | EU JRC FDI effort | `data/fdi_effort_med.csv` | ~83K | Fisheries Context, Map FDI layer, AI Analyst |
 | EU JRC FDI landings | `data/fdi_landings_med.csv` | ~212K | Fisheries Context, AI Analyst |
-| Combined IUU Vessel List | `data/iuu_vessels.csv` | 369 | Risk Table, Vessel Investigation, Map, Alerts, AI Analyst |
-| ICCAT Med-authorized | `data/iccat_med_vessels.csv` | ~9,200 | Risk Table, Vessel Investigation, Map, AI Analyst |
-| OFAC SDN vessels | `data/ofac_vessels.csv` | ~50 | Risk Table, Vessel Investigation, Map, Alerts, AI Analyst |
-| GFW Fishing Events | Live (fishing-in-MPA only) | Variable | Risk Table, Vessel Investigation, Fisheries Context, AI Analyst |
+| Combined IUU Vessel List | `data/iuu_vessels.csv` | 369 | Ranking, Vessel Investigation, Map, Alerts, AI Analyst |
+| ICCAT Med-authorized | `data/iccat_med_vessels.csv` | ~9,200 | Ranking, Vessel Investigation, Map, AI Analyst |
+| OFAC SDN vessels | `data/ofac_vessels.csv` | ~50 | Ranking, Vessel Investigation, Map, Alerts, AI Analyst |
+| GFW Fishing Events | Live (fishing-in-MPA only) | Variable | Ranking, Vessel Investigation, Fisheries Context, AI Analyst |

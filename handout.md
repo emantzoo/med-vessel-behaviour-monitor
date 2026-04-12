@@ -19,7 +19,7 @@ The same methodological move Kpler has made for sanctions (80% of *eventually-sa
 
 ## The scoring pipeline
 
-Three chains converge on the Fleet Analytics -> Risk Table subtab: the per-event multiplicative chain, the vessel-level aggregation that produces a base-vs-compound decomposition, and the dashed side-chain of four vessel-level Kpler-aligned flags (one structural, three temporal/compound) that are *displayed alongside* the score but are **not** multiplied into it.
+Three chains converge on the Fleet Analytics -> Ranking subtab: the per-event multiplicative chain, the vessel-level aggregation that produces a base-vs-compound decomposition, and the dashed side-chain of four vessel-level Kpler-aligned flags (one structural, three temporal/compound) that are *displayed alongside* the score but are **not** multiplied into it.
 
 ```mermaid
 flowchart TD
@@ -42,12 +42,12 @@ flowchart TD
     N -.-> O[multi_behaviour_flag]
     N -.-> P[dark_port_call_candidate]
     N -.-> Q[repeat_offender_90d]
-    N1 -.-> R["Display-only<br/>Risk Table badges<br/>+ risk tree rules"]
+    N1 -.-> R["Display-only<br/>Ranking badges<br/>+ risk tree rules"]
     O -.-> R
     P -.-> R
     Q -.-> R
 
-    M --> S[Risk Table subtab]
+    M --> S[Ranking subtab]
     L --> S
     R --> S
 
@@ -128,7 +128,7 @@ Same event. Behavioural base (including the MPA factor, which is a spatial rule-
 
 **Calibration of the MPA multiplier.** The MPA factor is anchored by regulatory tier rather than empirical outcomes, the same way every other factor in the formula is methodology-driven rather than enforcement-calibrated. GFCM FRAs (legally binding under Reg 1967/2006) sit at 2.0× for parity with "other RFMO IUU listing"; EU-designated marine sites at 1.5×; general WDPA entries at 1.2× (below flag-of-convenience). Sensitivity sweep on the static demo across `gfcm ∈ {1.5, 2.0, 2.5, 3.0}` preserves the top-6 *set* across all four values, holds the top-6 *order* stable across `[2.0, 3.0]` (a single rank swap inside the set occurs only at the lowest value), and keeps every top-10 vessel in the Critical band at every setting — calibration sits in a stable plateau. Empirical calibration would require a labelled Mediterranean enforcement-outcome dataset which does not currently exist at scale; this is the same gap named for `duration^0.75` and every other weight.
 
-**Fishing-in-MPA: a stronger signal, kept out of the multiplier chain.** Beyond the behavioural events feed (gaps / encounters / loitering), the app also pulls GFW's `public-global-fishing-events` dataset — per-vessel fishing activity classified by the Kroodsma et al. 2018 CNN that scores every AIS position for "is this vessel fishing right now". Fishing events outside MPAs are not surfaced at all (legitimate fishing is normal commercial activity), but fishing events that intersect WDPA polygons are aggregated per vessel into a fishing-in-MPA event count and total hours, displayed in the Risk Table and Vessel Investigation. The signal is intentionally **not** multiplied into the risk score: it is the strongest publicly available signal for IUU fishing inside protected areas — stronger than any inference-based signal in the behavioural feed — and is therefore reported on its own terms. The risk tree's `fishing_activity` branch fires at high severity when at least one fishing event for the vessel intersects an MPA, propagating the signal into the per-vessel investigation trace without polluting the base behavioural score.
+**Fishing-in-MPA: a stronger signal, kept out of the multiplier chain.** Beyond the behavioural events feed (gaps / encounters / loitering), the app also pulls GFW's `public-global-fishing-events` dataset — per-vessel fishing activity classified by the Kroodsma et al. 2018 CNN that scores every AIS position for "is this vessel fishing right now". Fishing events outside MPAs are not surfaced at all (legitimate fishing is normal commercial activity), but fishing events that intersect WDPA polygons are aggregated per vessel into a fishing-in-MPA event count and total hours, displayed in the Ranking subtab and Vessel Investigation. The signal is intentionally **not** multiplied into the risk score: it is the strongest publicly available signal for IUU fishing inside protected areas — stronger than any inference-based signal in the behavioural feed — and is therefore reported on its own terms. The risk tree's `fishing_activity` branch fires at high severity when at least one fishing event for the vessel intersects an MPA, propagating the signal into the per-vessel investigation trace without polluting the base behavioural score.
 
 ---
 

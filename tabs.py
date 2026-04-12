@@ -164,7 +164,7 @@ def render_event_types(df):
   counts).
 - **Risk band distribution table**: events binned into the Turning
   Tides bands. This is *event-level* banding -- the band column on the
-  Risk Table is *vessel-level* banding (sum across events).
+  Ranking subtab is *vessel-level* banding (sum across events).
             """
         )
     if df.empty:
@@ -398,7 +398,7 @@ def render_repeat_offenders(df):
 - A vessel is a "repeat offender" here if it has at least **two
   events** in the current filter window (any event type, any spacing).
   This is the loose definition; the strict 90-day version drives the
-  `repeat_offender_90d` flag in the Risk Table.
+  `repeat_offender_90d` flag in the Ranking subtab.
 - **Bar chart**: top 15 vessels by event count, x = MMSI, y = number of
   events, colour = total compounded risk.
 - IUU-listed vessels are pulled to the top of the underlying table
@@ -651,7 +651,7 @@ def render_encounter_analysis(df):
 
 
 def render_vessel_summary(df):
-    st.subheader("Risk Table")
+    st.subheader("Fleet Risk Ranking")
     st.caption(
         "Vessel-level aggregation reports risk per vessel across multiple "
         "behavioural events rather than per individual event."
@@ -1315,7 +1315,7 @@ def render_top_vessels_segmented(df, top_n=10):
 
     Vessel-centric counterpart to render_base_vs_compound_decomposition: same
     visual grammar, different question. Plot #1 shows the principle, this shows
-    the worst actors. Both belong in the Risk Table because they tell the
+    the worst actors. Both belong in the Ranking subtab because they tell the
     interviewer two things at once -- here is how scoring works, and here is who
     it singles out.
     """
@@ -1421,7 +1421,7 @@ def render_fishing_in_mpa_map(df, fishing_df):
   fishing trip globally -- inside an MPA the same signal flips from
   background noise into the strongest publicly available IUU indicator.
 - **Cross-reference**: vessels appearing here should match the
-  `fishing_in_mpa_count > 0` column in the Risk Table.
+  `fishing_in_mpa_count > 0` column in the Ranking subtab.
 - In static demo mode coverage is sparse (a handful of events). Switch
   to live GFW mode for the full picture.
 - **AIS-based lower bound.** McDonald et al. 2024 (*Nature*) found
@@ -1606,7 +1606,7 @@ def render_type_mismatch_by_class(df):
   ICCAT-authorised case). In live mode the picture will depend on
   what GFW resolves for each MMSI.
 - **Cross-reference**: vessels with mismatch=True should also appear
-  with the type-mismatch flag set in the Risk Table.
+  with the type-mismatch flag set in the Ranking subtab.
 - **Class-level comparison.** Mismatch fires on canonical-class
   disagreement after normalisation -- TRAWLER and FISHING both map to
   `industrial_fishing`, so spelling variants do not trigger the flag.

@@ -690,11 +690,11 @@ with tab_overview:
             f"({df_tab['mmsi'].nunique()} vessels). Clear pills to reset."
         )
 
-    sub_summary, sub_map, sub_fisheries = st.tabs([
-        "Risk Table", "Trends & Patterns", "Fisheries Context",
+    sub_ranking, sub_exploration, sub_map, sub_fisheries = st.tabs([
+        "Ranking", "Exploration", "Trends & Patterns", "Fisheries Context",
     ])
 
-    with sub_summary:
+    with sub_ranking:
         with st.expander("Tab guide", expanded=False):
             st.markdown("""\
 **What it shows:** The fleet-level risk ranking. One row per vessel, sorted by compounded risk score \
@@ -722,8 +722,7 @@ highest-priority targets. Type mismatches and multi-behaviour flags add investig
 Switch to the **Vessel Investigation** tab for a per-vessel deep dive.
 
 **Collapsed expanders below:** Risk band distribution -- Base vs structural-amplifier decomposition \
--- Top vessels segmented -- Type mismatch by vessel class -- Repeat offenders -- Encounter analysis \
--- AIS gap behaviour.""")
+-- Top vessels segmented.""")
 
         render_vessel_summary(df_tab)
 
@@ -736,8 +735,26 @@ Switch to the **Vessel Investigation** tab for a per-vessel deep dive.
         with st.expander("Top vessels: base vs structural amplifier", expanded=False):
             render_top_vessels_segmented(df_tab, top_n=10)
 
-        with st.expander("Type mismatch by vessel class", expanded=False):
-            render_type_mismatch_by_class(df_tab)
+    with sub_exploration:
+        with st.expander("Tab guide", expanded=False):
+            st.markdown("""\
+**What it shows:** Behavioural deep dives -- repeat offenders, encounter patterns, and AIS gap \
+analysis. These plots answer "who keeps coming back?", "who is transshipping with whom?", and \
+"who is going dark?"
+
+**Data:** Same pill-filtered GFW behavioural events as the Ranking subtab.
+
+**Sections:**
+- **Repeat offenders** -- vessels with 2+ events in a 90-day window, with timeline of top \
+recidivists. Cross-references IUU and ICCAT matches.
+- **Encounter analysis** -- scatter of encounter distance vs duration, with carrier vessel alerts \
+for possible transshipment.
+- **AIS gap behaviour** -- distribution and geographic scatter of GAP events, highlighting vessels \
+that go dark near MPAs or in known transshipment zones.
+
+**What to look for:** Repeat offenders with IUU matches are the highest-confidence targets. \
+Short-distance, long-duration encounters near carrier vessels suggest at-sea transshipment. \
+AIS gaps clustered near MPAs or away from shipping lanes may indicate intentional concealment.""")
 
         with st.expander("Repeat offenders -- IUU and ICCAT detail"):
             render_repeat_offenders(df_tab)
@@ -767,11 +784,11 @@ ENCOUNTER risk distributes over time.
 
 **What to look for:** Bright heatmap cells reveal flag-state specialisation (e.g. a flag that \
 only shows GAP events). Spikes in the daily trend near IUU-event dates suggest coordinated \
-behaviour. Use the **Risk Table** subtab for vessel-level drill-down.
+behaviour. Use the **Ranking** subtab for vessel-level drill-down.
 
 **Collapsed expanders below:** Risk exposure by MPA tier (donut) -- Fleet composition by vessel \
-class (donut) -- Flag breakdown (bars + IUU/ICCAT/OFAC tables) -- Event type distribution \
-(pie + summary table) -- Event duration distribution (histogram + scatter).""")
+class (donut) -- Type mismatch by vessel class -- Flag breakdown (bars + IUU/ICCAT/OFAC tables) \
+-- Event type distribution (pie + summary table) -- Event duration distribution (histogram + scatter).""")
         render_risk_heatmap(df_tab)
         render_daily_trend(df_tab)
 
@@ -780,6 +797,9 @@ class (donut) -- Flag breakdown (bars + IUU/ICCAT/OFAC tables) -- Event type dis
 
         with st.expander("Fleet composition by vessel class", expanded=False):
             render_vessel_class_composition(df_tab)
+
+        with st.expander("Type mismatch by vessel class", expanded=False):
+            render_type_mismatch_by_class(df_tab)
 
         with st.expander("Flag breakdown"):
             render_flag_breakdown(df_tab)
