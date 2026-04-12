@@ -1,20 +1,69 @@
 # Flag State Risk Context
 
-HIGH RISK (sanctions/dark fleet):
-- RUS (273): Russian shadow fleet, sanctions evasion, dark tanker operations
-- IRN (422): Iranian vessels, oil sanctions, AIS manipulation
-- SYR (468): Syrian conflict, sanctions
-- PRK (371): North Korean vessels, weapons/sanctions
+## High risk (sanctions / dark fleet)
 
-FLAGS OF CONVENIENCE (weak oversight):
-- PAN (351-354): Panama, largest FOC registry globally
-- LBR (636-637): Liberia, second largest FOC
-- MHL (538): Marshall Islands, growing FOC
-- MLT (248-249): Malta, EU flag but large FOC-like registry
+These flags receive elevated risk multipliers in `config.py FLAG_RISKS`:
 
-MEDITERRANEAN COASTAL:
-- GRC (237-241): Greece, largest EU fleet, Piraeus base
-- ITA (247): Italy, major Med fleet
-- TUR (271): Turkey, significant Med fleet
-- ESP (224-225): Spain, western Med
-- CYP (209-212): Cyprus, mixed flag use
+- **RUS** (273): Russian shadow fleet, sanctions evasion, dark tanker operations. Multiplier 2.8x.
+- **IRN** (422): Iranian vessels (NITC, IRISL), oil sanctions, AIS manipulation. Multiplier 2.4x.
+- **SYR** (468): Syrian conflict, regime-linked vessels. Multiplier 2.0x.
+- **PRK** (371): North Korean vessels, weapons/sanctions. Multiplier 3.0x.
+
+## Flags of convenience (weak oversight)
+
+These flags receive modest risk multipliers:
+
+- **PAN** (351-354): Panama, largest FOC registry globally. Multiplier 1.2x.
+- **LBR** (636-637): Liberia, second largest FOC. Multiplier 1.3x.
+- **MHL** (538): Marshall Islands, growing FOC. Multiplier 1.2x.
+
+## Mediterranean coastal states (fishing nations)
+
+These are the flags that dominate actual Med fishing catches (GFCM data,
+percentage variation chart, 2024 vs 2023). No risk multiplier (1.0x) --
+their presence in the data is normal operational activity, not a risk signal.
+
+**Northern shore (EU + candidate):**
+- **TUR**: Turkey. Largest Med fishing nation by catch volume. -26.8% variation.
+- **ITA**: Italy. Second largest EU Med fleet. -8.7% variation.
+- **GRC**: Greece. Largest EU fleet by vessel count (Piraeus base). -2.0% variation.
+- **ESP**: Spain. Western Med + Alboran. -11.3% variation.
+- **FRA**: France. Western Med (Marseille, Sete). -1.5% variation.
+- **HRV**: Croatia. Adriatic. -10.7% variation.
+- **MLT**: Malta. Central Med hub, EU flag but large registry. +16.7% variation.
+- **CYP**: Cyprus. Eastern Med, mixed flag use. +6.8% variation.
+- **SVN**: Slovenia. Adriatic (small fleet). -9.1% variation.
+- **MNE**: Montenegro. Adriatic (small fleet). -2.3% variation.
+- **ALB**: Albania. Adriatic. -6.3% variation.
+- **PRT**: Portugal. Atlantic/western approaches. -7.9% variation.
+
+**Southern shore (North Africa):**
+- **DZA**: Algeria. Largest catch increase in the Med (+36.6%, +24,978 tonnes).
+- **TUN**: Tunisia. Major south Med fleet. +4.1% variation.
+- **EGY**: Egypt. Eastern south Med. +4.8% variation.
+- **LBY**: Libya. Central south Med. +1.5% variation.
+- **MAR**: Morocco. Western Med / Atlantic interface. -45.7% variation (largest decline).
+
+**Eastern shore:**
+- **ISR**: Israel. +4.1% variation.
+- **LBN**: Lebanon. +4.4% variation.
+- **SYR**: Syria (also listed under sanctions above). +11.5% variation.
+- **PSE**: Palestine. -20.0% variation.
+
+**Black Sea (adjacent basin):**
+- **BGR**: Bulgaria. -19.5% variation.
+- **ROU**: Romania. -14.7% variation.
+- **GEO**: Georgia. -6.7% variation.
+- **TUR**: Turkey (also Black Sea). +19.4% variation in Black Sea basin.
+- **RUS**: Russia (also listed under sanctions above). -25.3% variation.
+
+## Demo data flag distribution
+
+The static demo dataset (`data/med_events_static.csv`, 94 events) uses a
+flag distribution roughly proportional to actual Med fishing activity:
+GRC 13, ITA 13, TUR 12, TUN 9, DZA 7, MLT 6, ESP 5, IRN 5, EGY 5,
+MAR 3, LBY 3, HRV 3, FRA 2, CYP 2, BHS 2, HND 2, ALB 1, UNK 1.
+
+IRN events are the three real OFAC/IUU demo vessels (KOOSHA 4, SABITI,
+ADRIAN DARYA 1). HND and BHS are real IUU/ICCAT demo vessels (ACROS NO. 2,
+FRIO NARUTO). All other flags are realistic Med coastal states.
