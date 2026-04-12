@@ -1055,13 +1055,18 @@ def render_base_vs_compound_decomposition(df):
 - **Blue segment** = sum of `base_risk_score` across every event in the
   current filter window. This is what we *observed*: event duration,
   shore distance, MPA tier, flag-state risk, event-specific factors.
-- **Red segment** = the additional risk added by the IUU x ICCAT x OFAC
-  multiplier chain. This is what we *looked up* about the vessels.
+- **Coloured segments** = the additional risk added by each lookup
+  stage: IUU listing (black), ICCAT authorization (blue), OFAC sanctions
+  (dark red). This is what we *looked up* about the vessels.
 - **Compound multiplier** in the title = total / base. A value close to
   1.0x means the fleet's risk is almost entirely behavioural; values
   above 2x mean structural lookups dominate.
-- MPA tier multipliers live in the *blue* segment because they describe
-  where the event happened, not who the vessel is.
+- **Why MPA tier lives in the base.** The MPA tier multiplier is
+  observation -- it describes where the event happened, not who the
+  vessel is. IUU / ICCAT / OFAC sit in the compound segment because
+  they are registry lookups about the vessel's identity. This is the
+  "base = observation, compound = lookup" split that underpins the
+  entire scoring design.
             """
         )
     if df.empty or "base_risk_score" not in df.columns:
@@ -1160,8 +1165,8 @@ def render_base_vs_compound_decomposition(df):
     st.markdown(
         f"**Read:** {' | '.join(parts)} = **{risk_total:.0f}** total "
         f"(**{compound_mult:.2f}x** compound multiplier). "
-        "MPA tier multipliers live in the base segment because they describe "
-        "where the event happened, not who the vessel is."
+        "The compound multiplier is the ratio of total to base -- how much "
+        "of this fleet's risk is structural vs behavioural."
     )
 
 
@@ -1419,6 +1424,12 @@ def render_fishing_in_mpa_map(df, fishing_df):
   `fishing_in_mpa_count > 0` column in the Risk Table.
 - In static demo mode coverage is sparse (a handful of events). Switch
   to live GFW mode for the full picture.
+- **AIS-based lower bound.** McDonald et al. 2024 (*Nature*) found
+  approximately 90% of fishing vessels detected by satellite radar inside
+  MPAs do not broadcast AIS. Vessels shown here broadcast openly inside
+  protected areas -- a strong signal precisely because they did not go
+  dark. The true number in violation is higher; this chart captures the
+  tip of the iceberg.
             """
         )
     if fishing_df is None or fishing_df.empty:
@@ -1596,6 +1607,13 @@ def render_type_mismatch_by_class(df):
   what GFW resolves for each MMSI.
 - **Cross-reference**: vessels with mismatch=True should also appear
   with the type-mismatch flag set in the Risk Table.
+- **Class-level comparison.** Mismatch fires on canonical-class
+  disagreement after normalisation -- TRAWLER and FISHING both map to
+  `industrial_fishing`, so spelling variants do not trigger the flag.
+  Only true category disagreement surfaces, e.g. a vessel broadcasting
+  FISHING in its AIS self-reported data while its registry record says
+  CARGO. This is the open-data equivalent of Kpler's "irregular vessel
+  information" indicator from the *Grey Fleet* paper (March 2025).
             """
         )
     if df.empty or "vessel_type_mismatch" not in df.columns or "vessel_class" not in df.columns:

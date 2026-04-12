@@ -820,6 +820,14 @@ high-value stocks. See also the **Vessel Investigation** tab for per-vessel FDI 
 
 **Collapsed expanders below:** Fishing activity inside MPAs (scatter map of fishing-in-MPA events) \
 -- Geographic risk breakdown (sub-zone bars, port-distance scatter).""")
+        st.markdown(
+            "Two views of fishing in the Mediterranean: the FDI baseline showing "
+            "where legitimate effort concentrates, and GFW fishing events inside "
+            "MPAs showing where that activity crosses into protected areas. "
+            "Low-effort c-squares with suspicious behavioural events are the "
+            "enforcement priority -- fishing happening where legitimate fishing "
+            "rarely occurs."
+        )
         render_fisheries_context(df_tab, fdi_effort, fdi_landings)
 
         with st.expander("Fishing activity inside MPAs", expanded=False):
