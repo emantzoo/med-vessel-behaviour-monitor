@@ -834,15 +834,19 @@ metadata in live mode and from the static profile in demo mode.
         "and filter the map above."
     )
     table_key = "vessel_summary_table"
-    # If a vessel was selected elsewhere (map click, investigation dropdown),
-    # pre-select the matching row in the table (Streamlit >= 1.56).
+    # One-shot pre-selection: when a map click sets a NEW vessel, inject
+    # the matching row index into the table widget state, then mark the
+    # click as consumed so subsequent reruns let the user freely pick a
+    # different row without the table snapping back.
     map_vessel = st.session_state.get("map_clicked_vessel")
-    if map_vessel:
+    already_synced = st.session_state.get("_table_synced_vessel")
+    if map_vessel and map_vessel != already_synced:
         match_idx = vessel_df.index[vessel_df["vessel_name"] == map_vessel].tolist()
         if match_idx:
             st.session_state[table_key] = {
                 "selection": {"rows": match_idx[:1], "columns": [], "cells": []}
             }
+        st.session_state["_table_synced_vessel"] = map_vessel
     selection = st.dataframe(
         styled,
         use_container_width=True,
@@ -864,6 +868,9 @@ metadata in live mode and from the static profile in demo mode.
                 # updates after a second user interaction.
                 prev = st.session_state.get("map_clicked_vessel")
                 st.session_state["map_clicked_vessel"] = picked_name
+                # Mark this row click as the new sync baseline so the
+                # one-shot pre-selection doesn't fight the user's choice.
+                st.session_state["_table_synced_vessel"] = picked_name
                 st.success(
                     f"Pre-selected **{picked_name}** for the Vessel Investigation subtab. "
                     "Switch to that subtab to see the full report. The map above "
