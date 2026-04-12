@@ -823,18 +823,32 @@ metadata in live mode and from the static profile in demo mode.
         if v in RISK_BAND_COLORS else "",
         subset=["risk_band"],
     )
-    # Single-row selection hands a vessel off to the Vessel Investigation
-    # subtab. We write to the same sentinel key that the map click uses, so
-    # the Investigation selector picks it up on the next rerun.
+    # Two-way selection sync: table row click → map filter (via
+    # map_clicked_vessel), and map marker click → table row highlight.
+    # Streamlit 1.56+ allows programmatic pre-selection by writing to
+    # st.session_state[key] before rendering. For older versions the
+    # table still works for user clicks but won't auto-highlight on
+    # map click.
     st.caption(
-        "Click a row to pre-select that vessel in the **Vessel Investigation** subtab."
+        "Click a row to pre-select that vessel in the **Vessel Investigation** subtab "
+        "and filter the map above."
     )
+    table_key = "vessel_summary_table"
+    # If a vessel was selected elsewhere (map click, investigation dropdown),
+    # pre-select the matching row in the table (Streamlit >= 1.56).
+    map_vessel = st.session_state.get("map_clicked_vessel")
+    if map_vessel:
+        match_idx = vessel_df.index[vessel_df["vessel_name"] == map_vessel].tolist()
+        if match_idx:
+            st.session_state[table_key] = {
+                "selection": {"rows": match_idx[:1], "columns": [], "cells": []}
+            }
     selection = st.dataframe(
         styled,
         use_container_width=True,
         on_select="rerun",
         selection_mode="single-row",
-        key="vessel_summary_table",
+        key=table_key,
     )
     selected_rows = (selection.selection.rows
                      if selection is not None and hasattr(selection, "selection")
