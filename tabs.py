@@ -834,19 +834,17 @@ metadata in live mode and from the static profile in demo mode.
         "and filter the map above."
     )
     table_key = "vessel_summary_table"
-    # One-shot pre-selection: when a map click sets a NEW vessel, inject
-    # the matching row index into the table widget state, then mark the
-    # click as consumed so subsequent reruns let the user freely pick a
-    # different row without the table snapping back.
+    # Highlight the row matching the map-clicked vessel with a light
+    # blue background so the user can spot it immediately. Programmatic
+    # checkbox selection is not supported by st.dataframe, so visual
+    # highlighting is the best we can do for map → table sync.
     map_vessel = st.session_state.get("map_clicked_vessel")
-    already_synced = st.session_state.get("_table_synced_vessel")
-    if map_vessel and map_vessel != already_synced:
-        match_idx = vessel_df.index[vessel_df["vessel_name"] == map_vessel].tolist()
-        if match_idx:
-            st.session_state[table_key] = {
-                "selection": {"rows": match_idx[:1], "columns": [], "cells": []}
-            }
-        st.session_state["_table_synced_vessel"] = map_vessel
+    if map_vessel:
+        def _highlight_vessel(row):
+            if row["vessel_name"] == map_vessel:
+                return ["background-color: #e0f0ff"] * len(row)
+            return [""] * len(row)
+        styled = styled.apply(_highlight_vessel, axis=1)
     selection = st.dataframe(
         styled,
         use_container_width=True,
@@ -868,9 +866,6 @@ metadata in live mode and from the static profile in demo mode.
                 # updates after a second user interaction.
                 prev = st.session_state.get("map_clicked_vessel")
                 st.session_state["map_clicked_vessel"] = picked_name
-                # Mark this row click as the new sync baseline so the
-                # one-shot pre-selection doesn't fight the user's choice.
-                st.session_state["_table_synced_vessel"] = picked_name
                 st.success(
                     f"Pre-selected **{picked_name}** for the Vessel Investigation subtab. "
                     "Switch to that subtab to see the full report. The map above "
