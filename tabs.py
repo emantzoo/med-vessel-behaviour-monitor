@@ -1311,7 +1311,7 @@ broadcast AIS. This chart captures the tip of the iceberg.
         prefer_canvas=True,
     )
 
-    # --- Layer 1: FDI effort heatmap (Folium Rectangles, same palette as main map) ---
+    # --- Layer 1: FDI effort heatmap — single GeoJSON (fast) ---
     if os.path.exists(_fdi_path):
         _fdi_bg = pd.read_csv(_fdi_path)
         _fdi_yr = _fdi_bg["year"].max()
@@ -1320,27 +1320,44 @@ broadcast AIS. This chart captures the tip of the iceberg.
             .groupby(["rectangle_lon", "rectangle_lat"])["totfishdays"]
             .sum().reset_index()
         )
-        for _, cell in _fdi_cells.iterrows():
-            sw_lon = cell["rectangle_lon"]
-            sw_lat = cell["rectangle_lat"]
-            days = cell["totfishdays"]
+        def _fdi_color(days):
             if days >= 2000:
-                color, opacity = "#e31a1c", 0.35
+                return "#e31a1c", 0.35
             elif days >= 500:
-                color, opacity = "#fd8d3c", 0.30
+                return "#fd8d3c", 0.30
             elif days >= 50:
-                color, opacity = "#fecc5c", 0.25
-            else:
-                color, opacity = "#ffffb2", 0.15
-            folium.Rectangle(
-                bounds=[[sw_lat, sw_lon], [sw_lat + 0.5, sw_lon + 0.5]],
-                color=color,
-                fill=True,
-                fill_color=color,
-                fill_opacity=opacity,
-                weight=0,
-                tooltip=f"FDI effort ({int(_fdi_yr)}): {days:,.0f} fishing days",
-            ).add_to(fmap)
+                return "#fecc5c", 0.25
+            return "#ffffb2", 0.15
+
+        _fdi_features = []
+        for _, cell in _fdi_cells.iterrows():
+            lo, la, days = cell["rectangle_lon"], cell["rectangle_lat"], cell["totfishdays"]
+            color, opacity = _fdi_color(days)
+            _fdi_features.append({
+                "type": "Feature",
+                "geometry": {
+                    "type": "Polygon",
+                    "coordinates": [[[lo, la], [lo + 0.5, la], [lo + 0.5, la + 0.5],
+                                     [lo, la + 0.5], [lo, la]]],
+                },
+                "properties": {
+                    "color": color,
+                    "opacity": opacity,
+                    "tooltip": f"FDI effort ({int(_fdi_yr)}): {days:,.0f} fishing days",
+                },
+            })
+        folium.GeoJson(
+            {"type": "FeatureCollection", "features": _fdi_features},
+            name=f"FDI effort ({int(_fdi_yr)})",
+            style_function=lambda f: {
+                "fillColor": f["properties"]["color"],
+                "fillOpacity": f["properties"]["opacity"],
+                "color": "none",
+                "weight": 0,
+            },
+            tooltip=folium.GeoJsonTooltip(fields=["tooltip"], aliases=[""], labels=False),
+            show=True,
+        ).add_to(fmap)
 
     # --- Layer 2: Background clustering — all fishing-in-MPA events ---
     if n_bg > 0:
@@ -1383,61 +1400,53 @@ broadcast AIS. This chart captures the tip of the iceberg.
         else:
             fg_df["_hours"] = 1.0
 
-        # SVG shape templates keyed by leaf
-        def _make_icon(leaf_id, severity, overlay):
-            color = {"high": "#E45756", "medium": "#F58518"}.get(severity, "#4C78A8")
-            border = "white" if overlay else "#333"
-            bw = 3 if overlay else 1
-            if leaf_id == "fishing_in_closed_area":
-                # triangle-up
-                svg = (
-                    f'<svg width="20" height="20" xmlns="http://www.w3.org/2000/svg">'
-                    f'<polygon points="10,2 19,18 1,18" fill="{color}" '
-                    f'stroke="{border}" stroke-width="{bw}"/></svg>'
-                )
-            elif leaf_id == "fishing_in_low_effort_cell":
-                # square
-                svg = (
-                    f'<svg width="18" height="18" xmlns="http://www.w3.org/2000/svg">'
-                    f'<rect x="1" y="1" width="16" height="16" fill="{color}" '
-                    f'stroke="{border}" stroke-width="{bw}"/></svg>'
-                )
-            elif leaf_id in ("gfw_no_rfmo_authorization", "unregulated_flag"):
-                # diamond
-                svg = (
-                    f'<svg width="20" height="20" xmlns="http://www.w3.org/2000/svg">'
-                    f'<polygon points="10,1 19,10 10,19 1,10" fill="{color}" '
-                    f'stroke="{border}" stroke-width="{bw}"/></svg>'
-                )
-            else:
-                svg = (
-                    f'<svg width="14" height="14" xmlns="http://www.w3.org/2000/svg">'
-                    f'<circle cx="7" cy="7" r="6" fill="{color}" '
-                    f'stroke="{border}" stroke-width="{bw}"/></svg>'
-                )
-            return folium.DivIcon(
-                html=svg,
-                icon_size=(20, 20),
-                icon_anchor=(10, 10),
-            )
-
         mpa_col = "mpa" if "mpa" in fg_df.columns else None
-        fg_layer = folium.FeatureGroup(name=f"High-signal events ({n_fg:,})", show=True)
 
+        # FastMarkerCluster for foreground — JS callback encodes leaf/severity/overlay
+        # into a coloured SVG DivIcon. Clustering collapses nearby points at low zoom.
+        _fg_callback = """
+        function(row, context) {
+            var lat  = row[0], lon = row[1];
+            var leaf = row[2], sev = row[3], ov = row[4], popup = row[5], tip = row[6];
+            var color = sev === 'high' ? '#E45756' : (sev === 'medium' ? '#F58518' : '#4C78A8');
+            var border = ov ? 'white' : '#333';
+            var bw = ov ? 3 : 1;
+            var svg;
+            if (leaf === 'fishing_in_closed_area') {
+                svg = '<svg width="20" height="20" xmlns="http://www.w3.org/2000/svg">'
+                    + '<polygon points="10,2 19,18 1,18" fill="'+color+'" stroke="'+border+'" stroke-width="'+bw+'"/></svg>';
+            } else if (leaf === 'fishing_in_low_effort_cell') {
+                svg = '<svg width="18" height="18" xmlns="http://www.w3.org/2000/svg">'
+                    + '<rect x="1" y="1" width="16" height="16" fill="'+color+'" stroke="'+border+'" stroke-width="'+bw+'"/></svg>';
+            } else if (leaf === 'gfw_no_rfmo_authorization' || leaf === 'unregulated_flag') {
+                svg = '<svg width="20" height="20" xmlns="http://www.w3.org/2000/svg">'
+                    + '<polygon points="10,1 19,10 10,19 1,10" fill="'+color+'" stroke="'+border+'" stroke-width="'+bw+'"/></svg>';
+            } else {
+                svg = '<svg width="14" height="14" xmlns="http://www.w3.org/2000/svg">'
+                    + '<circle cx="7" cy="7" r="6" fill="'+color+'" stroke="'+border+'" stroke-width="'+bw+'"/></svg>';
+            }
+            var icon = L.divIcon({html: svg, iconSize: [20,20], iconAnchor: [10,10], className: ''});
+            var marker = L.marker([lat, lon], {icon: icon});
+            marker.bindPopup(popup, {maxWidth: 280});
+            marker.bindTooltip(tip);
+            return marker;
+        }
+        """
+        _fg_rows = []
         for _, row in fg_df.iterrows():
             leaf_id = row["_fg_leaf"]
             severity = row["_fg_severity"]
-            overlay = bool(row["_vessel_overlay"])
+            overlay = 1 if bool(row["_vessel_overlay"]) else 0
             hours = row["_hours"]
-            popup_parts = [
+            popup_lines = [
                 f"<b>{row.get('vessel_name', 'Unknown')}</b>",
                 f"Flag: {row.get('flag', 'N/A')}",
-                f"Date: {row.get('date', '')}",
+                f"Date: {str(row.get('date', ''))}",
                 f"Fishing hours: {hours:.1f}h",
                 f"<b>Leaf: {LEAF_LABELS.get(leaf_id, leaf_id)}</b> ({severity})",
             ]
             if mpa_col and row.get(mpa_col):
-                popup_parts.append(f"MPA: {row[mpa_col]}")
+                popup_lines.append(f"MPA: {row[mpa_col]}")
             if overlay:
                 ov = []
                 if row.get("vessel_iuu_crosscheck"):
@@ -1446,15 +1455,24 @@ broadcast AIS. This chart captures the tip of the iceberg.
                     ov.append("stateless")
                 if row.get("vessel_unregulated_flag"):
                     ov.append("unregulated flag")
-                popup_parts.append(f"<b>Vessel signals:</b> {', '.join(ov)}")
-            folium.Marker(
-                location=[row["lat"], row["lon"]],
-                icon=_make_icon(leaf_id, severity, overlay),
-                popup=folium.Popup("<br>".join(popup_parts), max_width=280),
-                tooltip=f"{row.get('vessel_name', '?')} — {LEAF_LABELS.get(leaf_id, leaf_id)}",
-            ).add_to(fg_layer)
+                popup_lines.append(f"<b>Vessel signals:</b> {', '.join(ov)}")
+            _fg_rows.append([
+                row["lat"], row["lon"],
+                leaf_id, severity, overlay,
+                "<br>".join(popup_lines),
+                f"{row.get('vessel_name', '?')} — {LEAF_LABELS.get(leaf_id, leaf_id)}",
+            ])
 
-        fg_layer.add_to(fmap)
+        FastMarkerCluster(
+            data=_fg_rows,
+            callback=_fg_callback,
+            name=f"High-signal events ({n_fg:,})",
+            options={
+                "maxClusterRadius": 30,
+                "disableClusteringAtZoom": 8,
+                "spiderfyOnMaxZoom": True,
+            },
+        ).add_to(fmap)
 
     folium.LayerControl(collapsed=False).add_to(fmap)
     st_folium(fmap, use_container_width=True, height=520, returned_objects=[])
