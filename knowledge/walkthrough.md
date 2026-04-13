@@ -20,12 +20,12 @@ These elements sit above the four tabs because they carry the highest-priority s
 - **Size** = risk band: Low (14 px) → Emerging (17 px) → Elevated (20 px) → Severe (24 px) → Critical (28 px)
 - **Dashed amber outline** = dark port call candidate (loitering within 10 km of shore)
 
-**FDI choropleth layer (toggleable):** 0.5-degree c-squares near events, coloured by fishing days: yellow (<50d) → orange-red (50-500d) → red (500-2000d) → dark red (>2000d).
+**FDI choropleth layer (toggleable):** All Mediterranean 0.5-degree c-squares coloured by fishing days with opacity tiers — pale yellow (<50d, 0.15 opacity), orange (50–500d, 0.25), orange-red (500–2000d, 0.30), dark red (>2000d, 0.35). Coverage is fleet-wide, not limited to event proximity.
 
 **Interactions:**
 - Click a marker to see the event detail card (vessel, event type, risk score, flag, duration, date, listing status, FDI context, external lookup links).
 - Clicking a marker also pre-selects that vessel for the Vessel Investigation tab and filters the map to that vessel's events.
-- Use the layer control (top-right) to toggle Clean / ICCAT / IUU / OFAC / FDI layers.
+- Use the layer control (top-right) to toggle Clean / IUU / OFAC / FDI layers.
 - When a vessel is focused (via row click, marker click, or Investigation dropdown), the map auto-zooms to fit that vessel's events. Use the "Clear map filter" button to return to the full fleet view.
 
 ### Fleet Metrics (right column)
@@ -96,6 +96,7 @@ Red alert banner if any event involves an IUU-listed vessel. Expandable table wi
 
 **Key columns:**
 - `risk_band` — Kpler Turning Tides classification: Low (<50), Emerging (50-60), Elevated (60-80), Severe (80-100), Critical (>=100). Cell background coloured.
+- `avg_risk` / `peak_risk` — per-event average and maximum risk score. More stable than sum for cross-vessel comparison.
 - `compound_multiplier` — `risk_score_total / base_score_total`. 1.0x = purely behavioural; >2x = structural lookups (IUU, ICCAT, OFAC) dominate.
 - `vessel_class` — descriptive category from GFW Vessels API shiptypes (industrial_fishing / artisanal_fishing / carrier / tanker / cargo / support / passenger / other).
 - `type_mismatch` — fires when event-level vessel_type and registry shiptypes map to different canonical classes (Kpler Grey Fleet "irregular vessel information" equivalent).
@@ -103,7 +104,7 @@ Red alert banner if any event involves an IUU-listed vessel. Expandable table wi
 - MPA intersection: `in_mpa`, `mpa_tier`, `fishing_in_mpa_events`, `fishing_in_mpa_hours`.
 - Listing booleans: `iuu_matched`, `iccat_authorized`, `ofac_sanctioned`.
 
-**Pill filters:** Event type, risk band, flag state, vessel class. Sit above the subtabs and cascade to all four Fleet Analytics subtabs (Ranking, Exploration, Trends & Patterns, Fisheries Context).
+**Pill filters:** Event type, risk band, flag state, vessel class. Sit above the subtabs and cascade to all five Fleet Analytics subtabs.
 
 **Interactions:** Use the slider to control how many vessels appear. Use pill filters to narrow the fleet view. Switch to **Vessel Investigation** tab for per-vessel drill-down.
 
@@ -176,10 +177,34 @@ Red alert banner if any event involves an IUU-listed vessel. Expandable table wi
 
 | Expander | Chart | What it answers |
 |----------|-------|-----------------|
-| Fishing events with risk signals | Leaf-differentiated scatter (shape = leaf type, colour = severity, white border = vessel-level overlay). Sized by fishing hours. | Where is fishing happening inside protected areas, and which risk leaves fired? |
 | Geographic risk breakdown | Sub-zone risk bars + port-distance scatter | Which Mediterranean zones and port distances carry the most risk? |
 
 ---
+
+
+---
+
+### Subtab: Fishing Activity
+
+**What it shows:** GFW-classified fishing events (`public-global-fishing-events` CNN feed) with risk signal attribution. These are actual fishing detections — separate from the behavioural gap/encounter/loitering events.
+
+**Data:** `fishing_df` (loaded separately, never merged into `df_filtered`) cross-referenced against WDPA MPAs, FDI low-effort cells, and GFCM party flag list.
+
+**Toggle filters (cascade to both map and table):**
+- **In MPA only** — restrict to events with `in_mpa=True`
+- **Non-GFCM flag** — vessels flagged to non-GFCM contracting parties
+- **With behavioural** — vessels that also appear in the scored behavioural events
+- **Fishing-only** — vessels in `fishing_df` not in `df_filtered` (pure fishing detections, no suspicious AIS behaviour)
+
+**Views:**
+
+| View | What it shows |
+|---|---|
+| Scatter map | Background grey dots = all fishing inside MPAs; foreground coloured shapes = events that fired risk tree leaves. Shape encodes leaf type (circle = general MPA, triangle = closed area, square = low-effort cell, diamond = no RFMO auth); colour encodes severity. |
+| Fishing vessel table (expander) | One row per fishing vessel with event counts, total hours, in-MPA events, non-GFCM flag, whether the vessel also appears in the behavioural ranking. Sorted by in-MPA event count descending. |
+
+**Static-demo caveat:** the bundled fishing dataset has ~5 fishing-in-MPA events. Switch to live GFW mode for the full picture.
+
 
 ## Tab 3: Reference & Methodology
 
@@ -238,10 +263,11 @@ The model operates on copies. It cannot modify the live data, read/write files, 
 
 | Source | File / API | Rows | Used in |
 |--------|-----------|------|---------|
-| GFW Events API | Live or `data/med_events_static.csv` (88 demo) | Variable | All tabs |
+| GFW Events API | Live or `data/med_events_static.csv` (95 demo) | Variable | All tabs |
 | EU JRC FDI effort | `data/fdi_effort_med.csv` | ~83K | Fisheries Context, Map FDI layer, AI Analyst |
 | EU JRC FDI landings | `data/fdi_landings_med.csv` | ~212K | Fisheries Context, AI Analyst |
 | Combined IUU Vessel List | `data/iuu_vessels.csv` | 369 | Ranking, Vessel Investigation, Map, Alerts, AI Analyst |
 | ICCAT Med-authorized | `data/iccat_med_vessels.csv` | ~9,200 | Ranking, Vessel Investigation, Map, AI Analyst |
 | OFAC SDN vessels | `data/ofac_vessels.csv` | ~50 | Ranking, Vessel Investigation, Map, Alerts, AI Analyst |
-| GFW Fishing Events | Live (fishing-in-MPA only) | Variable | Ranking, Vessel Investigation, Fisheries Context, AI Analyst |
+| GFW Fishing Events | Live or `data/med_fishing_static.csv` (12 demo) | Variable | Fishing Activity, Ranking, Vessel Investigation, AI Analyst |
+| WDPA MPA reference | `data/wdpa_mpa_lookup.csv` | Variable | Fishing Activity scatter map |

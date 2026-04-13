@@ -18,11 +18,12 @@ The app is organised into four top-level tabs (with subtabs grouping related vie
 
 1. **Vessel Investigation** — four-layer view: framework methodology, structured narrative, per-vessel coloured risk tree, cumulative risk trajectory chart (behavioural arc over time). Quick-select table for vessel switching. Case-file Markdown export. The AQUARIS-style deep dive.
 
-2. **Fleet Analytics** — four subtabs covering all fleet-level views:
+2. **Fleet Analytics** — five subtabs covering all fleet-level views:
    - *Ranking* — vessel-level aggregation table with pill filters, risk bands and compounding multipliers, the four Kpler-aligned flags (industrial profile, multi-behaviour, dark port call candidate, repeat offender), the two vessel-identity columns (`vessel_class` descriptive label + `vessel_type_mismatch` Grey Fleet "irregular vessel information" flag), and a sortable length / GT profile column. Primary Kpler-vocabulary view.
    - *Exploration* — behavioural deep dives: repeat offenders, encounter/carrier alerts, AIS gap behaviour.
    - *Trends & Patterns* — risk heatmap, daily and monthly trend, type mismatch by vessel class. Secondary charts (flag breakdown, event types pie, duration distribution) in collapsed expanders.
    - *Fisheries Context* — FDI overlay, c-square context, species landings. Geographic risk breakdown in an expander.
+   - *Fishing Activity* — GFW-classified fishing events with leaf attribution scatter map and vessel table. Toggle filters for MPA-only, non-GFCM flag, vessels with/without behavioural events.
 
 3. **Reference & Methodology** — risk tree diagram from `risk_tree_framework.yaml`, end-to-end scoring pipeline, risk-band table, and per-multiplier tables. Direct conceptual link to Kpler's April 2026 shadow fleet risk tree blog post.
 
@@ -85,7 +86,7 @@ This demonstrates: open-data parity with a Kpler proprietary indicator, careful 
 
 ### Show the Fisheries Context tab (60 seconds)
 
-Switch to the **Fisheries Context** subtab. "This subtab overlays GFW events against the EU's official fisheries data. Each event is mapped to a c-square — a 0.5 degree grid cell used by STECF for fisheries reporting. I can see whether an event occurred in a known fishing ground, what species are typically caught there, and what the economic value is. High-value c-squares — swordfish, bluefin tuna areas — are where transshipment risk is highest because the incentive to launder unauthorized catch is strongest."
+Switch to the **Fisheries Context** subtab. "This subtab overlays GFW events against the EU's official fisheries data. The FDI choropleth now covers all Mediterranean c-squares (not just near events), so you can see the full effort baseline at a glance. Each event is mapped to a c-square — a 0.5 degree grid cell used by STECF for fisheries reporting. I can see whether an event occurred in a known fishing ground, what species are typically caught there, and what the economic value is. High-value c-squares — swordfish, bluefin tuna areas — are where transshipment risk is highest because the incentive to launder unauthorized catch is strongest."
 
 This demonstrates: spatial analysis capability, understanding of EU fisheries data infrastructure, economic reasoning about IUU incentives.
 
@@ -311,6 +312,8 @@ config.py           → Constants and pure functions. Event weights, flag risk
                       Two spatial helpers: classify_med_zone() (longitude
                       bands) and assign_csquare() (maps point to 0.5dd grid).
                       classify_risk_band() assigns the final band label.
+                      EEZ_MRGID_NAMES dict + resolve_eez_name() for resolving
+                      GFW numeric MRGID region IDs to country names.
 
 data_loading.py     → All data ingestion. Loaders, all @st.cache_data:
                       - load_static_data() → 88-row CSV or synthetic gen
@@ -325,6 +328,7 @@ data_loading.py     → All data ingestion. Loaders, all @st.cache_data:
                         MPAs (Tier 2 fallback for fishing_in_closed_area)
                       - download_insights_snapshot() → GFW Insights API v3
                         batch query (RFMO auth, AIS coverage, IUU cross-ref)
+                        uses vessel_id already in event data (no extra API call)
                       - load_snapshot_insights() → cached Insights API data
 
 risk_model.py       → All scoring and matching logic:
@@ -338,6 +342,10 @@ risk_model.py       → All scoring and matching logic:
                       - match_ofac_vessels() → applies OFAC to all rows
                       - detect_gap_then_fishing_sequence() → AIS dark then
                         fishing within 72h (IUU evasion signature)
+                      - get_low_effort_csquares() → bottom 5% FDI effort
+                        c-squares for anomalous-location detection
+                      - attribute_leaves_to_fishing_events() → per-event
+                        leaf attribution for Fishing Activity scatter map
                       - get_low_effort_csquares() → bottom 5% FDI effort
                         c-squares for anomalous-location detection
 
@@ -391,6 +399,8 @@ tabs.py             → Render functions invoked from the 4 top-level tabs,
                            distribution in expanders
                          - Fisheries Context: FDI overlay; geographic
                            risk breakdown in expander
+                         - Fishing Activity: GFW-classified fishing events
+                           with leaf attribution, scatter map, vessel table
                       3. Reference & Methodology — risk tree diagram,
                          scoring pipeline, multiplier tables
                       4. AI Analyst — Gemini 2.5 Flash sandboxed interface
@@ -414,7 +424,7 @@ exports.py          → Export helpers for analyst workflow:
 ### Data Pipeline (execution order in app.py)
 
 ```
-1.  Load data         load_live_data() or load_static_data()
+1.  Load data         load_live_data() or load_static_data()  [snapshot window: 30 days]
 2.  Load reference    load_fdi_*(), load_iuu_vessels(), load_iccat_vessels(), load_ofac_vessels(),
                       load_closed_area_mpas()
 3.  Filter            duration >= min_duration slider
@@ -446,7 +456,7 @@ OFAC matching:   MMSI exact (high) → IMO exact (high) → name exact (no fuzzy
 base = (duration_h ^ 0.75) x event_weight x flag_multiplier x shore_factor x mpa_multiplier
      x encounter_factors  (proximity + speed + vessel_type)
      x loitering_factors  (vessel_type + avg_speed)
-     x gap_factors        (speed_change)
+     x gap_factors        (intentional_disabling | implied_speed_knots)
 
 final = base x iuu_multiplier x iccat_multiplier x ofac_multiplier
 
@@ -489,7 +499,7 @@ Purple   = ENCOUNTER event
 ## Key Numbers to Know
 
 - 6 data sources cross-referenced (GFW, FDI, IUU, ICCAT, OFAC, GFCM register), with GFW providing four distinct feeds (Events API, `regions.mpa` WDPA intersection, `public-global-fishing-events` CNN classifier, Insights API v3)
-- 95 demo events across 4 top-level tabs (Fleet Analytics has 4 subtabs; secondary charts in expanders)
+- 95 demo events across 4 top-level tabs (Fleet Analytics has 5 subtabs; secondary charts in expanders)
 - 369 IUU vessels (213 currently listed, 150 GFCM-listed)
 - 9,203 ICCAT Med-authorized vessels
 - ~1,000 FDI c-squares covering EU Med waters

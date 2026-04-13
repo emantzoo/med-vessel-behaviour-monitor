@@ -29,7 +29,7 @@ base = (duration^0.75) × event_weight × flag_multiplier × shore_factor × mpa
 - **Event-specific factors**:
   - *Encounters*: proximity multiplier (<500m = 1.8x), speed multiplier (<2kn = 1.5x), vessel type multiplier (carrier/tanker = 1.4x)
   - *Loitering*: vessel type (carrier/tanker = 1.6x), speed (<2kn = 1.4x)
-  - *Gaps*: speed-change evasion proxy (>5 knots change = 1.5x)
+  - *Gaps*: evasion factor — `gap_intentional_disabling=True` → 1.5x; `gap_implied_speed_knots` >8 kn → 1.4x; >4 kn → 1.2x; otherwise 1.0x. Uses GFW-computed fields directly rather than a before/after speed delta.
 
 ### Step 2: Apply structural multipliers
 
@@ -123,7 +123,7 @@ The risk tree is a hierarchical framework with **8 branches** and **41 leaf ques
    - **Flag State Risk** — high-risk IUU country, flag of convenience, recent flag change, PSC blacklist.
    - **Behavioural History (90 days)** — AIS gap count, carrier encounters, loitering in fishing grounds, speed-change evasion, plus the four display-only flags (multi-behaviour, dark port call, repeat offender, industrial profile).
    - **Spatial / Contextual Risk** — contested EEZ, MPA/FRA intersection, high-value fishing grounds.
-   - **Fishing Activity** — four leaves analysing GFW-classified fishing events: fishing inside any MPA (`fishing_in_mpa`, high), fishing inside a no-take MPA or curated closed area (`fishing_in_closed_area`, high — two-tier signal using GFW's `mpaNoTake` field as primary and `closed_area_mpas.csv` as fallback), AIS gap followed by fishing within 72 hours (`gap_then_fishing_sequence`, high — classic IUU evasion signature), and EU vessel fishing in a bottom-5% FDI effort c-square (`fishing_in_low_effort_cell`, medium — anomalous location for EU fleet).
+   - **Fishing Activity** — four leaves analysing GFW-classified fishing events: fishing inside any MPA (`fishing_in_mpa`, high), fishing inside a no-take MPA or curated closed area (`fishing_in_closed_area`, high — two-tier: GFW `mpaNoTake` field as primary, `closed_area_mpas.csv` Med-specific closures as fallback), AIS gap ≥4h followed by fishing within 72 hours (`gap_then_fishing_sequence`, high — classic IUU evasion signature, detected by `detect_gap_then_fishing_sequence()` in `risk_model.py`), and EU vessel fishing in a bottom-5% FDI effort c-square (`fishing_in_low_effort_cell`, medium — anomalous location, computed via `get_low_effort_csquares()`). Leaf attribution per event is computed by `attribute_leaves_to_fishing_events()` and visualised in the Fishing Activity subtab.
 
 3. **Contextual branches** (direction-dependent) — the answer changes interpretation depending on what other branches found:
    - **Fishing Authorization Status** — ICCAT/GFCM authorization is an opportunity indicator, not exoneration. A carrier authorized for bluefin paired with suspicious AIS behaviour is *more* concerning, not less. This branch also covers the FAO "unregulated" category: **stateless_vessel** (high — vessel broadcasting empty/unknown flag, outside any state's regulatory authority) and **unregulated_flag_in_gfcm_area** (medium — vessel flagged to a non-GFCM contracting party, fishing under no applicable regional conservation measures). Two GFW Insights API leaves provide cross-references: **gfw_iuu_crosscheck** (high — GFW's live RFMO IUU list confirms listing, independent of our static CSV) and **gfw_no_rfmo_authorization** (medium — GFW detected fishing in RFMO areas where vessel has no known authorization from any of 40+ registries). Together with existing illegal-fishing detection, these complete coverage of two of three FAO IUU categories.
@@ -183,9 +183,9 @@ The behavioural substrate. Three distinct feeds:
 
 - **GFW Events API** -- AIS-derived behavioural events (gap, encounter, loitering) for the Mediterranean polygon. Anchored in Miller et al. 2018. Primary input to the scoring pipeline.
 - **GFW `regions.mpa`** -- WDPA point-in-polygon intersection, computed server-side by GFW on each event. Feeds the MPA tier multiplier in the base score.
-- **GFW `public-global-fishing-events`** -- Kroodsma et al. 2018 CNN-classified fishing activity. Separate feed, display-only (fishing-in-MPA flag).
+- **GFW `public-global-fishing-events`** -- Kroodsma et al. 2018 CNN-classified fishing activity. Separate feed, display-only. Surfaced in the **Fishing Activity** subtab (leaf-attributed scatter map + vessel table) and as a per-vessel fishing-in-MPA flag in Vessel Investigation.
 - **GFW Vessels API** -- vessel metadata (length, tonnage, shiptypes, flag, IMO). Used for `is_industrial`, `vessel_class`, `vessel_type_mismatch`.
-- **GFW Insights API** (v3) -- optional batch query for unique vessels in the snapshot. Returns RFMO authorization checks (fishing without known authorization from 40+ registries), AIS coverage percentage, and live IUU list cross-reference. Queried during snapshot download when "Include vessel insights" toggle is enabled (~1 min for ~200 Elevated+ vessels). Cached to `data/api_insights_snapshot.csv`. Two tree-only leaves: `gfw_iuu_crosscheck` (high) and `gfw_no_rfmo_authorization` (medium). No scoring multiplier.
+- **GFW Insights API** (v3) -- optional batch query for unique vessels in the snapshot. Returns RFMO authorization checks (fishing without known authorization from 40+ registries), AIS coverage percentage, and live IUU list cross-reference. Queried during snapshot download when "Include vessel insights" toggle is enabled (~5-10 min for Elevated+ vessels). Uses `vessel_id` already captured in event parsing — no extra Vessels API round-trip. Cached to `data/api_insights_snapshot.csv`. Two tree-only leaves: `gfw_iuu_crosscheck` (high) and `gfw_no_rfmo_authorization` (medium). No scoring multiplier.
 
 ### 2. EU JRC FDI (Fisheries Dependent Information)
 
