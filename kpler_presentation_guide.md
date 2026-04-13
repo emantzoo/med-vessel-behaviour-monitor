@@ -16,7 +16,7 @@ They do NOT care about: academic fisheries science, R packages, MCDA methodology
 
 The app is organised into four top-level tabs (with subtabs grouping related views) sized for a 30-minute demo:
 
-1. **Vessel Investigation** — three-layer view: framework methodology, structured narrative, per-vessel coloured risk tree. Quick-select table for vessel switching. The AQUARIS-style deep dive.
+1. **Vessel Investigation** — four-layer view: framework methodology, structured narrative, per-vessel coloured risk tree, cumulative risk trajectory chart (behavioural arc over time). Quick-select table for vessel switching. Case-file Markdown export. The AQUARIS-style deep dive.
 
 2. **Fleet Analytics** — four subtabs covering all fleet-level views:
    - *Ranking* — vessel-level aggregation table with pill filters, risk bands and compounding multipliers, the four Kpler-aligned flags (industrial profile, multi-behaviour, dark port call candidate, repeat offender), the two vessel-identity columns (`vessel_class` descriptive label + `vessel_type_mismatch` Grey Fleet "irregular vessel information" flag), and a sortable length / GT profile column. Primary Kpler-vocabulary view.
@@ -103,9 +103,11 @@ Collapse the framework expander. Then select KOOSHA 4 from the dropdown, click R
 
 The 10-step structured report renders instantly: identity confirmation, IUU listing status (red error box), ICCAT check, OFAC check, fisheries context, behavioural pattern, risk decomposition, hypothesis, external links, threat assessment.
 
-"This is the framework applied to a specific vessel. The methodology document above shows how an analyst would think about IUU risk. The investigation below executes that same logic against the data — rule-based, deterministic, no LLM. Two views of the same intelligence: the framework, and the case file."
+Below the risk tree, the **risk trajectory** chart shows the cumulative risk score over time — each event marker shows when the vessel crossed band thresholds. For KOOSHA 4, the line shoots into Critical on the first GAP event alone.
 
-This demonstrates: structured analytical thinking, the ability to encode domain expertise as rules, direct extension of Kpler's published methodology into an adjacent domain, and awareness that LLMs aren't always the right tool for the job.
+"This is the framework applied to a specific vessel. The methodology document above shows how an analyst would think about IUU risk. The investigation below executes that same logic against the data — rule-based, deterministic, no LLM. The trajectory chart shows *when* the risk accumulated — the behavioural arc over the observation window, the same framing you used in the AQUARIS case study in Turning Tides."
+
+This demonstrates: structured analytical thinking, the ability to encode domain expertise as rules, direct extension of Kpler's published methodology into an adjacent domain, temporal-arc analysis, and awareness that LLMs aren't always the right tool for the job.
 
 ### Show the AI Analyst (90 seconds — take your time here)
 
@@ -356,7 +358,8 @@ tabs.py             → Render functions invoked from the 4 top-level tabs,
 
                       Top-level tabs (defined in app.py):
                       1. Vessel Investigation: per-vessel structured
-                           report + coloured risk tree + quick-select table
+                           report + coloured risk tree + risk trajectory
+                           chart + case-file export + quick-select table
                       2. Fleet Analytics — four subtabs:
                          - Ranking: vessel-level aggregation with
                            pill filters, risk bands and Kpler-aligned flags

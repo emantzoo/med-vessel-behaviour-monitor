@@ -121,7 +121,7 @@ Nine-module Streamlit application:
 
 Four top-level tabs, organised for a tight 30-minute demo (tab order as rendered in `app.py`):
 
-1. **Vessel Investigation** -- three-layer deep dive for the selected vessel: structured narrative from `investigation.py`, per-branch expander cards over the risk tree trace, an interactive Plotly icicle (click a branch to drill in), the full Graphviz framework diagram in a collapsed expander, and a dedicated Behavioural Flags step. Quick-select table for vessel switching.
+1. **Vessel Investigation** -- four-layer deep dive for the selected vessel: structured narrative from `investigation.py`, per-branch expander cards over the risk tree trace, an interactive Plotly icicle (click a branch to drill in), the full Graphviz framework diagram in a collapsed expander, a cumulative risk trajectory chart (behavioural arc over time with band threshold lines), a dedicated Behavioural Flags step, and a Markdown case-file export. Quick-select table for vessel switching.
 2. **Fleet Analytics** -- four subtabs covering all fleet-level views:
    - *Ranking* -- vessel-level aggregation table with pill filters (event type, risk band, flag state, vessel class), risk bands, base vs compounded score decomposition, and the four display-only Kpler-aligned flags (industrial profile, multi-behaviour, dark port call candidate, repeat offender) plus a sortable length / GT profile column.
    - *Exploration* -- behavioural deep dives: repeat offenders, encounter/carrier alerts, AIS gap behaviour. All pill-filtered.
