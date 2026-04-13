@@ -486,25 +486,56 @@ def _parse_events_df(raw_df):
         port = distances.get("port") if isinstance(distances.get("port"), dict) else {}
         row_dict["nearest_port"] = port.get("name")
 
+        # Parse regions — handles both formats:
+        # 1. List of dicts: [{"dataset": "public-mpa-all", "name": "..."}]
+        # 2. Flat dict:     {"mpa": [id1], "eez": [...], "rfmo": [...]}
         mpa_names, rfmo_names, mpa_ids = [], [], []
-        for region in (r.get("regions") or []):
-            if isinstance(region, dict):
-                ds = str(region.get("dataset", "")).lower()
-                name = region.get("name")
-                rid = region.get("id")
-                if "eez" in ds:
-                    row_dict["eez"] = name
-                elif "mpa" in ds and name:
-                    mpa_names.append(str(name))
-                    if rid:
-                        mpa_ids.append(str(rid))
-                elif "rfmo" in ds and name:
-                    rfmo_names.append(str(name))
-        row_dict["mpa"] = "; ".join(mpa_names) if mpa_names else ""
+        regions = r.get("regions")
+        if isinstance(regions, list):
+            # Format 1: list of region dicts
+            for region in regions:
+                if isinstance(region, dict):
+                    ds = str(region.get("dataset", "")).lower()
+                    name = region.get("name")
+                    rid = region.get("id")
+                    if "eez" in ds:
+                        row_dict["eez"] = name
+                    elif "mpa" in ds and name:
+                        mpa_names.append(str(name))
+                        if rid:
+                            mpa_ids.append(str(rid))
+                    elif "rfmo" in ds and name:
+                        rfmo_names.append(str(name))
+        elif isinstance(regions, dict):
+            # Format 2: flat dict with array values
+            _has_no_take = False
+            eez_ids = regions.get("eez")
+            if isinstance(eez_ids, list) and eez_ids:
+                row_dict["eez"] = str(eez_ids[0])
+            _seen_ids = set()
+            for key in ("mpa", "mpaNoTake", "mpaNoTakePartial"):
+                ids = regions.get(key)
+                if isinstance(ids, list) and ids:
+                    for i in ids:
+                        sid = str(i)
+                        if sid not in _seen_ids:
+                            mpa_ids.append(sid)
+                            _seen_ids.add(sid)
+                    if key in ("mpaNoTake", "mpaNoTakePartial"):
+                        _has_no_take = True
+            rfmo_ids = regions.get("rfmo")
+            if isinstance(rfmo_ids, list):
+                rfmo_names.extend(str(i) for i in rfmo_ids)
+        row_dict["mpa"] = "; ".join(mpa_names) if mpa_names else "; ".join(mpa_ids)
         row_dict["mpa_ids"] = "; ".join(mpa_ids) if mpa_ids else ""
         row_dict["rfmo"] = "; ".join(rfmo_names) if rfmo_names else ""
-        row_dict["in_mpa"] = bool(mpa_names)
-        row_dict["mpa_tier"] = classify_mpa_tier(mpa_names) if mpa_names else ""
+        row_dict["in_mpa"] = bool(mpa_names or mpa_ids)
+        if mpa_names:
+            row_dict["mpa_tier"] = classify_mpa_tier(mpa_names)
+        elif mpa_ids:
+            row_dict["mpa_tier"] = "gfcm_fra" if _has_no_take else "general"
+        else:
+            row_dict["mpa_tier"] = ""
 
         event_info = r.get("event_info") if isinstance(r.get("event_info"), dict) else {}
 
@@ -562,16 +593,45 @@ def _parse_fishing_df(raw_df):
             except Exception:
                 pass
 
-        mpa_names = []
-        for region in (r.get("regions") or []):
-            if isinstance(region, dict):
-                ds = str(region.get("dataset", "")).lower()
-                name = region.get("name")
-                if "mpa" in ds and name:
-                    mpa_names.append(str(name))
-        row["mpa"] = "; ".join(mpa_names) if mpa_names else ""
-        row["in_mpa"] = bool(mpa_names)
-        row["mpa_tier"] = classify_mpa_tier(mpa_names) if mpa_names else ""
+        # Parse regions — handles both formats:
+        # 1. List of dicts: [{"dataset": "public-mpa-all", "name": "..."}]
+        # 2. Flat dict:     {"mpa": [id1, id2], "mpaNoTake": [...], ...}
+        mpa_names, mpa_ids = [], []
+        regions = r.get("regions")
+        if isinstance(regions, list):
+            # Format 1: list of region dicts (same as behavioural events)
+            for region in regions:
+                if isinstance(region, dict):
+                    ds = str(region.get("dataset", "")).lower()
+                    name = region.get("name")
+                    if "mpa" in ds and name:
+                        mpa_names.append(str(name))
+        elif isinstance(regions, dict):
+            # Format 2: flat dict with array values (fishing events v3)
+            # mpaNoTake/mpaNoTakePartial are subsets of mpa — deduplicate
+            _has_no_take = False
+            _seen_ids = set()
+            for key in ("mpa", "mpaNoTake", "mpaNoTakePartial"):
+                ids = regions.get(key)
+                if isinstance(ids, list) and ids:
+                    for i in ids:
+                        sid = str(i)
+                        if sid not in _seen_ids:
+                            mpa_ids.append(sid)
+                            _seen_ids.add(sid)
+                    if key in ("mpaNoTake", "mpaNoTakePartial"):
+                        _has_no_take = True
+            row["_has_no_take"] = _has_no_take
+        row["mpa"] = "; ".join(mpa_names) if mpa_names else "; ".join(mpa_ids)
+        row["mpa_ids"] = "; ".join(mpa_ids)
+        row["in_mpa"] = bool(mpa_names or mpa_ids)
+        if mpa_names:
+            row["mpa_tier"] = classify_mpa_tier(mpa_names)
+        elif mpa_ids:
+            # IDs without names: use no-take flag for tier
+            row["mpa_tier"] = "gfcm_fra" if row.get("_has_no_take") else "general"
+        else:
+            row["mpa_tier"] = ""
         rows.append(row)
 
     return pd.DataFrame(rows)
