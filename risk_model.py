@@ -1,5 +1,6 @@
 """GFW-aligned behavioral risk scoring and FDI context lookups."""
 
+import numpy as np
 import pandas as pd
 
 from config import (
@@ -84,6 +85,105 @@ def compute_risk_score(row, event_weights, flag_risks):
 
     else:
         return base * ew * fm * shore_factor * mpa_factor
+
+
+def compute_risk_scores_vec(df, event_weights, flag_risks):
+    """Vectorized risk scoring — replaces per-row .apply(compute_risk_score).
+
+    Same formula as the scalar version but uses numpy/pandas vector ops
+    for ~50-100x speedup on large DataFrames.
+    """
+    n = len(df)
+    if n == 0:
+        return pd.Series(dtype=float)
+
+    # Base: duration_h ^ 0.75
+    dur = pd.to_numeric(df["duration_h"], errors="coerce").fillna(0).values
+    base = np.power(dur, 0.75)
+
+    # Event weight
+    ew = df["event_type"].map(event_weights).fillna(1.0).values
+
+    # Flag multiplier
+    fm = df["flag"].map(flag_risks).fillna(1.0).values
+
+    # Shore factor
+    if "distance_from_shore_km" in df.columns:
+        shore_km = pd.to_numeric(df["distance_from_shore_km"], errors="coerce").values
+        shore_factor = np.where(np.isnan(shore_km), 1.0,
+                       np.where(shore_km > 37, 1.5,
+                       np.where(shore_km > 10, 1.2, 0.8)))
+    else:
+        shore_factor = np.ones(n)
+
+    # MPA factor
+    if "mpa_tier" in df.columns:
+        mpa_tier = df["mpa_tier"].fillna("").astype(str)
+        mpa_factor = mpa_tier.map(lambda t: MPA_MULTIPLIERS.get(t, 1.0) if t else 1.0).values
+    else:
+        mpa_factor = np.ones(n)
+
+    # Start with common product
+    score = base * ew * fm * shore_factor * mpa_factor
+
+    # --- ENCOUNTER extras ---
+    is_enc = (df["event_type"] == "ENCOUNTER").values
+
+    if is_enc.any():
+        # Proximity factor
+        if "encounter_median_distance_km" in df.columns:
+            dist = pd.to_numeric(df["encounter_median_distance_km"], errors="coerce").values
+            prox = np.where(np.isnan(dist), 1.0,
+                   np.where(dist < 0.5, 1.8,
+                   np.where(dist < 1.0, 1.3, 1.0)))
+        else:
+            prox = np.ones(n)
+
+        # Speed factor
+        if "encounter_median_speed_knots" in df.columns:
+            espd = pd.to_numeric(df["encounter_median_speed_knots"], errors="coerce").values
+            espd_f = np.where(np.isnan(espd), 1.0, np.where(espd < 2.0, 1.5, 1.0))
+        else:
+            espd_f = np.ones(n)
+
+        # Vessel type factor
+        vtype = df.get("vessel_type", pd.Series("", index=df.index)).fillna("").str.upper().values
+        vt_f = np.where(np.isin(vtype, list(TRANSSHIPMENT_VESSEL_TYPES)), 1.4, 1.0)
+
+        score = np.where(is_enc, score * prox * espd_f * vt_f, score)
+
+    # --- LOITERING extras ---
+    is_loit = (df["event_type"] == "LOITERING").values
+
+    if is_loit.any():
+        vtype_l = df.get("vessel_type", pd.Series("", index=df.index)).fillna("").str.upper().values
+        vt_l = np.where(np.isin(vtype_l, list(TRANSSHIPMENT_VESSEL_TYPES)), 1.6, 1.0)
+
+        if "loitering_avg_speed_knots" in df.columns:
+            lspd = pd.to_numeric(df["loitering_avg_speed_knots"], errors="coerce").values
+            lspd_f = np.where(np.isnan(lspd), 1.0, np.where(lspd < 2.0, 1.4, 1.0))
+        else:
+            lspd_f = np.ones(n)
+
+        score = np.where(is_loit, score * vt_l * lspd_f, score)
+
+    # --- GAP extras ---
+    is_gap = (df["event_type"] == "GAP").values
+
+    if is_gap.any():
+        if "speed_before_gap" in df.columns and "speed_after_gap" in df.columns:
+            spd_b = pd.to_numeric(df["speed_before_gap"], errors="coerce").values
+            spd_a = pd.to_numeric(df["speed_after_gap"], errors="coerce").values
+            speed_change = np.abs(spd_b - spd_a)
+            evasion = np.where(np.isnan(speed_change), 1.0,
+                     np.where(speed_change > 5, 1.5,
+                     np.where(speed_change > 2, 1.2, 1.0)))
+        else:
+            evasion = np.ones(n)
+
+        score = np.where(is_gap, score * evasion, score)
+
+    return pd.Series(np.round(score, 1), index=df.index)
 
 
 def get_fdi_context(csq_lon, csq_lat, fdi_effort, fdi_landings, year=None):
@@ -217,22 +317,31 @@ def match_iuu_vessels(df, iuu_df, include_delisted=False):
 
     Adds iuu_* columns and applies multiplier to risk_score.
     Called from app.py after compute_risk_score.
+    Optimised: matches per unique vessel, then broadcasts to all events.
     """
     if iuu_df.empty or df.empty:
         for col, val in _NO_MATCH.items():
             df[col] = val
         return df
 
-    matches = df.apply(
+    # Deduplicate: match once per unique vessel (mmsi)
+    vessel_keys = df.groupby("mmsi").first()[["vessel_name", "imo"]].reset_index()
+    vessel_matches = vessel_keys.apply(
         lambda row: check_iuu_match(
             row["mmsi"], row.get("vessel_name"), iuu_df, include_delisted,
             imo=row.get("imo"),
         ),
         axis=1,
     )
-    match_df = pd.DataFrame(matches.tolist(), index=df.index)
-    for col in match_df.columns:
-        df[col] = match_df[col]
+    vessel_result = pd.DataFrame(vessel_matches.tolist(), index=vessel_keys.index)
+    vessel_result["mmsi"] = vessel_keys["mmsi"].values
+
+    # Broadcast to all events
+    lookup = vessel_result.set_index("mmsi")
+    for col in _NO_MATCH:
+        mapped = df["mmsi"].map(lookup[col])
+        default = _NO_MATCH[col]
+        df[col] = mapped if default is None else mapped.fillna(default)
 
     # Apply risk multiplier
     df["risk_score"] = (df["risk_score"] * df["iuu_multiplier"]).round(1)
@@ -304,23 +413,29 @@ def match_iccat_vessels(df, iccat_df):
 
     Adds iccat_* columns and applies multiplier to risk_score.
     Called from app.py after match_iuu_vessels.
+    Optimised: matches per unique vessel, then broadcasts to all events.
     """
     if iccat_df.empty or df.empty:
         for col, val in _NO_ICCAT_MATCH.items():
             df[col] = val
         return df
 
-    matches = df.apply(
+    vessel_keys = df.groupby("mmsi").first()[["vessel_name", "imo"]].reset_index()
+    vessel_matches = vessel_keys.apply(
         lambda row: check_iccat_match(
             row.get("vessel_name"), iccat_df, imo=row.get("imo"),
         ),
         axis=1,
     )
-    match_df = pd.DataFrame(matches.tolist(), index=df.index)
-    for col in match_df.columns:
-        df[col] = match_df[col]
+    vessel_result = pd.DataFrame(vessel_matches.tolist(), index=vessel_keys.index)
+    vessel_result["mmsi"] = vessel_keys["mmsi"].values
 
-    # Apply risk multiplier
+    lookup = vessel_result.set_index("mmsi")
+    for col in _NO_ICCAT_MATCH:
+        mapped = df["mmsi"].map(lookup[col])
+        default = _NO_ICCAT_MATCH[col]
+        df[col] = mapped if default is None else mapped.fillna(default)
+
     df["risk_score"] = (df["risk_score"] * df["iccat_multiplier"]).round(1)
     return df
 
@@ -404,24 +519,30 @@ def match_ofac_vessels(df, ofac_df):
 
     Adds ofac_* columns and applies multiplier to risk_score.
     Called from app.py after match_iccat_vessels.
+    Optimised: matches per unique vessel, then broadcasts to all events.
     """
     if ofac_df.empty or df.empty:
         for col, val in _NO_OFAC_MATCH.items():
             df[col] = val
         return df
 
-    matches = df.apply(
+    vessel_keys = df.groupby("mmsi").first()[["vessel_name", "imo"]].reset_index()
+    vessel_matches = vessel_keys.apply(
         lambda row: check_ofac_match(
             row["mmsi"], row.get("vessel_name"), ofac_df,
             imo=row.get("imo"),
         ),
         axis=1,
     )
-    match_df = pd.DataFrame(matches.tolist(), index=df.index)
-    for col in match_df.columns:
-        df[col] = match_df[col]
+    vessel_result = pd.DataFrame(vessel_matches.tolist(), index=vessel_keys.index)
+    vessel_result["mmsi"] = vessel_keys["mmsi"].values
 
-    # Apply risk multiplier
+    lookup = vessel_result.set_index("mmsi")
+    for col in _NO_OFAC_MATCH:
+        mapped = df["mmsi"].map(lookup[col])
+        default = _NO_OFAC_MATCH[col]
+        df[col] = mapped if default is None else mapped.fillna(default)
+
     df["risk_score"] = (df["risk_score"] * df["ofac_multiplier"]).round(1)
     return df
 
@@ -499,24 +620,18 @@ def compute_vessel_flags(df):
     df["dark_port_call_candidate"] = (df["event_type"] == "LOITERING") & (shore < 10)
 
     # 4. Repeat offender -- vessel-level, any 90-day window containing >= 2 events
-    repeat_mmsi = set()
-    if "start_time" in df.columns:
-        time_col = "start_time"
-    elif "date" in df.columns:
-        time_col = "date"
-    else:
-        time_col = None
+    # Vectorized: sort once, compute diff per vessel group, check <=90
+    time_col = "start_time" if "start_time" in df.columns else ("date" if "date" in df.columns else None)
     if time_col is not None:
-        for mmsi, group in df.groupby("mmsi"):
-            if len(group) < 2:
-                continue
-            times = pd.to_datetime(group[time_col], errors="coerce").dropna().sort_values()
-            if len(times) < 2:
-                continue
-            deltas = times.diff().dt.days.dropna()
-            if (deltas <= 90).any():
-                repeat_mmsi.add(mmsi)
-    df["repeat_offender_90d"] = df["mmsi"].isin(repeat_mmsi)
+        _ts = pd.to_datetime(df[time_col], errors="coerce")
+        _tmp = df[["mmsi"]].copy()
+        _tmp["_ts"] = _ts
+        _tmp = _tmp.dropna(subset=["_ts"]).sort_values(["mmsi", "_ts"])
+        _tmp["_diff_days"] = _tmp.groupby("mmsi")["_ts"].diff().dt.days
+        _repeat = _tmp[_tmp["_diff_days"] <= 90]["mmsi"].unique()
+        df["repeat_offender_90d"] = df["mmsi"].isin(_repeat)
+    else:
+        df["repeat_offender_90d"] = False
 
     # 5. Vessel class -- descriptive label derived from registry shiptypes.
     # Falls back to event-level vessel_type when shiptypes is empty so the
@@ -526,8 +641,13 @@ def compute_vessel_flags(df):
     # axis -- both axes can disagree and that is by design.
     shiptypes_series = df["shiptypes"] if "shiptypes" in df.columns else pd.Series("", index=df.index)
     vessel_type_series = df["vessel_type"] if "vessel_type" in df.columns else pd.Series("", index=df.index)
-    shiptypes_class = shiptypes_series.apply(derive_vessel_class)
-    vessel_type_class = vessel_type_series.apply(derive_vessel_class)
+    # Deduplicate: derive once per unique value, then map back
+    _st_uniq = shiptypes_series.unique()
+    _st_map = {v: derive_vessel_class(v) for v in _st_uniq}
+    shiptypes_class = shiptypes_series.map(_st_map)
+    _vt_uniq = vessel_type_series.unique()
+    _vt_map = {v: derive_vessel_class(v) for v in _vt_uniq}
+    vessel_type_class = vessel_type_series.map(_vt_map)
     # Prefer shiptypes (registry, more authoritative) when present
     df["vessel_class"] = shiptypes_class.where(shiptypes_class != "", vessel_type_class)
 

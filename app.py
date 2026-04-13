@@ -10,15 +10,17 @@ from datetime import datetime
 
 from config import (
     EVENT_COLORS, DEFAULT_EVENT_WEIGHTS, FLAG_RISKS,
-    SPECIES_NAMES, assign_csquare, classify_risk_band,
+    SPECIES_NAMES, assign_csquare, assign_csquares_vec, classify_risk_band,
 )
 from data_loading import (
     load_knowledge_base, load_static_data, load_live_data,
     load_fdi_effort, load_fdi_landings, load_iuu_vessels, load_iccat_vessels,
     load_ofac_vessels, lookup_vessel_metadata,
     load_fishing_events_static, load_fishing_events_live, aggregate_fishing_in_mpa,
+    snapshot_exists, snapshot_info, download_api_snapshot,
+    load_snapshot_events, load_snapshot_fishing,
 )
-from risk_model import compute_risk_score, get_fdi_context, match_iuu_vessels, match_iccat_vessels, match_ofac_vessels, compute_vessel_flags
+from risk_model import compute_risk_score, compute_risk_scores_vec, get_fdi_context, match_iuu_vessels, match_iccat_vessels, match_ofac_vessels, compute_vessel_flags
 from tabs import (
     render_daily_trend, render_flag_breakdown, render_event_types,
     render_duration_analysis, render_geographic_risk, render_risk_heatmap,
@@ -53,10 +55,20 @@ except (FileNotFoundError, KeyError):
         help="Register at globalfishingwatch.org -> Our APIs",
     )
 
-use_live = st.sidebar.toggle(
-    "Use Live GFW API", value=False,
-    help="Requires valid token. Static demo data is always available.",
+# Data source: Static demo | API snapshot | Live API
+_source_options = ["Static demo"]
+if snapshot_exists():
+    _source_options.insert(0, "API snapshot")
+_source_options.append("Live GFW API")
+
+data_source = st.sidebar.radio(
+    "Data source",
+    _source_options,
+    index=0,
+    help="Static demo: bundled sample. API snapshot: previously downloaded real data. Live: fetch from GFW now.",
 )
+use_live = data_source == "Live GFW API"
+use_snapshot = data_source == "API snapshot"
 
 date_range = st.sidebar.date_input(
     "Date range",
@@ -96,13 +108,57 @@ show_fdi_layer = st.sidebar.toggle(
     help="Overlay officially reported fishing effort (days) per c-square grid cell.",
 )
 
+# Download API snapshot button
+include_fishing = st.sidebar.toggle(
+    "Include fishing events", value=False,
+    help="Load GFW fishing events for fishing-in-MPA detection. Slower with large datasets.",
+)
+
+if token:
+    with st.sidebar.expander("Download API snapshot"):
+        snap_info = snapshot_info()
+        if snap_info:
+            ev_n, fish_n, snap_date = snap_info
+            st.caption(
+                f"Existing: {ev_n} events + {fish_n} fishing, "
+                f"saved {snap_date:%Y-%m-%d %H:%M}"
+            )
+        if st.button("Download 30 days from API", key="dl_snapshot"):
+            from datetime import timedelta
+            end_dt = datetime.today()
+            start_dt = end_dt - timedelta(days=30)
+            bar = st.progress(0, text="Starting download...")
+            try:
+                download_api_snapshot(
+                    token, start_dt, end_dt,
+                    include_fishing=include_fishing,
+                    progress=lambda pct, msg: bar.progress(pct, text=msg),
+                )
+                bar.empty()
+                st.success("Snapshot saved. Switch data source to 'API snapshot'.")
+                st.cache_data.clear()
+                st.rerun()
+            except Exception as e:
+                bar.empty()
+                import traceback
+                st.error(f"Download failed: {e}")
+                st.code(traceback.format_exc(), language="text")
+
 # ========================= DATA LOADING =========================
+_empty_fishing = pd.DataFrame(columns=[
+    "date", "vessel_name", "mmsi", "lat", "lon",
+    "fishing_hours", "mpa", "mpa_tier", "in_mpa",
+])
+
 if use_live and token:
     df = load_live_data(token, date_range[0], date_range[1], min_duration)
-    fishing_df = load_fishing_events_live(token, date_range[0], date_range[1])
+    fishing_df = load_fishing_events_live(token, date_range[0], date_range[1]) if include_fishing else _empty_fishing
+elif use_snapshot:
+    df = load_snapshot_events()
+    fishing_df = load_snapshot_fishing() if include_fishing else _empty_fishing
 else:
     df = load_static_data()
-    fishing_df = load_fishing_events_static()
+    fishing_df = load_fishing_events_static() if include_fishing else _empty_fishing
 
 fdi_effort = load_fdi_effort()
 fdi_landings = load_fdi_landings()
@@ -122,17 +178,17 @@ if "date" in df.columns and len(date_range) == 2:
     buffer_end = pd.Timestamp(date_range[1]) + pd.Timedelta(days=3)
     df = df[df["date"].between(buffer_start, buffer_end) | df["date"].isna()]
 
+# Drop rows with missing coordinates (API may return null positions)
+df = df.dropna(subset=["lat", "lon"])
 df_filtered = df[df["duration_h"] >= min_duration].copy()
-df_filtered["risk_score"] = df_filtered.apply(
-    compute_risk_score, axis=1, event_weights=event_weights, flag_risks=FLAG_RISKS,
-).round(1)
+df_filtered["risk_score"] = compute_risk_scores_vec(df_filtered, event_weights, FLAG_RISKS)
 total_risk = df_filtered["risk_score"].sum()
 
-# Assign c-square cells for FDI joins
+# Assign c-square cells for FDI joins (vectorized)
 if not df_filtered.empty:
-    csq = df_filtered.apply(lambda r: assign_csquare(r["lat"], r["lon"]), axis=1)
-    df_filtered["csq_lon"] = csq.apply(lambda x: x[0])
-    df_filtered["csq_lat"] = csq.apply(lambda x: x[1])
+    csq_lon, csq_lat = assign_csquares_vec(df_filtered["lat"], df_filtered["lon"])
+    df_filtered["csq_lon"] = csq_lon
+    df_filtered["csq_lat"] = csq_lat
 
 # Vessel metadata enrichment via GFW Vessels API (live mode only).
 # Returns dict[mmsi] -> {"imo", "length_m", "tonnage_gt", "shiptypes"}.
@@ -184,7 +240,13 @@ if not df_filtered.empty and not ofac_vessels.empty:
 
 # Classify final compounded risk into Kpler-aligned bands
 if not df_filtered.empty:
-    df_filtered["risk_band"] = df_filtered["risk_score"].apply(classify_risk_band)
+    import numpy as _np
+    _s = df_filtered["risk_score"].values
+    df_filtered["risk_band"] = _np.select(
+        [_s < 50, _s < 60, _s < 80, _s < 100],
+        ["Low", "Emerging", "Elevated", "Severe"],
+        default="Critical",
+    )
 
 # Kpler-aligned display-only behavioural flags (do not multiply into risk_score)
 df_filtered = compute_vessel_flags(df_filtered)
@@ -253,10 +315,10 @@ with col1:
         # Layer toggles are organised by listing status so the user can isolate,
         # e.g., all ICCAT-authorised events regardless of behaviour type.
         from config import RISK_BAND_COLORS
+        from folium.plugins import FastMarkerCluster
 
-        band_size_px = {"Low": 14, "Emerging": 17, "Elevated": 20, "Severe": 24, "Critical": 28}
+        band_size_px = {"Low": 5, "Emerging": 6, "Elevated": 7, "Severe": 9, "Critical": 11}
 
-        fg_clean = folium.FeatureGroup(name="Clean (no listing)", show=True)
         fg_iccat = folium.FeatureGroup(name="ICCAT Authorized", show=True)
         fg_iuu = folium.FeatureGroup(name="IUU-Listed", show=True)
         fg_ofac = folium.FeatureGroup(name="OFAC Sanctioned", show=True)
@@ -276,9 +338,9 @@ with col1:
             for _, cell in fdi_agg.iterrows():
                 sw_lon = cell["rectangle_lon"]
                 sw_lat = cell["rectangle_lat"]
-                centre_lon = sw_lon + 0.25
-                centre_lat = sw_lat + 0.25
-                if not ((abs(event_lons - centre_lon) < 1.0) & (abs(event_lats - centre_lat) < 1.0)).any():
+                centre_lon_cell = sw_lon + 0.25
+                centre_lat_cell = sw_lat + 0.25
+                if not ((abs(event_lons - centre_lon_cell) < 1.0) & (abs(event_lats - centre_lat_cell) < 1.0)).any():
                     continue
                 days = cell["totfishdays"]
                 if days >= 2000:
@@ -302,16 +364,60 @@ with col1:
         # Pre-compute FDI context per unique c-square (avoid repeated 83K-row scans)
         fdi_cache = {}
         if not fdi_effort.empty and "csq_lon" in df_filtered.columns:
-            for csq_lon, csq_lat in df_filtered[["csq_lon", "csq_lat"]].drop_duplicates().values:
-                fdi_cache[(csq_lon, csq_lat)] = get_fdi_context(csq_lon, csq_lat, fdi_effort, fdi_landings)
+            for csq_lon_v, csq_lat_v in df_filtered[["csq_lon", "csq_lat"]].drop_duplicates().values:
+                fdi_cache[(csq_lon_v, csq_lat_v)] = get_fdi_context(csq_lon_v, csq_lat_v, fdi_effort, fdi_landings)
 
-        def _svg_shape(event_type, fill, size, stroke="#222", stroke_w=1.5, dashed=False):
-            """Return an inline SVG shape for a Folium DivIcon.
+        # Separate flagged (IUU/ICCAT/OFAC) from clean events.
+        # Flagged vessels get full DivIcon markers with SVG shapes.
+        # Clean events use FastMarkerCluster (client-side JS) for performance.
+        _is_flagged = (
+            df_map.get("ofac_sanctioned", pd.Series(False, index=df_map.index)).fillna(False).astype(bool)
+            | df_map.get("iuu_matched", pd.Series(False, index=df_map.index)).fillna(False).astype(bool)
+            | df_map.get("iccat_authorized", pd.Series(False, index=df_map.index)).fillna(False).astype(bool)
+        )
+        df_flagged = df_map[_is_flagged]
+        df_clean = df_map[~_is_flagged]
 
-            Circle = GAP, square = LOITERING, triangle = ENCOUNTER.
-            `dashed=True` draws an amber dashed outline used to flag Kpler-aligned
-            dark port call candidates (loitering within 10 km of shore).
+        # Exclude Low-band clean events from the map (bulk noise, minimal risk signal).
+        # Flagged vessels always show regardless of band.
+        df_clean = df_clean[df_clean.get("risk_band", pd.Series("Low", index=df_clean.index)) != "Low"]
+
+        # --- Clean events: FastMarkerCluster with colour-coded circle markers ---
+        # Each row is [lat, lon, color, radius, tooltip_text]
+        _band_color_map = {b: RISK_BAND_COLORS.get(b, "#2ecc71") for b in ["Low", "Emerging", "Elevated", "Severe", "Critical"]}
+        _event_color_map = {"GAP": "#e74c3c", "LOITERING": "#f39c12", "ENCOUNTER": "#9b59b6"}
+
+        if not df_clean.empty:
+            _clean_data = []
+            for _idx, _r in df_clean.iterrows():
+                _lat_v = float(_r["lat"])
+                _lon_v = float(_r["lon"])
+                _band = _r.get("risk_band", "Low")
+                _color = _event_color_map.get(_r["event_type"], "#888")
+                _radius = band_size_px.get(_band, 5)
+                _vn = _r.get("vessel_name", "") or "(unknown)"
+                _tip = f"{_vn} | {_r['event_type']} | {_r['flag']} | risk {_r['risk_score']:.1f} ({_band})"
+                _clean_data.append([_lat_v, _lon_v, _color, _radius, _tip])
+
+            _fast_callback = """
+            function (row) {
+                var marker = L.circleMarker(new L.LatLng(row[0], row[1]), {
+                    radius: row[3],
+                    fillColor: row[2],
+                    color: '#333',
+                    weight: 0.5,
+                    fillOpacity: 0.7
+                });
+                marker.bindTooltip(row[4]);
+                return marker;
+            }
             """
+            FastMarkerCluster(
+                data=_clean_data, callback=_fast_callback, name="Events",
+            ).add_to(m)
+
+        # --- Flagged events: individual DivIcon markers with SVG shapes ---
+        def _svg_shape(event_type, fill, size, stroke="#222", stroke_w=1.5, dashed=False):
             s = size
             half = s / 2
             if dashed:
@@ -325,32 +431,29 @@ with col1:
             elif event_type == "ENCOUNTER":
                 pts = f"{half},1 {s-1},{s-1} 1,{s-1}"
                 body = f'<polygon points="{pts}" fill="{fill}" stroke="{stroke}" stroke-width="{stroke_w}"{dash_attr}/>'
-            else:  # GAP or unknown -> circle
+            else:
                 r = half - 1
                 body = f'<circle cx="{half}" cy="{half}" r="{r}" fill="{fill}" stroke="{stroke}" stroke-width="{stroke_w}"{dash_attr}/>'
             return f'<svg width="{s}" height="{s}" xmlns="http://www.w3.org/2000/svg">{body}</svg>'
 
-        for _, row in df_map.iterrows():
+        _flag_size = 22
+        for _, row in df_flagged.iterrows():
+            if pd.isna(row.get("lat")) or pd.isna(row.get("lon")):
+                continue
             is_ofac = row.get("ofac_sanctioned", False)
             is_iuu = row.get("iuu_matched", False)
             is_iccat = row.get("iccat_authorized", False)
             vname = row.get("vessel_name", "")
-            band = row.get("risk_band", "Low")
-            size = band_size_px.get(band, 14)
 
-            # Listing status sets fill colour (priority OFAC > IUU > ICCAT > clean-by-band)
             if is_ofac:
                 fill = "#8B0000"
                 target = fg_ofac
             elif is_iuu:
                 fill = "#000000"
                 target = fg_iuu
-            elif is_iccat:
+            else:
                 fill = "#1f77b4"
                 target = fg_iccat
-            else:
-                fill = RISK_BAND_COLORS.get(band, "#2ecc71")
-                target = fg_clean
 
             listings = []
             if is_ofac:
@@ -359,36 +462,15 @@ with col1:
                 listings.append("IUU")
             if is_iccat:
                 listings.append("ICCAT")
-            listing_txt = ", ".join(listings) if listings else "clean"
+            listing_txt = ", ".join(listings)
 
-            # Compound / temporal behavioural flags (display-only, do not modify fill/size)
-            is_dpc = bool(row.get("dark_port_call_candidate", False))
-            is_multi = bool(row.get("multi_behaviour_flag", False))
-            is_repeat = bool(row.get("repeat_offender_90d", False))
-            behavioural_flags = []
-            if is_dpc:
-                behavioural_flags.append("dark-port-candidate")
-            if is_multi:
-                behavioural_flags.append("multi-behaviour")
-            if is_repeat:
-                behavioural_flags.append("repeat-offender")
+            tooltip = f"{vname or '(unknown)'} | {row['event_type']} | {row['flag']} | risk {row['risk_score']:.1f} | {listing_txt}"
 
-            tooltip_parts = [
-                vname if pd.notna(vname) and vname else "(unknown)",
-                f"{row['event_type']}",
-                f"flag {row['flag']}",
-                f"risk {row['risk_score']:.1f} ({band})",
-                listing_txt,
-            ]
-            if behavioural_flags:
-                tooltip_parts.append("Behavioural flags: " + ", ".join(behavioural_flags))
-            tooltip = " | ".join(tooltip_parts)
-
-            svg = _svg_shape(row["event_type"], fill, size, dashed=is_dpc)
+            svg = _svg_shape(row["event_type"], fill, _flag_size)
             icon = folium.DivIcon(
-                html=f'<div style="width:{size}px;height:{size}px">{svg}</div>',
-                icon_size=(size, size),
-                icon_anchor=(size // 2, size // 2),
+                html=f'<div style="width:{_flag_size}px;height:{_flag_size}px">{svg}</div>',
+                icon_size=(_flag_size, _flag_size),
+                icon_anchor=(_flag_size // 2, _flag_size // 2),
             )
             folium.Marker(
                 location=[row["lat"], row["lon"]],
@@ -398,13 +480,15 @@ with col1:
 
         # Add all layer groups to map (FDI first so it renders behind markers)
         fg_fdi.add_to(m)
-        fg_clean.add_to(m)
         fg_iccat.add_to(m)
         fg_iuu.add_to(m)
         fg_ofac.add_to(m)
         folium.LayerControl(collapsed=True).add_to(m)
 
-        map_data = st_folium(m, width=700, height=500)
+        map_data = st_folium(
+            m, height=500, use_container_width=True,
+            returned_objects=["last_object_clicked"],
+        )
 
         # Dual-encoding legend: shape = behaviour, fill = listing, size = risk band
         def _legend_svg(shape, fill="#888", size=14, dashed=False):
@@ -427,23 +511,20 @@ with col1:
 
         from config import RISK_BAND_COLORS as _RBC
         legend_md = (
-            '<b>Behaviour</b> (shape):&ensp;'
-            f'{_legend_svg("circle")} AIS Gap&ensp;'
-            f'{_legend_svg("square")} Loitering&ensp;'
-            f'{_legend_svg("triangle")} Encounter&emsp;'
-            '<b>Listing</b> (fill):&ensp;'
-            f'{_legend_svg("circle", fill=_RBC["Low"])} Clean&ensp;'
+            '<b>Event type</b> (colour):&ensp;'
+            f'{_legend_svg("circle", fill="#e74c3c")} AIS Gap&ensp;'
+            f'{_legend_svg("circle", fill="#f39c12")} Loitering&ensp;'
+            f'{_legend_svg("circle", fill="#9b59b6")} Encounter&emsp;'
+            '<b>Flagged vessels</b> (SVG shapes):&ensp;'
             f'{_legend_svg("circle", fill="#1f77b4")} ICCAT&ensp;'
             f'{_legend_svg("circle", fill="#000000")} IUU&ensp;'
             f'{_legend_svg("circle", fill="#8B0000")} OFAC<br/>'
-            '<b>Risk band</b> (size + clean fill):&ensp;'
-            f'{_legend_svg("circle", fill=_RBC["Low"], size=14)} Low&ensp;'
-            f'{_legend_svg("circle", fill=_RBC["Emerging"], size=17)} Emerging&ensp;'
-            f'{_legend_svg("circle", fill=_RBC["Elevated"], size=20)} Elevated&ensp;'
-            f'{_legend_svg("circle", fill=_RBC["Severe"], size=24)} Severe&ensp;'
-            f'{_legend_svg("circle", fill=_RBC["Critical"], size=28)} Critical<br/>'
-            '<b>Behavioural flag</b>:&ensp;'
-            f'{_legend_svg("square", fill=_RBC["Low"], size=17, dashed=True)} dashed amber outline = dark port call candidate (loitering within 10 km of shore, AIS-inferred, not satellite-verified)&emsp;'
+            '<b>Risk band</b> (marker size):&ensp;'
+            f'{_legend_svg("circle", fill="#888", size=10)} Low&ensp;'
+            f'{_legend_svg("circle", fill="#888", size=12)} Emerging&ensp;'
+            f'{_legend_svg("circle", fill="#888", size=14)} Elevated&ensp;'
+            f'{_legend_svg("circle", fill="#888", size=18)} Severe&ensp;'
+            f'{_legend_svg("circle", fill="#888", size=22)} Critical<br/>'
             '<b>FDI effort</b>:&ensp;'
             '<span style="display:inline-block;width:11px;height:11px;background:#ffffb2;border:1px solid #ccc;margin-right:3px"></span><small>&lt;50d</small>&ensp;'
             '<span style="display:inline-block;width:11px;height:11px;background:#fecc5c;border:1px solid #ccc;margin-right:3px"></span><small>50-500d</small>&ensp;'
@@ -613,7 +694,7 @@ if not df_filtered.empty and "ofac_sanctioned" in df_filtered.columns:
             display_cols = [c for c in display_cols if c in ofac_events.columns]
             st.dataframe(
                 ofac_events[display_cols].sort_values("risk_score", ascending=False),
-                use_container_width=True,
+                width="stretch",
             )
 
 # IUU Alert Box (full width, below map)
@@ -630,7 +711,7 @@ if not df_filtered.empty and "iuu_matched" in df_filtered.columns:
             display_cols = [c for c in display_cols if c in iuu_events.columns]
             st.dataframe(
                 iuu_events[display_cols].sort_values("risk_score", ascending=False),
-                use_container_width=True,
+                width="stretch",
             )
 
 # ========================= TABS =========================

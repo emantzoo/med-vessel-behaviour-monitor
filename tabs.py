@@ -695,7 +695,7 @@ metadata in live mode and from the static profile in demo mode.
         if v in RISK_BAND_COLORS else "",
         subset=["risk_band"],
     )
-    st.dataframe(styled, use_container_width=True)
+    st.dataframe(styled, width="stretch")
 
     # Band summary under the table
     band_order = ["Critical", "Severe", "Elevated", "Emerging", "Low"]
@@ -850,7 +850,7 @@ def render_fisheries_context(df, fdi_effort, fdi_landings):
             "risk_score": "{:.1f}", "fishing_days": "{:,.0f}",
             "landings_value_eur": "EUR {:,.0f}", "duration_h": "{:.1f}",
         }),
-        use_container_width=True,
+        width="stretch",
     )
     st.info(
         "FDI spatial data covers EU Member State fleets only. C-squares in non-EU waters "
@@ -949,7 +949,7 @@ def render_base_vs_compound_decomposition(df):
     if fig is None:
         st.info("No risk scored in current filter window.")
         return
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
     base_total = float(df["base_risk_score"].sum())
     risk_total = float(df["risk_score"].sum())
@@ -972,7 +972,7 @@ def render_base_vs_compound_decomposition(df):
             "than Emerging -- band membership is driven by behavioural severity "
             "AND structural amplification."
         )
-        st.plotly_chart(fig_band, use_container_width=True)
+        st.plotly_chart(fig_band, width="stretch")
 
 
 def render_risk_band_distribution(df):
@@ -1012,7 +1012,7 @@ def render_risk_band_distribution(df):
         st.info("No vessel-level risk in current filter window.")
         return
 
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
     st.markdown(
         "**Bands:** Low <50 | Emerging 50-60 | Elevated 60-80 | Severe 80-100 | Critical >=100. "
         "Cutoffs aligned with Kpler R&C *Turning Tides* (Dec 2025)."
@@ -1084,7 +1084,7 @@ def render_mpa_tier_exposure(df):
         title=f"Total risk score by MPA tier (sum: {float(risk_by_tier.sum()):.0f})",
         margin=dict(l=20, r=20, t=50, b=20),
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
     in_mpa_share = float(risk_by_tier.drop("", errors="ignore").sum()) / float(risk_by_tier.sum())
     st.markdown(
@@ -1135,7 +1135,7 @@ def render_top_vessels_segmented(df, top_n=10):
     if fig is None:
         st.info("Base risk score not available or no vessels in current filter window.")
         return
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
     st.markdown(
         "**Read:** vessels with a long red segment owe most of their score to "
         "structural lookups (IUU listing, ICCAT carrier authorisation, OFAC "
@@ -1249,7 +1249,7 @@ def render_fishing_in_mpa_map(df, fishing_df):
         margin=dict(l=0, r=0, t=10, b=0),
         legend_title_text="MPA tier",
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
     if hours_col and hours_col in fim.columns:
         total_h = float(pd.to_numeric(fim[hours_col], errors="coerce").fillna(0).sum())
@@ -1324,7 +1324,7 @@ def render_vessel_class_composition(df):
         title=f"Fleet composition ({int(counts.sum())} unique vessels)",
         margin=dict(l=20, r=20, t=50, b=20),
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
 
 def render_type_mismatch_by_class(df):
@@ -1405,7 +1405,7 @@ def render_type_mismatch_by_class(df):
         xaxis_title="Mismatched vessel count",
         margin=dict(l=20, r=20, t=50, b=20),
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
     # Show the actual mismatched vessels for context
     detail = per_vessel[per_vessel["vessel_type_mismatch"].fillna(False).astype(bool)][
@@ -1414,7 +1414,7 @@ def render_type_mismatch_by_class(df):
     ].reset_index(drop=True)
     if not detail.empty:
         st.caption("Mismatched vessels in current filter window:")
-        st.dataframe(detail, use_container_width=True)
+        st.dataframe(detail, width="stretch")
 
 
 def render_vessel_trajectory(vessel_events: pd.DataFrame, vessel_summary_row: dict):
@@ -1453,7 +1453,7 @@ def render_vessel_trajectory(vessel_events: pd.DataFrame, vessel_summary_row: di
         st.info("No events for this vessel in the current filter window.")
         return
 
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
     # Summary caption
     time_col = "start_time" if "start_time" in vessel_events.columns else "date"
@@ -1562,7 +1562,7 @@ def render_vessel_investigation(df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_l
 
         _inv_sel = st.dataframe(
             _compact_styled,
-            use_container_width=True,
+            width="stretch",
             on_select="rerun",
             selection_mode="single-row",
             key="investigation_quick_table",
@@ -1696,7 +1696,7 @@ def render_vessel_investigation(df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_l
                 "Top species": ", ".join(ctx.get("top_species", []) or []) or "-",
             })
         fisheries_df = pd.DataFrame(fisheries_rows)
-        st.dataframe(fisheries_df, use_container_width=True, hide_index=True)
+        st.dataframe(fisheries_df, width="stretch", hide_index=True)
         st.caption(
             f"Per-event FDI context across {len(fisheries_rows)} event(s). "
             "Fishing ground = c-square has reported EU fleet activity in the FDI dataset."
@@ -1731,7 +1731,7 @@ def render_vessel_investigation(df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_l
         if ev_rows:
             ev_df = pd.DataFrame(ev_rows)
             keep_cols = [c for c in ["date", "lat", "lon", "fishing_hours", "mpa", "mpa_tier"] if c in ev_df.columns]
-            st.dataframe(ev_df[keep_cols], use_container_width=True, hide_index=True)
+            st.dataframe(ev_df[keep_cols], width="stretch", hide_index=True)
     else:
         st.info("No GFW fishing events recorded inside an MPA for this vessel in the current dataset.")
 
@@ -1930,7 +1930,7 @@ def render_vessel_investigation(df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_l
                     threat_level=report["assessment"]["threat_level"],
                 )
                 if fig_icicle:
-                    st.plotly_chart(fig_icicle, use_container_width=True)
+                    st.plotly_chart(fig_icicle, width="stretch")
                 else:
                     st.info("No risk tree data for this vessel.")
             except Exception as e:
@@ -2130,15 +2130,15 @@ def render_reference():
         [
             {
                 "Band": label,
-                "Lower bound": low,
-                "Upper bound": ("infinity" if high == float("inf") else high),
+                "Lower bound": str(low),
+                "Upper bound": ("\u221e" if high == float("inf") else str(high)),
                 "Meaning": desc,
             }
             for low, high, label, desc in RISK_BANDS
         ]
     )
     st.markdown("**Risk bands (applied to final compounded score)**")
-    st.dataframe(bands_df, use_container_width=True, hide_index=True)
+    st.dataframe(bands_df, width="stretch", hide_index=True)
 
     # 4. Multiplier tables (collapsed)
     with st.expander("Multiplier tables (from config.py)", expanded=False):
@@ -2151,7 +2151,7 @@ def render_reference():
             .sort_values("Multiplier", ascending=False)
             .reset_index(drop=True)
         )
-        st.dataframe(flag_df, use_container_width=True, hide_index=True, height=300)
+        st.dataframe(flag_df, width="stretch", hide_index=True, height=300)
         st.caption("Derived from the Poseidon IUU Fishing Risk Index — 10 Flag-responsibility indicators per country. Flags not in the Index carry a 1.0x multiplier (neutral).")
 
         st.markdown("**IUU listing multipliers** — applied on IUU vessel match")
@@ -2167,7 +2167,7 @@ def render_reference():
                 for k, v in IUU_MULTIPLIERS.items()
             ]
         )
-        st.dataframe(iuu_df, use_container_width=True, hide_index=True)
+        st.dataframe(iuu_df, width="stretch", hide_index=True)
 
         st.markdown(
             "**ICCAT authorisation multipliers** — applied conditionally on "
@@ -2190,7 +2190,7 @@ def render_reference():
                 for k, v in ICCAT_MULTIPLIERS.items()
             ]
         ).sort_values("Multiplier", ascending=False).reset_index(drop=True)
-        st.dataframe(iccat_df, use_container_width=True, hide_index=True)
+        st.dataframe(iccat_df, width="stretch", hide_index=True)
 
         st.markdown("**OFAC sanctions multiplier** — applied on OFAC SDN match")
         ofac_df = pd.DataFrame(
@@ -2201,7 +2201,7 @@ def render_reference():
                 }
             ]
         )
-        st.dataframe(ofac_df, use_container_width=True, hide_index=True)
+        st.dataframe(ofac_df, width="stretch", hide_index=True)
 
         st.markdown(
             "**MPA intersection multipliers** — applied to the base behavioural "
@@ -2223,7 +2223,7 @@ def render_reference():
                 for k, v in MPA_MULTIPLIERS.items()
             ]
         ).sort_values("Multiplier", ascending=False).reset_index(drop=True)
-        st.dataframe(mpa_df, use_container_width=True, hide_index=True)
+        st.dataframe(mpa_df, width="stretch", hide_index=True)
 
     # 5. ICCAT framing note
     with st.expander("ICCAT framing note", expanded=False):
@@ -2248,7 +2248,7 @@ def render_reference():
     with st.expander("Data source provenance", expanded=False):
         prov_df = pd.DataFrame(content["data_source_provenance"])
         prov_df.columns = [c.capitalize() for c in prov_df.columns]
-        st.dataframe(prov_df, use_container_width=True, hide_index=True)
+        st.dataframe(prov_df, width="stretch", hide_index=True)
 
     # 7. Epistemological separation
     with st.expander("Epistemological separation", expanded=False):

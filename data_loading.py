@@ -129,6 +129,143 @@ def load_static_data():
     return df
 
 
+# ========================= API SNAPSHOT (download once, keep as CSV) =========
+
+_DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
+_SNAPSHOT_EVENTS = os.path.join(_DATA_DIR, "api_events_snapshot.csv")
+_SNAPSHOT_FISHING = os.path.join(_DATA_DIR, "api_fishing_snapshot.csv")
+
+
+def snapshot_exists():
+    """True if a cached API snapshot CSV is present."""
+    return os.path.exists(_SNAPSHOT_EVENTS)
+
+
+def snapshot_info():
+    """Return (event_count, fishing_count, file_date) or None."""
+    if not snapshot_exists():
+        return None
+    mtime = datetime.fromtimestamp(os.path.getmtime(_SNAPSHOT_EVENTS))
+    ev_count = sum(1 for _ in open(_SNAPSHOT_EVENTS, encoding="utf-8")) - 1
+    fish_count = 0
+    if os.path.exists(_SNAPSHOT_FISHING):
+        fish_count = sum(1 for _ in open(_SNAPSHOT_FISHING, encoding="utf-8")) - 1
+    return ev_count, fish_count, mtime
+
+
+def _gfw_post(token, datasets, start_date, end_date, page_size=5000, progress=None):
+    """Direct REST call to GFW Events API v3 with auto-pagination."""
+    import requests as _requests
+
+    url = "https://gateway.api.globalfishingwatch.org/v3/events"
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    body = {
+        "datasets": datasets,
+        "startDate": start_date.strftime("%Y-%m-%d"),
+        "endDate": end_date.strftime("%Y-%m-%d"),
+        "geometry": {
+            "type": "Polygon",
+            "coordinates": [[[-6, 30], [36.5, 30], [36.5, 46], [-6, 46], [-6, 30]]],
+        },
+    }
+    all_entries = []
+    offset = 0
+    while True:
+        resp = _requests.post(
+            url, json=body, headers=headers,
+            params={"limit": page_size, "offset": offset}, timeout=120,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        entries = data.get("entries", [])
+        all_entries.extend(entries)
+        total = data.get("total", len(all_entries))
+        next_offset = data.get("nextOffset")
+        if progress:
+            progress(f"Fetched {len(all_entries)}/{total} events...")
+        if next_offset is None or next_offset >= total or not entries:
+            break
+        offset = next_offset
+    return all_entries
+
+
+def download_api_snapshot(token, start_date, end_date, include_fishing=False, progress=None):
+    """Fetch events (+ optionally fishing) from GFW API via plain REST and save to CSV.
+
+    Returns (events_df, fishing_df). Both are also persisted to
+    data/api_events_snapshot.csv and data/api_fishing_snapshot.csv
+    so subsequent runs can use them without an API key.
+    """
+    if progress:
+        progress(0.1, "Fetching behavioural events (gaps, encounters, loitering)...")
+
+    raw_entries = _gfw_post(token, [
+        "public-global-gaps-events:latest",
+        "public-global-encounters-events:latest",
+        "public-global-loitering-events:latest",
+    ], start_date, end_date)
+
+    raw_events = pd.DataFrame(raw_entries) if raw_entries else pd.DataFrame()
+    events_df = _parse_events_df(raw_events) if not raw_events.empty else pd.DataFrame()
+
+    fishing_df = pd.DataFrame()
+    if include_fishing:
+        if progress:
+            progress(0.5, f"Got {len(events_df)} events. Fetching fishing events...")
+
+        raw_fishing_entries = _gfw_post(token, [
+            "public-global-fishing-events:latest",
+        ], start_date, end_date)
+
+        raw_fishing = pd.DataFrame(raw_fishing_entries) if raw_fishing_entries else pd.DataFrame()
+        fishing_df = _parse_fishing_df(raw_fishing) if not raw_fishing.empty else pd.DataFrame()
+
+    if progress:
+        progress(0.8, "Saving to CSV...")
+
+    # Persist
+    if not events_df.empty:
+        events_df.to_csv(_SNAPSHOT_EVENTS, index=False)
+    if not fishing_df.empty:
+        fishing_df.to_csv(_SNAPSHOT_FISHING, index=False)
+
+    if progress:
+        progress(1.0, "Done.")
+
+    return events_df, fishing_df
+
+
+@st.cache_data
+def load_snapshot_events():
+    """Load cached API events snapshot."""
+    if not os.path.exists(_SNAPSHOT_EVENTS):
+        return load_static_data()
+    df = pd.read_csv(_SNAPSHOT_EVENTS, parse_dates=["date"])
+    df["imo"] = df["imo"].astype(str).fillna("") if "imo" in df.columns else ""
+    for col, default in [("mpa", ""), ("mpa_tier", ""), ("in_mpa", False)]:
+        if col not in df.columns:
+            df[col] = default
+    df["mpa"] = df["mpa"].fillna("")
+    df["mpa_tier"] = df["mpa_tier"].fillna("")
+    df["in_mpa"] = df["in_mpa"].fillna(False).astype(bool)
+    return df
+
+
+@st.cache_data
+def load_snapshot_fishing():
+    """Load cached API fishing snapshot."""
+    if not os.path.exists(_SNAPSHOT_FISHING):
+        return load_fishing_events_static()
+    df = pd.read_csv(_SNAPSHOT_FISHING, parse_dates=["date"])
+    for col, default in [("mpa", ""), ("mpa_tier", ""), ("in_mpa", False)]:
+        if col not in df.columns:
+            df[col] = default
+    df["mpa"] = df["mpa"].fillna("")
+    df["mpa_tier"] = df["mpa_tier"].fillna("")
+    df["in_mpa"] = df["in_mpa"].fillna(False).astype(bool)
+    return df
+
+
 # ========================= LIVE GFW API =========================
 
 def _safe_get(d, *keys, default=None):
@@ -141,123 +278,145 @@ def _safe_get(d, *keys, default=None):
     return d if d is not None else default
 
 
+def _parse_events_df(raw_df):
+    """Parse raw GFW API events dataframe into flat rows."""
+    rows = []
+    for _, r in raw_df.iterrows():
+        row_dict = {}
+        row_dict["event_type"] = str(r.get("type", "")).upper()
+        row_dict["date"] = r.get("start")
+
+        pos = r.get("position") if isinstance(r.get("position"), dict) else {}
+        row_dict["lat"] = pos.get("lat")
+        row_dict["lon"] = pos.get("lon")
+
+        vessel = r.get("vessel") if isinstance(r.get("vessel"), dict) else {}
+        row_dict["mmsi"] = vessel.get("ssvid", "0")
+        row_dict["flag"] = vessel.get("flag", "UNK")
+        row_dict["vessel_name"] = vessel.get("name", "")
+        row_dict["vessel_type"] = vessel.get("type", "")
+
+        row_dict["duration_h"] = 0
+        if r.get("start") and r.get("end"):
+            try:
+                start_dt = pd.to_datetime(r["start"])
+                end_dt = pd.to_datetime(r["end"])
+                row_dict["duration_h"] = round((end_dt - start_dt).total_seconds() / 3600, 1)
+            except Exception:
+                pass
+
+        distances = r.get("distances") if isinstance(r.get("distances"), dict) else {}
+        row_dict["distance_from_shore_km"] = distances.get("shoreDistanceKm")
+        row_dict["distance_from_port_km"] = distances.get("portDistanceKm")
+        port = distances.get("port") if isinstance(distances.get("port"), dict) else {}
+        row_dict["nearest_port"] = port.get("name")
+
+        mpa_names, rfmo_names, mpa_ids = [], [], []
+        for region in (r.get("regions") or []):
+            if isinstance(region, dict):
+                ds = str(region.get("dataset", "")).lower()
+                name = region.get("name")
+                rid = region.get("id")
+                if "eez" in ds:
+                    row_dict["eez"] = name
+                elif "mpa" in ds and name:
+                    mpa_names.append(str(name))
+                    if rid:
+                        mpa_ids.append(str(rid))
+                elif "rfmo" in ds and name:
+                    rfmo_names.append(str(name))
+        row_dict["mpa"] = "; ".join(mpa_names) if mpa_names else ""
+        row_dict["mpa_ids"] = "; ".join(mpa_ids) if mpa_ids else ""
+        row_dict["rfmo"] = "; ".join(rfmo_names) if rfmo_names else ""
+        row_dict["in_mpa"] = bool(mpa_names)
+        row_dict["mpa_tier"] = classify_mpa_tier(mpa_names) if mpa_names else ""
+
+        event_info = r.get("event_info") if isinstance(r.get("event_info"), dict) else {}
+
+        if row_dict["event_type"] == "GAP":
+            row_dict["gap_distance_km"] = event_info.get("distanceKm")
+            row_dict["speed_before_gap"] = event_info.get("speedBeforeKnots")
+            row_dict["speed_after_gap"] = event_info.get("speedAfterKnots")
+        elif row_dict["event_type"] == "ENCOUNTER":
+            enc_vessel = event_info.get("vessel") if isinstance(event_info.get("vessel"), dict) else {}
+            row_dict["encounter_vessel_name"] = enc_vessel.get("name")
+            row_dict["encounter_vessel_flag"] = enc_vessel.get("flag")
+            row_dict["encounter_median_distance_km"] = event_info.get("medianDistanceKm")
+            row_dict["encounter_median_speed_knots"] = event_info.get("medianSpeedKnots")
+        elif row_dict["event_type"] == "LOITERING":
+            row_dict["loitering_total_distance_km"] = event_info.get("totalDistanceKm")
+            row_dict["loitering_avg_speed_knots"] = event_info.get("averageSpeedKnots")
+
+        rows.append(row_dict)
+
+    df = pd.DataFrame(rows)
+    type_map = {"GAP": "GAP", "ENCOUNTER": "ENCOUNTER", "LOITERING": "LOITERING"}
+    df["event_type"] = df["event_type"].map(type_map).fillna(df["event_type"])
+
+    if "lat" in df.columns and "lon" in df.columns:
+        df["med_zone"] = df.apply(
+            lambda r: classify_med_zone(r["lon"], r["lat"])
+            if pd.notna(r.get("lon")) and pd.notna(r.get("lat")) else "", axis=1)
+
+    df["imo"] = ""
+    return df
+
+
+def _parse_fishing_df(raw_df):
+    """Parse raw GFW fishing events into flat rows."""
+    rows = []
+    for _, r in raw_df.iterrows():
+        row = {}
+        row["date"] = r.get("start")
+        pos = r.get("position") if isinstance(r.get("position"), dict) else {}
+        row["lat"] = pos.get("lat")
+        row["lon"] = pos.get("lon")
+
+        vessel = r.get("vessel") if isinstance(r.get("vessel"), dict) else {}
+        row["mmsi"] = vessel.get("ssvid", "0")
+        row["flag"] = vessel.get("flag", "UNK")
+        row["vessel_name"] = vessel.get("name", "")
+
+        row["fishing_hours"] = 0.0
+        if r.get("start") and r.get("end"):
+            try:
+                start_dt = pd.to_datetime(r["start"])
+                end_dt = pd.to_datetime(r["end"])
+                row["fishing_hours"] = round((end_dt - start_dt).total_seconds() / 3600, 2)
+            except Exception:
+                pass
+
+        mpa_names = []
+        for region in (r.get("regions") or []):
+            if isinstance(region, dict):
+                ds = str(region.get("dataset", "")).lower()
+                name = region.get("name")
+                if "mpa" in ds and name:
+                    mpa_names.append(str(name))
+        row["mpa"] = "; ".join(mpa_names) if mpa_names else ""
+        row["in_mpa"] = bool(mpa_names)
+        row["mpa_tier"] = classify_mpa_tier(mpa_names) if mpa_names else ""
+        rows.append(row)
+
+    return pd.DataFrame(rows)
+
+
 @st.cache_data
 def load_live_data(token, start_date, end_date, _min_dur):
-    """Fetch events from GFW Events API with full nested field extraction."""
+    """Fetch events from GFW Events API v3 via plain REST."""
     try:
-        import gfwapiclient as gfw
-
-        gfw_client = gfw.Client(access_token=token)
-
-        datasets = [
+        raw_entries = _gfw_post(token, [
             "public-global-gaps-events:latest",
             "public-global-encounters-events:latest",
             "public-global-loitering-events:latest",
-        ]
+        ], start_date, end_date)
 
-        med_geometry = {
-            "type": "Polygon",
-            "coordinates": [[[-6, 30], [36.5, 30], [36.5, 46], [-6, 46], [-6, 30]]],
-        }
-
-        async def _fetch():
-            result = await gfw_client.events.get_all_events(
-                datasets=datasets,
-                start_date=start_date.strftime("%Y-%m-%d"),
-                end_date=end_date.strftime("%Y-%m-%d"),
-                geometry=med_geometry,
-                limit=5000,
-            )
-            return result.df()
-
-        raw_df = asyncio.run(_fetch())
-
-        if raw_df.empty:
+        if not raw_entries:
             st.warning("No events returned from API for this period.")
             return load_static_data()
 
-        rows = []
-        for _, r in raw_df.iterrows():
-            row_dict = {}
-            row_dict["event_type"] = str(r.get("type", "")).upper()
-            row_dict["date"] = r.get("start")
-
-            pos = r.get("position") if isinstance(r.get("position"), dict) else {}
-            row_dict["lat"] = pos.get("lat")
-            row_dict["lon"] = pos.get("lon")
-
-            vessel = r.get("vessel") if isinstance(r.get("vessel"), dict) else {}
-            row_dict["mmsi"] = vessel.get("ssvid", "0")
-            row_dict["flag"] = vessel.get("flag", "UNK")
-            row_dict["vessel_name"] = vessel.get("name", "")
-            row_dict["vessel_type"] = vessel.get("type", "")
-
-            if r.get("start") and r.get("end"):
-                try:
-                    start_dt = pd.to_datetime(r["start"])
-                    end_dt = pd.to_datetime(r["end"])
-                    row_dict["duration_h"] = round((end_dt - start_dt).total_seconds() / 3600, 1)
-                except Exception:
-                    row_dict["duration_h"] = 0
-
-            distances = r.get("distances") if isinstance(r.get("distances"), dict) else {}
-            row_dict["distance_from_shore_km"] = distances.get("shoreDistanceKm")
-            row_dict["distance_from_port_km"] = distances.get("portDistanceKm")
-            port = distances.get("port") if isinstance(distances.get("port"), dict) else {}
-            row_dict["nearest_port"] = port.get("name")
-
-            # GFW regions array carries point-in-polygon intersections for
-            # eez, mpa, rfmo, fao majors — all pre-computed server-side.
-            # We preserve EEZ as a scalar (single name) and accumulate MPAs
-            # and RFMOs as lists since a point may intersect multiple.
-            mpa_names, rfmo_names, mpa_ids = [], [], []
-            for region in (r.get("regions") or []):
-                if isinstance(region, dict):
-                    ds = str(region.get("dataset", "")).lower()
-                    name = region.get("name")
-                    rid = region.get("id")
-                    if "eez" in ds:
-                        row_dict["eez"] = name
-                    elif "mpa" in ds and name:
-                        mpa_names.append(str(name))
-                        if rid:
-                            mpa_ids.append(str(rid))
-                    elif "rfmo" in ds and name:
-                        rfmo_names.append(str(name))
-            row_dict["mpa"] = "; ".join(mpa_names) if mpa_names else ""
-            row_dict["mpa_ids"] = "; ".join(mpa_ids) if mpa_ids else ""
-            row_dict["rfmo"] = "; ".join(rfmo_names) if rfmo_names else ""
-            row_dict["in_mpa"] = bool(mpa_names)
-            row_dict["mpa_tier"] = classify_mpa_tier(mpa_names) if mpa_names else ""
-
-            event_info = r.get("event_info") if isinstance(r.get("event_info"), dict) else {}
-
-            if row_dict["event_type"] == "GAP":
-                row_dict["gap_distance_km"] = event_info.get("distanceKm")
-                row_dict["speed_before_gap"] = event_info.get("speedBeforeKnots")
-                row_dict["speed_after_gap"] = event_info.get("speedAfterKnots")
-            elif row_dict["event_type"] == "ENCOUNTER":
-                enc_vessel = event_info.get("vessel") if isinstance(event_info.get("vessel"), dict) else {}
-                row_dict["encounter_vessel_name"] = enc_vessel.get("name")
-                row_dict["encounter_vessel_flag"] = enc_vessel.get("flag")
-                row_dict["encounter_median_distance_km"] = event_info.get("medianDistanceKm")
-                row_dict["encounter_median_speed_knots"] = event_info.get("medianSpeedKnots")
-            elif row_dict["event_type"] == "LOITERING":
-                row_dict["loitering_total_distance_km"] = event_info.get("totalDistanceKm")
-                row_dict["loitering_avg_speed_knots"] = event_info.get("averageSpeedKnots")
-
-            rows.append(row_dict)
-
-        df = pd.DataFrame(rows)
-        type_map = {"GAP": "GAP", "ENCOUNTER": "ENCOUNTER", "LOITERING": "LOITERING"}
-        df["event_type"] = df["event_type"].map(type_map).fillna(df["event_type"])
-
-        if "lat" in df.columns and "lon" in df.columns:
-            df["med_zone"] = df.apply(
-                lambda r: classify_med_zone(r["lon"], r["lat"])
-                if pd.notna(r.get("lon")) and pd.notna(r.get("lat")) else "", axis=1)
-
-        return df
+        raw_df = pd.DataFrame(raw_entries)
+        return _parse_events_df(raw_df)
 
     except Exception as e:
         st.error(f"Live API error: {e}. Falling back to static demo data.")
@@ -295,75 +454,17 @@ def load_fishing_events_static():
 
 @st.cache_data
 def load_fishing_events_live(token, start_date, end_date):
-    """Fetch fishing events from GFW Events API as a separate, lightweight df.
-
-    Uses the public-global-fishing-events:latest dataset. We only need
-    enough fields to compute fishing-in-MPA aggregates per vessel. Falls
-    back to the static fixture on any error so the rest of the app still
-    works. The fishing df is intentionally NOT merged into the behavioural
-    df: legitimate fishing outside MPAs is normal and would dilute the
-    behavioural risk signal. Only fishing INSIDE MPAs is the IUU signal,
-    and we expose it as a display-only flag rather than a multiplier.
-    """
+    """Fetch fishing events from GFW Events API v3 via plain REST."""
     try:
-        import gfwapiclient as gfw
+        raw_entries = _gfw_post(token, [
+            "public-global-fishing-events:latest",
+        ], start_date, end_date)
 
-        gfw_client = gfw.Client(access_token=token)
-        med_geometry = {
-            "type": "Polygon",
-            "coordinates": [[[-6, 30], [36.5, 30], [36.5, 46], [-6, 46], [-6, 30]]],
-        }
-
-        async def _fetch():
-            result = await gfw_client.events.get_all_events(
-                datasets=["public-global-fishing-events:latest"],
-                start_date=start_date.strftime("%Y-%m-%d"),
-                end_date=end_date.strftime("%Y-%m-%d"),
-                geometry=med_geometry,
-                limit=5000,
-            )
-            return result.df()
-
-        raw_df = asyncio.run(_fetch())
-        if raw_df.empty:
+        if not raw_entries:
             return load_fishing_events_static()
 
-        rows = []
-        for _, r in raw_df.iterrows():
-            row = {}
-            row["date"] = r.get("start")
-            pos = r.get("position") if isinstance(r.get("position"), dict) else {}
-            row["lat"] = pos.get("lat")
-            row["lon"] = pos.get("lon")
-
-            vessel = r.get("vessel") if isinstance(r.get("vessel"), dict) else {}
-            row["mmsi"] = vessel.get("ssvid", "0")
-            row["flag"] = vessel.get("flag", "UNK")
-            row["vessel_name"] = vessel.get("name", "")
-
-            if r.get("start") and r.get("end"):
-                try:
-                    start_dt = pd.to_datetime(r["start"])
-                    end_dt = pd.to_datetime(r["end"])
-                    row["fishing_hours"] = round((end_dt - start_dt).total_seconds() / 3600, 2)
-                except Exception:
-                    row["fishing_hours"] = 0.0
-            else:
-                row["fishing_hours"] = 0.0
-
-            mpa_names = []
-            for region in (r.get("regions") or []):
-                if isinstance(region, dict):
-                    ds = str(region.get("dataset", "")).lower()
-                    name = region.get("name")
-                    if "mpa" in ds and name:
-                        mpa_names.append(str(name))
-            row["mpa"] = "; ".join(mpa_names) if mpa_names else ""
-            row["in_mpa"] = bool(mpa_names)
-            row["mpa_tier"] = classify_mpa_tier(mpa_names) if mpa_names else ""
-            rows.append(row)
-
-        return pd.DataFrame(rows)
+        raw_df = pd.DataFrame(raw_entries)
+        return _parse_fishing_df(raw_df)
 
     except Exception as e:
         st.warning(f"Fishing events API error: {e}. Using static fishing fixture.")

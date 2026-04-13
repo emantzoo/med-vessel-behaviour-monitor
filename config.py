@@ -319,3 +319,16 @@ def assign_csquare(lat, lon):
     centre_lon = round(round(lon * 2) / 2, 1)
     centre_lat = round(round(lat * 2) / 2, 1)
     return centre_lon - 0.25, centre_lat - 0.25
+
+
+def assign_csquares_vec(lat_series, lon_series):
+    """Vectorized c-square assignment — replaces per-row .apply(assign_csquare).
+
+    Returns (csq_lon, csq_lat) as two numpy arrays.
+    """
+    import numpy as np
+    lon = np.asarray(lon_series, dtype=float)
+    lat = np.asarray(lat_series, dtype=float)
+    centre_lon = np.round(np.round(lon * 2) / 2, 1)
+    centre_lat = np.round(np.round(lat * 2) / 2, 1)
+    return centre_lon - 0.25, centre_lat - 0.25
