@@ -1053,6 +1053,8 @@ Includes fishing-only vessels not visible in the behavioural Ranking tab.""")
             render_fishing_in_mpa_map(df_tab, _fish_filt)
 
             # Vessel table (aggregated from filtered events)
+            # Highlight row if a map marker was clicked
+            _clicked_mmsi = st.session_state.get("fishing_map_clicked_mmsi")
             with st.expander("Fishing vessel table", expanded=True):
                 _fv = _fish_filt.groupby(["mmsi", "vessel_name", "flag"]).agg(
                     events=("date", "size"),
@@ -1063,16 +1065,42 @@ Includes fishing-only vessels not visible in the behavioural Ranking tab.""")
                 _fv["in_mpa_events"] = _fv["in_mpa_events"].astype(int)
                 _fv["non_gfcm_flag"] = ~_fv["flag"].fillna("").str.upper().str.strip().isin(GFCM_PARTY_FLAGS)
                 _fv["has_behavioural"] = _fv["mmsi"].astype(str).isin(_beh_mmsi)
-                _fv = _fv.sort_values("in_mpa_events", ascending=False)
+                _fv = _fv.sort_values("in_mpa_events", ascending=False).reset_index(drop=True)
+
+                # Move clicked vessel to top and show event detail card
+                if _clicked_mmsi:
+                    _hit = _fv[_fv["mmsi"].astype(str) == _clicked_mmsi]
+                    _rest = _fv[_fv["mmsi"].astype(str) != _clicked_mmsi]
+                    _fv = pd.concat([_hit, _rest], ignore_index=True)
+                    if not _hit.empty:
+                        _r = _hit.iloc[0]
+                        st.info(
+                            f"Selected: **{_r['vessel_name']}** ({_r['flag']}) — "
+                            f"{int(_r['in_mpa_events'])} in-MPA events, "
+                            f"{_r['total_hours']:.1f} h total fishing. "
+                            f"{'Has behavioural events.' if _r['has_behavioural'] else 'Fishing-only vessel.'}"
+                        )
+
+                _fv_display = _fv.rename(columns={
+                    "mmsi": "MMSI", "vessel_name": "Vessel", "flag": "Flag",
+                    "events": "Fishing events", "total_hours": "Total hours",
+                    "in_mpa_events": "In MPA", "non_gfcm_flag": "Non-GFCM",
+                    "has_behavioural": "Behavioural",
+                })
+
+                def _highlight_clicked(row):
+                    if _clicked_mmsi and str(row["MMSI"]) == _clicked_mmsi:
+                        return ["background-color: #fff3cd"] * len(row)
+                    return [""] * len(row)
+
                 st.dataframe(
-                    _fv.rename(columns={
-                        "mmsi": "MMSI", "vessel_name": "Vessel", "flag": "Flag",
-                        "events": "Fishing events", "total_hours": "Total hours",
-                        "in_mpa_events": "In MPA", "non_gfcm_flag": "Non-GFCM",
-                        "has_behavioural": "Behavioural",
-                    }),
+                    _fv_display.style.apply(_highlight_clicked, axis=1),
                     use_container_width=True, hide_index=True,
                 )
+                if _clicked_mmsi:
+                    if st.button("Clear selection", key="fa_clear_sel"):
+                        st.session_state.pop("fishing_map_clicked_mmsi", None)
+                        st.rerun()
         else:
             st.info("No fishing events available. Enable 'Include fishing events' and download.")
 

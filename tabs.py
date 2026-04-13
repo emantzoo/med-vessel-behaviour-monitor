@@ -1518,7 +1518,22 @@ satellite radar inside MPAs do not broadcast AIS. This map captures the tip of t
         ).add_to(fmap)
 
     folium.LayerControl(collapsed=True).add_to(fmap)
-    st_folium(fmap, use_container_width=True, height=520, returned_objects=[])
+    map_data = st_folium(fmap, use_container_width=True, height=520, returned_objects=["last_object_clicked"])
+
+    # Return click data so the caller (app.py) can highlight the vessel table
+    clicked = map_data.get("last_object_clicked") if map_data else None
+    if clicked:
+        clat, clng = clicked.get("lat"), clicked.get("lng")
+        if clat is not None and clng is not None:
+            _all = pd.concat([bg_df if n_bg > 0 else pd.DataFrame(),
+                              fg_df if n_fg > 0 else pd.DataFrame()], ignore_index=True)
+            if not _all.empty and "lat" in _all.columns and "lon" in _all.columns:
+                dist = (_all["lat"] - clat)**2 + (_all["lon"] - clng)**2
+                nearest_idx = dist.idxmin()
+                if dist[nearest_idx] < 0.05:
+                    clicked_mmsi = str(_all.loc[nearest_idx, "mmsi"]) if "mmsi" in _all.columns else None
+                    if clicked_mmsi:
+                        st.session_state["fishing_map_clicked_mmsi"] = clicked_mmsi
 
     # Inline legend (mirrors main Behavioural Risk Map style)
     def _fsv(shape, fill="#888", size=14, border="#333", bw=1, dashed_border=False):
