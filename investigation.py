@@ -89,14 +89,14 @@ def investigate_vessel(vessel_identifier, df, iuu_df, iccat_df, ofac_df, fdi_eff
     trace.append({
         "branch_id": "identity", "question_id": "mmsi_consistent",
         "answer": "unknown", "severity": "none", "rule_fired": False,
-        "note": "Needs longitudinal MMSI history (GFW Vessels API multi-SSVID, not available in static mode)",
+        "note": "Requires longitudinal AIS history per MMSI over multiple years (GFW Vessels API multi-SSVID time-series pipeline)",
         "status": "future_work",
     })
     # Name history (future_work: needs vessel registry change history)
     trace.append({
         "branch_id": "identity", "question_id": "name_history",
         "answer": "unknown", "severity": "none", "rule_fired": False,
-        "note": "Needs vessel registry change history (not available in current dataset)",
+        "note": "Requires historical vessel name registry with timestamped changes (Equasis / WDPA partial coverage)",
         "status": "future_work",
     })
 
@@ -175,7 +175,7 @@ def investigate_vessel(vessel_identifier, df, iuu_df, iccat_df, ofac_df, fdi_eff
     trace.append({
         "branch_id": "regulatory_status", "question_id": "eu_sanctioned",
         "answer": "unknown", "severity": "none", "rule_fired": False,
-        "note": "EU sanctions list not loaded (only OFAC SDN available)",
+        "note": "Requires EU Consolidated Financial Sanctions List (vessels track); data prep analogous to OFAC SDN",
         "status": "future_work",
     })
 
@@ -200,7 +200,7 @@ def investigate_vessel(vessel_identifier, df, iuu_df, iccat_df, ofac_df, fdi_eff
     trace.append({
         "branch_id": "flag_risk", "question_id": "flag_recent_change",
         "answer": "unknown", "severity": "none", "rule_fired": False,
-        "note": "Needs historical flag data (not available in current dataset)",
+        "note": "Requires longitudinal flag-state history per vessel (same pipeline gap as mmsi_consistent)",
         "status": "future_work",
     })
     psc_blacklist = {"KHM", "COM", "TGO", "TZA", "SLE"}
@@ -224,7 +224,7 @@ def investigate_vessel(vessel_identifier, df, iuu_df, iccat_df, ofac_df, fdi_eff
     trace.append({
         "branch_id": "authorization", "question_id": "gfcm_authorized",
         "answer": "unknown", "severity": "none", "rule_fired": False,
-        "note": "GFCM Authorized Vessel List not loaded",
+        "note": "Requires GFCM Record of Authorised Vessels (partial public availability); data prep analogous to ICCAT",
         "status": "future_work",
     })
     # Authorization mismatch: check if flag has no fishing rights in Med
@@ -623,7 +623,7 @@ def investigate_vessel(vessel_identifier, df, iuu_df, iccat_df, ofac_df, fdi_eff
     trace.append({
         "branch_id": "network_exposure", "question_id": "shared_ownership",
         "answer": "unknown", "severity": "none", "rule_fired": False,
-        "note": "Ownership data not available (requires Maritime 2.0 or Equasis)",
+        "note": "Requires beneficial ownership graph (Kpler Maritime 2.0 or Equasis); open-data coverage too sparse for fishing vessels",
         "status": "future_work",
     })
 
@@ -740,6 +740,45 @@ def investigate_vessel(vessel_identifier, df, iuu_df, iccat_df, ofac_df, fdi_eff
     report["trace"] = trace
 
     return report
+
+
+def format_trace_for_llm(trace: list, vessel_name: str = "") -> str:
+    """Format the risk tree trace as LLM-readable structured text.
+
+    Produces a compact, branch-grouped summary intended for inclusion
+    in the AI Analyst's system prompt. Non-firing rules are included
+    but marked, so the LLM can reason about what did and did not fire.
+    """
+    if not trace:
+        return "No risk tree evaluation available for this vessel."
+
+    from collections import OrderedDict
+    branches = OrderedDict()
+    for entry in trace:
+        bid = entry.get("branch_id", "unknown")
+        branches.setdefault(bid, []).append(entry)
+
+    lines = []
+    if vessel_name:
+        lines.append(f"Risk tree trace for {vessel_name}:")
+    else:
+        lines.append("Risk tree trace:")
+    lines.append("")
+
+    for bid, entries in branches.items():
+        fired = [e for e in entries if e.get("rule_fired")]
+        lines.append(f"Branch: {bid}  ({len(fired)}/{len(entries)} rules fired)")
+        for e in entries:
+            mark = "FIRED" if e.get("rule_fired") else "not fired"
+            sev = e.get("severity", "none")
+            qid = e.get("question_id", "?")
+            note = e.get("note", "")
+            status = e.get("status", "")
+            suffix = f" [future_work]" if status == "future_work" else ""
+            lines.append(f"  - {qid}: {mark} | severity={sev} | {note}{suffix}")
+        lines.append("")
+
+    return "\n".join(lines)
 
 
 def _recommend_action(threat_level, is_ofac, is_iuu, is_iccat):

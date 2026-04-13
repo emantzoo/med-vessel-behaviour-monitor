@@ -283,7 +283,7 @@ scope_and_limitations: |
   North Africa.
 
   Temporal. FDI reliable from 2017 onwards. Live mode pulls current GFW
-  events subject to API rate limits; static mode uses a fixed 86-event
+  events subject to API rate limits; static mode uses a fixed 94-event
   demo dataset.
 
   Spatial resolution. GFW events are point-level; FDI is aggregated to

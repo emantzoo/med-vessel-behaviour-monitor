@@ -8,6 +8,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 from config import FORBIDDEN_CODE
+from investigation import investigate_vessel, format_trace_for_llm
 
 
 def _cross_ref_summary(df):
@@ -165,6 +166,7 @@ RULES:
 - When asked to investigate a vessel, ALWAYS generate code that filters df for that vessel and displays its key columns as result_df. Follow the investigation template from the knowledge base.
 - Do not fabricate data or make up vessel names/MMSIs
 - CRITICAL ANTI-HALLUCINATION RULE: For IUU, ICCAT, and OFAC status you MUST generate code that reads and displays the actual boolean column values (iuu_matched, iccat_authorized, ofac_sanctioned) for the vessel. Your ANALYSIS section MUST match what the code outputs — do not contradict the data. Do NOT infer or assume a vessel is IUU/ICCAT/OFAC based on its flag, type, or name. An Iranian tanker is NOT necessarily OFAC-sanctioned unless ofac_sanctioned==True. A vessel can be IUU-listed but NOT OFAC-sanctioned — these are independent data sources. When investigating a vessel, your code MUST include these columns in result_df: iuu_matched, ofac_sanctioned, iccat_authorized, iuu_multiplier, ofac_multiplier, iccat_multiplier.
+- When the user asks about a specific vessel (by MMSI or name), you will receive a STRUCTURED EVIDENCE block at the end of this prompt containing the risk tree trace for that vessel. Use it as the primary source for vessel-specific analysis. Ground your narrative in the branches that fired and the severities assigned. If the structured evidence does not appear, answer from the raw data as before.
 - When discussing flags, use the domain knowledge to explain risk context
 - When discussing locations, reference relevant Med geography
 
@@ -333,6 +335,35 @@ Typical patterns:
     return prompt
 
 
+def _extract_vessel_reference(query: str, df) -> tuple:
+    """Detect whether the user query references a specific vessel.
+
+    Returns (mmsi, vessel_name) if a vessel is identified, (None, None) otherwise.
+    Uses two strategies: MMSI pattern match (9-digit number) and
+    vessel name match against the unique vessel_name column of df.
+    """
+    # MMSI pattern: 9-digit number
+    mmsi_match = re.search(r"\b(\d{9})\b", query)
+    if mmsi_match:
+        mmsi = mmsi_match.group(1)
+        if mmsi in df["mmsi"].astype(str).values:
+            vessel_row = df[df["mmsi"].astype(str) == mmsi].iloc[0]
+            return mmsi, vessel_row.get("vessel_name", "")
+
+    # Vessel name match: check if any unique vessel name appears in query
+    if "vessel_name" in df.columns:
+        query_upper = query.upper()
+        # Sort by length descending so longer names match first (avoids
+        # "MARE NOSTRUM II" matching partial "MARE NOSTRUM II (HRV-2)")
+        names = sorted(df["vessel_name"].dropna().unique(), key=len, reverse=True)
+        for name in names:
+            if isinstance(name, str) and len(name) > 3 and name.upper() in query_upper:
+                mmsi = str(df[df["vessel_name"] == name].iloc[0]["mmsi"])
+                return mmsi, name
+
+    return None, None
+
+
 def is_safe_code(code):
     """Basic check that generated code doesn't do anything dangerous."""
     code_lower = code.lower()
@@ -421,6 +452,33 @@ def render_ai_analyst(df_filtered, fdi_effort, fdi_landings, knowledge_base, gem
                 system_ctx = build_system_prompt(
                     df_filtered, knowledge_base, fdi_effort, fdi_landings, iuu_vessels, iccat_vessels, ofac_vessels, fishing_df
                 )
+
+                # Detect if the query references a specific vessel and append risk tree trace
+                vessel_mmsi, vessel_name = _extract_vessel_reference(question, df_filtered)
+                if vessel_mmsi:
+                    try:
+                        report = investigate_vessel(
+                            vessel_mmsi, df_filtered,
+                            iuu_vessels if iuu_vessels is not None else pd.DataFrame(),
+                            iccat_vessels if iccat_vessels is not None else pd.DataFrame(),
+                            ofac_vessels if ofac_vessels is not None else pd.DataFrame(),
+                            fdi_effort if fdi_effort is not None else pd.DataFrame(),
+                            fdi_landings if fdi_landings is not None else pd.DataFrame(),
+                            fishing_df=fishing_df,
+                        )
+                        trace = report.get("trace", [])
+                        trace_text = format_trace_for_llm(trace, vessel_name)
+                    except Exception as e:
+                        trace_text = f"(Risk tree trace unavailable: {e})"
+                    system_ctx += (
+                        "\n\n---\n"
+                        "STRUCTURED EVIDENCE — risk tree evaluation for the vessel referenced in the query.\n"
+                        "When the query is about this specific vessel, use this evaluation as the "
+                        "primary evidence. Reference the branches that fired and the severity assigned. "
+                        "Do not contradict the deterministic rule evaluation. You may comment on its "
+                        "implications or add context, but do not overwrite which rules fired.\n\n"
+                        f"{trace_text}"
+                    )
 
                 contents = []
                 for msg in st.session_state.ai_messages[-20:]:

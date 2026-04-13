@@ -37,9 +37,19 @@ framework:
         - id: mmsi_consistent
           text: "Has the MMSI been consistent in the dataset?"
           escalation: "Recent MMSI changes indicate identity manipulation."
+          status: future_work
+          data_requirement: >
+            Longitudinal AIS history per MMSI over multiple years to detect
+            reassignment patterns. Requires time-series data pipeline beyond
+            current single-window snapshot.
         - id: name_history
           text: "Has the vessel changed names more than twice?"
           escalation: "Multiple name changes are a classic identity-laundering indicator."
+          status: future_work
+          data_requirement: >
+            Historical vessel name registry with timestamped changes. WDPA and
+            Equasis have partial coverage; a fuller source would be needed for
+            commercial use.
         - id: identity_misrepresentation
           text: "Does the vessel's event-level vessel_type disagree with its registry shiptypes (vessel_type_mismatch)?"
           weight: medium
@@ -76,6 +86,10 @@ framework:
         - id: flag_recent_change
           text: "Has the flag changed in the last 12 months?"
           weight: medium
+          status: future_work
+          data_requirement: >
+            Longitudinal flag-state history per vessel. Same pipeline gap as
+            mmsi_consistent and name_history.
         - id: flag_psc_blacklist
           text: "Is the flag on the Paris MoU or Tokyo MoU black list?"
           weight: medium
@@ -93,6 +107,11 @@ framework:
         - id: eu_sanctioned
           text: "Is the vessel on EU sanctions lists?"
           escalation: "Automatic Critical or High depending on program."
+          status: future_work
+          data_requirement: >
+            EU Consolidated Financial Sanctions List (vessels track). Data prep
+            analogous to OFAC SDN — a CSV loader script. Deferred until higher-
+            leverage integrations land.
       gate_rule: "Any sanctions hit = Critical. Any IUU listing = High minimum. Both = Critical."
 
     - id: authorization
@@ -105,6 +124,11 @@ framework:
         - id: gfcm_authorized
           text: "Is the vessel on the GFCM Authorized Vessel List?"
           note: "Vessels >15m LOA must be on this list to fish in GFCM area."
+          status: future_work
+          data_requirement: >
+            GFCM Record of Authorised Vessels (currently partial public availability).
+            Data prep analogous to ICCAT Rec. 24-05. Complement to ICCAT, captures
+            non-tuna Med fisheries authorisation.
         - id: authorization_mismatch
           text: "Does the vessel's flag have legitimate fishing rights in the area where it was observed?"
           escalation: "Iranian or Russian vessels in EU waters have no legitimate fishing rights."
@@ -251,6 +275,9 @@ framework:
           escalation: "Common ownership networks are how IUU operations scale."
           note: "Requires vessel ownership data -- flagged as enrichment opportunity."
           status: future_work
+          data_requirement: >
+            Beneficial ownership graph (e.g. Kpler Maritime 2.0). Open-data ownership
+            coverage for fishing vessels is too sparse to support this rule.
 
   tier_assignment_rules:
     description: >

@@ -59,32 +59,93 @@ using all available data sources.
 Query the df for the vessel by name or MMSI. Report vessel name, MMSI, IMO,
 flag, vessel type, number of events, and match confidence.
 
+Risk tree leaves evaluated at this step:
+- **imo_present** (gate) -- missing IMO = identity unverifiable, escalate to Elevated minimum
+- **identity_misrepresentation** (medium) -- vessel_type_mismatch fires when event-level vessel_type and registry shiptypes map to different canonical classes
+- mmsi_consistent, name_history -- future work (need longitudinal data)
+
 ### Step 2: IUU Listing Status
 Check iuu_matched, iuu_vessel_name, iuu_listing_rfmos, iuu_match_type,
 iuu_match_confidence, iuu_is_gfcm. Report listing RFMOs and reason.
+
+Risk tree leaf: **iuu_listed** (regulatory_status branch, gate). GFCM-listed = high severity, other RFMO = medium.
 
 ### Step 3: ICCAT Authorization Status
 Check iccat_authorized, iccat_authorizations, iccat_risk_tier. Note if
 authorized as a Carrier (requires Regional Observer Programme coverage).
 
+Risk tree leaves: **iccat_authorized** and **authorization_mismatch** (authorization branch, contextual). Authorization is an opportunity indicator, not exoneration.
+- gfcm_authorized -- future work (needs GFCM Authorized Vessel List)
+
 ### Step 4: Sanctions Status
 Check ofac_sanctioned, ofac_sanctions_program, ofac_vessel_name. OFAC
 sanctions are the most severe compliance flag.
+
+Risk tree leaf: **ofac_sanctioned** (regulatory_status branch, gate). Automatic Critical tier.
+- eu_sanctioned -- future work (needs EU Consolidated Financial Sanctions List)
 
 ### Step 5: Fisheries Context
 Look up FDI baseline for the c-square(s) where events occurred. Report
 fishing days, top species, gear types, and whether the activity makes
 sense in this fisheries context.
 
-### Step 6: Behavioural Pattern Analysis
+### Step 6: Behavioural Pattern Analysis and Network Exposure
+
 Analyse event patterns: event type mix, duration patterns, speed analysis,
 geographic spread, temporal clustering. For AIS gaps: speed drop suggests
 mid-sea operation; >12h suggests deliberate AIS disabling. For encounters:
 proximity + duration = transfer likelihood.
 
+Risk tree leaves evaluated at this step (behavioural_history branch, additive):
+- **ais_gap_count** -- 2-3 gaps = medium, 4+ = high
+- **encounter_with_carrier** -- medium severity
+- **loitering_in_fishing_grounds** -- medium severity
+- **speed_change_at_gap** -- >3kn drop = high severity
+- **multi_behaviour_compound** -- two or more distinct event types = medium
+- **dark_port_call_candidate** -- loitering within 10 km of shore = medium
+- **repeat_offender_90d** -- two or more events in 90-day window = medium
+- **vessel_size_industrial** -- >=24m LOA or >=100 GT = medium
+
+#### Network Exposure (associative risk)
+
+Evaluate encounter-partner signals from the risk tree's network_exposure branch.
+Four specific leaves are evaluated deterministically for each vessel:
+
+1. **encounter_iuu_vessel** (high severity) -- vessel had an encounter with a
+   partner whose name appears on the TMT Combined IUU list across 13 RFMOs.
+   Report the matched partner name(s).
+
+2. **encounter_sanctioned_vessel** (critical severity) -- vessel had an
+   encounter with a partner whose name appears on the OFAC SDN list.
+   Report the matched partner name(s) and the sanctions program.
+
+3. **encounter_weak_cooperation_partner** (medium severity) -- vessel had an
+   encounter with a partner flagged by a Med coastal state cited in GFCM
+   non-compliance reports (Libya or Syria). Report the partner flag.
+
+4. **encounter_distant_water_partner** (medium severity) -- vessel had an
+   encounter with a partner whose flag is neither EU nor Med coastal --
+   distant-water fishing fleets and non-Med flags of convenience. Report
+   the partner flag.
+
+For vessel-specific queries the exact rule evaluation will appear in the
+STRUCTURED EVIDENCE block. Ground your narrative in which specific leaves
+fired. If no encounter-partner leaves fire, state that the network exposure
+branch is clear.
+
+Note: none of these four leaves multiply into the numeric risk_score. They
+fire in the risk tree, appear in the vessel investigation narrative, but do
+not affect the score. This preserves the base-vs-compound decomposition
+(base = event observation, compound = vessel-identity lookup).
+
 ### Step 7: Risk Score Decomposition
 Break down risk_score into: base (duration^0.75), event weight, flag
 multiplier, shore factor, event-specific factors, IUU/ICCAT/OFAC multipliers.
+
+Key columns: base_risk_score (behavioural + spatial, pre-lookup) vs
+risk_score (final compounded). compound_multiplier = sum(risk_score) /
+sum(base_risk_score). High compound = mostly structural (lookup-driven).
+Near 1 = mostly behavioural. risk_band is derived from final risk_score.
 
 ### Step 8: Hypothesis Generation
 State most likely explanation: unauthorized fishing, at-sea transshipment,

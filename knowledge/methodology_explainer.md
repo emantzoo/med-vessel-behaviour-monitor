@@ -152,7 +152,9 @@ The final tier is not a simple sum of branch scores. It follows compound rules w
 
 ### What the risk tree does not do (yet)
 
-6 of the 31 leaf questions remain as future-work stubs (hardcoded `answer: "unknown"`):
+6 of the 31 leaf questions remain as future-work stubs, each annotated with
+`status: future_work` and a `data_requirement` note in both the YAML and
+`investigation.py` documenting exactly what data source would enable it:
 
 - **`shared_ownership`** (Network Exposure) — requires vessel beneficial-ownership data (Maritime 2.0 or Equasis). The four first-degree encounter-partner leaves are wired; fleet-network propagation is the next step.
 - **`mmsi_consistent`** (Identity Verification) — requires longitudinal MMSI history. Partially available in live mode via GFW Vessels API multi-SSVID entries, but not in the static demo.

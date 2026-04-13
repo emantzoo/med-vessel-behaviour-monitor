@@ -121,13 +121,13 @@ Wait for Gemini to generate and execute the code. While it runs, explain: "The A
 
 Type: "Investigate KOOSHA 4."
 
-The AI follows the investigation template loaded via the RAG knowledge base. It walks through ten structured steps: identity confirmation, IUU listing history, ICCAT authorization status, OFAC sanctions check, fisheries context for the event location, behavioural pattern analysis, risk score decomposition, hypothesis generation, external lookup links, and a summary threat assessment.
+The AI detects the vessel name, runs the deterministic risk tree evaluation from `investigation.py`, and injects the full trace as a STRUCTURED EVIDENCE block into its system prompt. It then walks through ten structured steps grounded in the specific leaves that fired and the severities assigned — identity confirmation, IUU listing history, ICCAT authorization status, OFAC sanctions check, fisheries context for the event location, behavioural pattern analysis and network exposure, risk score decomposition, hypothesis generation, external lookup links, and a summary threat assessment.
 
-Explain while it runs: "This is what an analyst would do manually — cross-reference five data sources, build a vessel profile, generate hypotheses, decide what to escalate. The AI does it in one query, with the investigation methodology codified in the knowledge base. The output includes MarineTraffic and VesselFinder links so the analyst can verify current position and ownership directly without leaving the workflow."
+Explain while it runs: "This is what an analyst would do manually — cross-reference five data sources, build a vessel profile, generate hypotheses, decide what to escalate. The AI does it in one query, but it's not reasoning from scratch — the deterministic risk tree runs first and its results are injected as structured evidence. The AI grounds its narrative in those specific leaf evaluations. The output includes MarineTraffic and VesselFinder links so the analyst can verify current position and ownership directly without leaving the workflow."
 
 **What to say about the architecture:**
 
-"The RAG approach means the AI doesn't hallucinate about maritime concepts — it has specific, curated knowledge about IUU indicators, GFCM regulations, ICCAT observer programmes, OFAC sanctions programs, and the investigation workflow itself. The live dataframe schema is injected into the system prompt so the AI knows exactly what columns are available and what's queryable."
+"The RAG approach means the AI doesn't hallucinate about maritime concepts — it has specific, curated knowledge about IUU indicators, GFCM regulations, ICCAT observer programmes, OFAC sanctions programs, and the investigation workflow itself. The live dataframe schema is injected into the system prompt so the AI knows exactly what columns are available and what's queryable. For vessel-specific queries, it also receives a STRUCTURED EVIDENCE block — the full deterministic risk tree trace from `investigation.py`, showing which of the 31 leaves fired and at what severity. The AI is instructed not to contradict those results."
 
 "The sandbox is important — generated code can only read the data and produce visualisations. It can't modify the source dataframes, access the filesystem, or make network calls. That matters when you're executing AI-generated code against compliance-sensitive data."
 
@@ -331,7 +331,9 @@ investigation.py    → Deterministic vessel investigation (rule-based, no LLM):
                       - Returns structured dict for UI rendering
                       - No API calls, no LLM, instant results
                       - Used by the Vessel Investigation top-level tab
-                        as a reliable fallback to the LLM-based AI analyst
+                      - For vessel-specific AI analyst queries, the risk tree
+                        trace is injected into the Gemini system prompt as a
+                        STRUCTURED EVIDENCE block (upstream to the LLM)
 
 risk_tree.py        → Med IUU Risk Tree framework rendering:
                       - load_framework() → reads risk_tree_framework.yaml
@@ -394,7 +396,7 @@ ai_analyst.py       → Gemini 2.5 Flash integration:
 11. Classify band     classify_risk_band() → risk_band column (Low..Critical)
 12. Render map        Folium markers (priority: OFAC > IUU > ICCAT > event type)
 13. Render tabs       6 top-level tabs dispatched with df_filtered + reference data
-14. AI analyst        Gemini with RAG + sandboxed code execution + investigation template
+14. AI analyst        Gemini with RAG + sandboxed code execution + risk tree trace (per vessel)
 ```
 
 ### Identity Matching Chain
@@ -454,7 +456,7 @@ Purple   = ENCOUNTER event
 ## Key Numbers to Know
 
 - 5 data sources cross-referenced (GFW, FDI, IUU, ICCAT, OFAC), with GFW providing three distinct feeds (Events API, `regions.mpa` WDPA intersection, `public-global-fishing-events` CNN classifier)
-- 88 demo events across 6 top-level tabs (secondary charts in expanders)
+- 94 demo events across 6 top-level tabs (secondary charts in expanders)
 - 369 IUU vessels (213 currently listed, 150 GFCM-listed)
 - 9,203 ICCAT Med-authorized vessels
 - ~1,000 FDI c-squares covering EU Med waters
@@ -462,7 +464,7 @@ Purple   = ENCOUNTER event
 - 3-level identity matching: MMSI → IMO → vessel name
 - Risk formula: 8 multiplicative factors compounding independently, then classified into 5 Kpler-aligned bands
 - GFW methodology aligned with Miller et al. 2018
-- 10-step structured investigation workflow — both deterministic (rule-based) and LLM-powered (RAG)
+- 10-step structured investigation workflow — deterministic risk tree trace feeds LLM-powered (RAG) analysis
 - Risk tree framework with 7 branches and 5 tier outcomes — adapted from Kpler's April 2026 shadow fleet methodology
 
 ## The One Thing to Communicate
