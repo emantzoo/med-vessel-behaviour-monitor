@@ -77,11 +77,13 @@ Because the band is derived from the compounded score, the decomposition lets an
 
 ## Vessel-level aggregation
 
-Event scores are summed per vessel with three derived metrics:
+Event scores are aggregated per vessel with five derived metrics:
 
 - `base_score_total` — sum of pre-multiplier scores (behaviour only)
 - `risk_score_total` — sum of post-multiplier scores (behaviour + structural)
 - `compound_multiplier` — the ratio, showing how much risk comes from behaviour vs structural amplifiers
+- `avg_risk` — average per-event risk score. More stable than sum for comparing vessels with different event counts.
+- `peak_risk` — maximum single-event risk score. Identifies the worst individual event.
 
 This decomposition enables the base-vs-compounded narrative move: *"this vessel's risk is 30 from behaviour, compounded to 168 because it's GFCM-listed and ICCAT-authorised as a carrier"*. The analyst sees both numbers side by side, so structural amplification is never hidden inside the final score.
 
@@ -108,7 +110,7 @@ This is a deliberate discipline worth calling out in an R&C conversation: the sc
 
 The scoring pipeline answers "how risky is this vessel's behaviour?" The risk tree answers a different question: **"what kind of risk is it, and what should we investigate next?"**
 
-The risk tree is a hierarchical framework with **8 branches** and **40 leaf questions**, defined in `data/risk_tree_framework.yaml`. It drives the per-vessel investigation trace in the Vessel Investigation tab — each branch is evaluated for the selected vessel, coloured by severity, and rendered as expandable cards plus an interactive icicle chart.
+The risk tree is a hierarchical framework with **8 branches** and **41 leaf questions**, defined in `data/risk_tree_framework.yaml`. It drives the per-vessel investigation trace in the Vessel Investigation tab — each branch is evaluated for the selected vessel, coloured by severity, and rendered as expandable cards plus an interactive icicle chart.
 
 ### The three branch types
 
@@ -121,10 +123,10 @@ The risk tree is a hierarchical framework with **8 branches** and **40 leaf ques
    - **Flag State Risk** — high-risk IUU country, flag of convenience, recent flag change, PSC blacklist.
    - **Behavioural History (90 days)** — AIS gap count, carrier encounters, loitering in fishing grounds, speed-change evasion, plus the four display-only flags (multi-behaviour, dark port call, repeat offender, industrial profile).
    - **Spatial / Contextual Risk** — contested EEZ, MPA/FRA intersection, high-value fishing grounds.
-   - **Fishing Activity** — GFW-classified fishing events inside MPAs (the strongest publicly available IUU signal).
+   - **Fishing Activity** — four leaves analysing GFW-classified fishing events: fishing inside any MPA (`fishing_in_mpa`, high), fishing inside a no-take MPA or curated closed area (`fishing_in_closed_area`, high — two-tier signal using GFW's `mpaNoTake` field as primary and `closed_area_mpas.csv` as fallback), AIS gap followed by fishing within 72 hours (`gap_then_fishing_sequence`, high — classic IUU evasion signature), and EU vessel fishing in a bottom-5% FDI effort c-square (`fishing_in_low_effort_cell`, medium — anomalous location for EU fleet).
 
 3. **Contextual branches** (direction-dependent) — the answer changes interpretation depending on what other branches found:
-   - **Fishing Authorization Status** — ICCAT/GFCM authorization is an opportunity indicator, not exoneration. A carrier authorized for bluefin paired with suspicious AIS behaviour is *more* concerning, not less. This branch also covers the FAO "unregulated" category: **stateless_vessel** (high — vessel broadcasting empty/unknown flag, outside any state's regulatory authority) and **unregulated_flag_in_gfcm_area** (medium — vessel flagged to a non-GFCM contracting party, fishing under no applicable regional conservation measures). Together with existing illegal-fishing detection, these complete coverage of two of three FAO IUU categories.
+   - **Fishing Authorization Status** — ICCAT/GFCM authorization is an opportunity indicator, not exoneration. A carrier authorized for bluefin paired with suspicious AIS behaviour is *more* concerning, not less. This branch also covers the FAO "unregulated" category: **stateless_vessel** (high — vessel broadcasting empty/unknown flag, outside any state's regulatory authority) and **unregulated_flag_in_gfcm_area** (medium — vessel flagged to a non-GFCM contracting party, fishing under no applicable regional conservation measures). Two GFW Insights API leaves provide cross-references: **gfw_iuu_crosscheck** (high — GFW's live RFMO IUU list confirms listing, independent of our static CSV) and **gfw_no_rfmo_authorization** (medium — GFW detected fishing in RFMO areas where vessel has no known authorization from any of 40+ registries). Together with existing illegal-fishing detection, these complete coverage of two of three FAO IUU categories.
 
 ### How it differs from the scoring pipeline
 
@@ -153,7 +155,7 @@ The final tier is not a simple sum of branch scores. It follows compound rules w
 
 ### What the risk tree does not do (yet)
 
-5 of the 34 leaf questions remain as future-work stubs, each annotated with
+5 of the 41 leaf questions remain as future-work stubs, each annotated with
 `status: future_work` and a `data_requirement` note in both the YAML and
 `investigation.py` documenting exactly what data source would enable it:
 
@@ -183,6 +185,7 @@ The behavioural substrate. Three distinct feeds:
 - **GFW `regions.mpa`** -- WDPA point-in-polygon intersection, computed server-side by GFW on each event. Feeds the MPA tier multiplier in the base score.
 - **GFW `public-global-fishing-events`** -- Kroodsma et al. 2018 CNN-classified fishing activity. Separate feed, display-only (fishing-in-MPA flag).
 - **GFW Vessels API** -- vessel metadata (length, tonnage, shiptypes, flag, IMO). Used for `is_industrial`, `vessel_class`, `vessel_type_mismatch`.
+- **GFW Insights API** (v3) -- optional batch query for unique vessels in the snapshot. Returns RFMO authorization checks (fishing without known authorization from 40+ registries), AIS coverage percentage, and live IUU list cross-reference. Queried during snapshot download when "Include vessel insights" toggle is enabled (~1 min for ~200 Elevated+ vessels). Cached to `data/api_insights_snapshot.csv`. Two tree-only leaves: `gfw_iuu_crosscheck` (high) and `gfw_no_rfmo_authorization` (medium). No scoring multiplier.
 
 ### 2. EU JRC FDI (Fisheries Dependent Information)
 
@@ -207,6 +210,10 @@ The behavioural substrate. Three distinct feeds:
 ### 7. GFCM Authorised Vessel Register
 
 77,304 vessels, 24 Med countries. 24% MMSI coverage. Two positive-evidence leaves wired: `gfcm_listed_no_licence` (medium), `gfcm_listed_inactive` (medium). Absence-based signal remains future work due to coverage limitation.
+
+### 8. Curated Closed-Area MPAs
+
+52 named Mediterranean no-take zones and gear-specific closures (GFCM FRAs, national reserves) used as Tier 2 fallback in the `fishing_in_closed_area` leaf. File: `data/closed_area_mpas.csv`. Tier 1 is GFW's `mpaNoTake` field (globally authoritative). The CSV catches Med-specific closures that GFW may not classify as no-take (e.g. gear-specific GFCM restrictions).
 
 ### Data sources not wired (future work)
 

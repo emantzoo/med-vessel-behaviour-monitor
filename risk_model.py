@@ -1,5 +1,6 @@
 """GFW-aligned behavioral risk scoring and FDI context lookups."""
 
+import os
 import numpy as np
 import pandas as pd
 
@@ -8,6 +9,8 @@ from config import (
     IUU_MULTIPLIERS, ICCAT_MULTIPLIERS, OFAC_MULTIPLIER,
     MPA_MULTIPLIERS,
     derive_vessel_class,
+    EU_FLAGS, assign_csquare,
+    RECOGNISED_FLAG_VALUES_INVALID, GFCM_PARTY_FLAGS,
 )
 
 
@@ -73,11 +76,13 @@ def compute_risk_score(row, event_weights, flag_risks):
         return base * ew * fm * shore_factor * mpa_factor * vessel_factor * speed_factor
 
     elif row["event_type"] == "GAP":
-        spd_before = row.get("speed_before_gap")
-        spd_after = row.get("speed_after_gap")
-        if pd.notna(spd_before) and pd.notna(spd_after):
-            speed_change = abs(spd_before - spd_after)
-            evasion_factor = 1.5 if speed_change > 5 else (1.2 if speed_change > 2 else 1.0)
+        implied_speed = row.get("gap_implied_speed_knots")
+        intentional = row.get("gap_intentional_disabling")
+        if intentional is True:
+            evasion_factor = 1.5
+        elif pd.notna(implied_speed):
+            implied_speed = float(implied_speed)
+            evasion_factor = 1.4 if implied_speed > 8 else (1.2 if implied_speed > 4 else 1.0)
         else:
             evasion_factor = 1.0
 
@@ -171,15 +176,13 @@ def compute_risk_scores_vec(df, event_weights, flag_risks):
     is_gap = (df["event_type"] == "GAP").values
 
     if is_gap.any():
-        if "speed_before_gap" in df.columns and "speed_after_gap" in df.columns:
-            spd_b = pd.to_numeric(df["speed_before_gap"], errors="coerce").values
-            spd_a = pd.to_numeric(df["speed_after_gap"], errors="coerce").values
-            speed_change = np.abs(spd_b - spd_a)
-            evasion = np.where(np.isnan(speed_change), 1.0,
-                     np.where(speed_change > 5, 1.5,
-                     np.where(speed_change > 2, 1.2, 1.0)))
-        else:
-            evasion = np.ones(n)
+        intentional = df.get("gap_intentional_disabling", pd.Series(False, index=df.index))
+        is_intentional = (intentional == True).values  # noqa: E712
+        implied_spd = pd.to_numeric(df.get("gap_implied_speed_knots", pd.Series(dtype=float)), errors="coerce").values
+        evasion = np.where(is_intentional, 1.5,
+                 np.where(np.isnan(implied_spd), 1.0,
+                 np.where(implied_spd > 8, 1.4,
+                 np.where(implied_spd > 4, 1.2, 1.0))))
 
         score = np.where(is_gap, score * evasion, score)
 
@@ -731,3 +734,171 @@ def detect_gap_then_fishing_sequence(
             })
 
     return matches
+
+
+def get_low_effort_csquares(fdi_effort, percentile=5):
+    """Return the set of c-square (lon, lat) tuples in the bottom percentile of FDI effort.
+
+    Uses rectangle_lon / rectangle_lat as c-square keys and totfishdays as the
+    effort column. Only cells with positive effort are considered (zero-effort
+    cells are unknown, not low-effort).
+
+    Args:
+        fdi_effort: FDI effort DataFrame with rectangle_lon, rectangle_lat, totfishdays.
+        percentile: bottom percentile threshold (default 5 = bottom 5%).
+
+    Returns:
+        set of (rectangle_lon, rectangle_lat) tuples below the threshold,
+        or empty set if data is unavailable.
+    """
+    if fdi_effort is None or fdi_effort.empty:
+        return set()
+    required = {"rectangle_lon", "rectangle_lat", "totfishdays"}
+    if not required.issubset(fdi_effort.columns):
+        return set()
+
+    cell_effort = (
+        fdi_effort.groupby(["rectangle_lon", "rectangle_lat"])["totfishdays"]
+        .sum()
+        .reset_index()
+    )
+    cell_effort = cell_effort[cell_effort["totfishdays"] > 0]
+    if cell_effort.empty:
+        return set()
+
+    threshold = np.percentile(cell_effort["totfishdays"], percentile)
+    low = cell_effort[cell_effort["totfishdays"] <= threshold]
+    return set(zip(low["rectangle_lon"], low["rectangle_lat"]))
+
+
+# ---------------------------------------------------------------------------
+# Leaf attribution for fishing events (visualisation helper)
+# ---------------------------------------------------------------------------
+
+def attribute_leaves_to_fishing_events(fishing_df, df_filtered,
+                                       closed_area_csv_path=None):
+    """For each fishing event, determine which fishing-related leaves fired.
+
+    Returns a copy of *fishing_df* with extra boolean columns for each leaf,
+    a ``primary_leaf`` column (highest-severity fired leaf), and vessel-level
+    overlay flags joined from *df_filtered*.
+
+    New columns added:
+        leaf_fishing_in_mpa, leaf_fishing_in_closed_area,
+        leaf_fishing_in_low_effort_cell, leaf_gfw_no_rfmo_authorization,
+        primary_leaf, primary_severity,
+        vessel_iuu_crosscheck, vessel_stateless, vessel_unregulated_flag.
+    """
+    if fishing_df is None or fishing_df.empty:
+        return fishing_df
+
+    out = fishing_df.copy()
+
+    # -- Leaf 1: fishing_in_mpa (any WDPA MPA) ----------------------------
+    out["leaf_fishing_in_mpa"] = (
+        out["in_mpa"].fillna(False).astype(bool)
+        if "in_mpa" in out.columns
+        else False
+    )
+
+    # -- Leaf 2: fishing_in_closed_area (no-take OR curated CSV) ----------
+    no_take = (
+        out["in_no_take_mpa"].fillna(False).astype(bool)
+        if "in_no_take_mpa" in out.columns
+        else pd.Series(False, index=out.index)
+    )
+    curated_closed = pd.Series(False, index=out.index)
+    if closed_area_csv_path and os.path.exists(closed_area_csv_path):
+        try:
+            closed_csv = pd.read_csv(closed_area_csv_path)
+            closed_names = set(
+                closed_csv["mpa_name"].dropna().str.strip().str.upper()
+            )
+            if "mpa" in out.columns:
+                event_mpas = out["mpa"].fillna("").astype(str).str.upper()
+                curated_closed = event_mpas.apply(
+                    lambda m: any(c in m for c in closed_names) if m else False
+                )
+        except Exception:
+            pass
+    out["leaf_fishing_in_closed_area"] = no_take | curated_closed
+
+    # -- Leaf 3: fishing_in_low_effort_cell (pre-computed flag) -----------
+    out["leaf_fishing_in_low_effort_cell"] = (
+        out["in_low_effort_cell"].fillna(False).astype(bool)
+        if "in_low_effort_cell" in out.columns
+        else False
+    )
+
+    # -- Leaf 4: gfw_no_rfmo_authorization (vessel-level from Insights) ---
+    out["leaf_gfw_no_rfmo_authorization"] = False
+    if (df_filtered is not None and not df_filtered.empty
+            and "fishing_without_rfmo_auth_events" in df_filtered.columns
+            and "mmsi" in df_filtered.columns):
+        vessel_no_auth = (
+            df_filtered.drop_duplicates("mmsi")
+            .set_index(df_filtered.drop_duplicates("mmsi")["mmsi"].astype(str))
+            ["fishing_without_rfmo_auth_events"]
+            .fillna(0)
+        )
+        out["leaf_gfw_no_rfmo_authorization"] = (
+            out["mmsi"].astype(str).map(
+                (vessel_no_auth.astype(float) > 0)
+            ).fillna(False).astype(bool)
+        )
+
+    # -- Vessel-level overlay flags (from df_filtered) --------------------
+    for col in ("vessel_iuu_crosscheck", "vessel_stateless",
+                "vessel_unregulated_flag"):
+        out[col] = False
+
+    if df_filtered is not None and not df_filtered.empty and "mmsi" in df_filtered.columns:
+        df_dedup = df_filtered.drop_duplicates("mmsi")
+        mmsi_idx = df_dedup["mmsi"].astype(str)
+
+        # IUU crosscheck
+        if "iuu_listed" in df_dedup.columns:
+            raw_iuu = df_dedup["iuu_listed"].fillna(False)
+            # Guard against NaN being truthy
+            vessel_iuu = pd.Series(
+                [bool(v) if not (isinstance(v, float) and pd.isna(v)) else False
+                 for v in raw_iuu],
+                index=mmsi_idx,
+            )
+            out["vessel_iuu_crosscheck"] = (
+                out["mmsi"].astype(str).map(vessel_iuu).fillna(False).astype(bool)
+            )
+
+        # Stateless + unregulated flag
+        if "flag" in df_dedup.columns:
+            vessel_flags = df_dedup.set_index(mmsi_idx)["flag"].fillna("").str.upper().str.strip()
+            out["vessel_stateless"] = (
+                out["mmsi"].astype(str).map(
+                    vessel_flags.isin(RECOGNISED_FLAG_VALUES_INVALID)
+                ).fillna(False).astype(bool)
+            )
+            out["vessel_unregulated_flag"] = (
+                out["mmsi"].astype(str).map(
+                    ~vessel_flags.isin(RECOGNISED_FLAG_VALUES_INVALID)
+                    & ~vessel_flags.isin(GFCM_PARTY_FLAGS)
+                    & ~vessel_flags.isin(EU_FLAGS)
+                ).fillna(False).astype(bool)
+            )
+
+    # -- Primary leaf (highest severity fired) ----------------------------
+    def _primary(row):
+        if row.get("leaf_fishing_in_closed_area"):
+            return "fishing_in_closed_area", "high"
+        if row.get("leaf_gfw_no_rfmo_authorization"):
+            return "gfw_no_rfmo_authorization", "medium"
+        if row.get("leaf_fishing_in_low_effort_cell"):
+            return "fishing_in_low_effort_cell", "medium"
+        if row.get("leaf_fishing_in_mpa"):
+            return "fishing_in_mpa", "high"
+        return "none", "none"
+
+    pairs = out.apply(_primary, axis=1)
+    out["primary_leaf"] = [p[0] for p in pairs]
+    out["primary_severity"] = [p[1] for p in pairs]
+
+    return out

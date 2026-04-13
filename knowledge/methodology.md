@@ -164,18 +164,19 @@ sense in this fisheries context.
 
 ### Step 5b: Fishing Activity Analysis (GFW classification)
 
-Two fishing_activity branch leaves use the GFW fishing-events dataset
-(separate from behavioural events) cross-referenced against curated
-regulatory data:
+Three fishing_activity branch leaves use the GFW fishing-events dataset
+(separate from behavioural events) cross-referenced against regulatory data:
 
 1. **fishing_in_closed_area** (high severity) — vessel had a GFW-classified
-   fishing event inside an MPA listed as totally closed or no-take in
-   `data/closed_area_mpas.csv`. Distinct from the existing `fishing_in_mpa`
-   signal which counts all MPA intersections — this leaf fires only for the
-   strictly-closed subset where any fishing is by definition illegal
-   regardless of gear, species, or vessel type. The curated CSV includes
-   12 Mediterranean entries covering GFCM FRAs and national no-take zones,
-   each with explicit closure_type and source_reference.
+   fishing event inside a no-take MPA. Primary signal: GFW's `mpaNoTake`
+   field on fishing events, which identifies no-take MPAs from the WDPA
+   (persisted as `in_no_take_mpa` column). This is the authoritative,
+   globally maintained signal for areas where any fishing is illegal
+   regardless of gear, species, or vessel type. Fallback: substring match
+   against the curated `data/closed_area_mpas.csv` for named GFCM FRAs and
+   national closures that GFW may not classify as mpaNoTake. Distinct from
+   `fishing_in_mpa` which counts all MPA intersections — this leaf fires
+   only for the strictly-closed subset.
 
 2. **gap_then_fishing_sequence** (high severity) — vessel went AIS-dark
    for 4+ hours and then resumed fishing within 72 hours. Classic IUU
@@ -186,7 +187,16 @@ regulatory data:
    coverage gaps); the leaf is a behavioural pattern indicator, not
    direct evidence.
 
-Both are tree-only (no scoring multiplier).
+3. **fishing_in_low_effort_cell** (medium severity) — EU-flagged vessel had
+   a GFW fishing event in a c-square that falls in the bottom 5% of JRC FDI
+   total fishing days. Cells with negligible historical EU activity are
+   anomalous locations for EU vessels to fish — may indicate misreported
+   position, unreported fishing ground, or displacement from enforcement
+   zones. Only applies to EU flags (FDI covers EU fleets only). Uses
+   `assign_csquare()` to map fishing event lat/lon to the 0.5x0.5 dd FDI
+   grid.
+
+All three are tree-only (no scoring multiplier).
 
 ### Step 6: Behavioural Pattern Analysis and Network Exposure
 

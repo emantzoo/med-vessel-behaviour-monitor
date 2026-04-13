@@ -128,11 +128,11 @@ Same event. Behavioural base (including the MPA factor, which is a spatial rule-
 
 **Calibration of the MPA multiplier.** The MPA factor is anchored by regulatory tier rather than empirical outcomes, the same way every other factor in the formula is methodology-driven rather than enforcement-calibrated. GFCM FRAs (legally binding under Reg 1967/2006) sit at 2.0× for parity with "other RFMO IUU listing"; EU-designated marine sites at 1.5×; general WDPA entries at 1.2× (below flag-of-convenience). Sensitivity sweep on the static demo across `gfcm ∈ {1.5, 2.0, 2.5, 3.0}` preserves the top-6 *set* across all four values, holds the top-6 *order* stable across `[2.0, 3.0]` (a single rank swap inside the set occurs only at the lowest value), and keeps every top-10 vessel in the Critical band at every setting — calibration sits in a stable plateau. Empirical calibration would require a labelled Mediterranean enforcement-outcome dataset which does not currently exist at scale; this is the same gap named for `duration^0.75` and every other weight.
 
-**Fishing-in-MPA: a stronger signal, kept out of the multiplier chain.** Beyond the behavioural events feed (gaps / encounters / loitering), the app also pulls GFW's `public-global-fishing-events` dataset — per-vessel fishing activity classified by the Kroodsma et al. 2018 CNN that scores every AIS position for "is this vessel fishing right now". Fishing events outside MPAs are not surfaced at all (legitimate fishing is normal commercial activity), but fishing events that intersect WDPA polygons are aggregated per vessel into a fishing-in-MPA event count and total hours, displayed in the Ranking subtab and Vessel Investigation. The signal is intentionally **not** multiplied into the risk score: it is the strongest publicly available signal for IUU fishing inside protected areas — stronger than any inference-based signal in the behavioural feed — and is therefore reported on its own terms. The risk tree's `fishing_activity` branch fires at high severity when at least one fishing event for the vessel intersects an MPA, propagating the signal into the per-vessel investigation trace without polluting the base behavioural score.
+**Fishing-in-MPA: a stronger signal, kept out of the multiplier chain.** Beyond the behavioural events feed (gaps / encounters / loitering), the app also pulls GFW's `public-global-fishing-events` dataset — per-vessel fishing activity classified by the Kroodsma et al. 2018 CNN that scores every AIS position for "is this vessel fishing right now". Fishing events outside MPAs are not surfaced at all (legitimate fishing is normal commercial activity), but fishing events that intersect WDPA polygons are aggregated per vessel into a fishing-in-MPA event count and total hours, displayed in the Ranking subtab and Vessel Investigation. The signal is intentionally **not** multiplied into the risk score: it is the strongest publicly available signal for IUU fishing inside protected areas — stronger than any inference-based signal in the behavioural feed — and is therefore reported on its own terms. The risk tree's `fishing_activity` branch evaluates four leaves: `fishing_in_mpa` (any MPA intersection, high), `fishing_in_closed_area` (no-take zone via GFW `mpaNoTake` or curated CSV, high), `gap_then_fishing_sequence` (AIS dark 4h+ then fishing within 72h, high — classic IUU evasion), and `fishing_in_low_effort_cell` (EU vessel in bottom 5% FDI effort c-square, medium — anomalous location). All are tree-only — no scoring multiplier.
 
 ---
 
-## Five data sources, five epistemologies (GFW provides three distinct feeds)
+## Data sources and epistemologies (GFW provides four distinct feeds)
 
 | # | Source | Scale | Epistemic role |
 |---|---|---|---|
@@ -169,10 +169,10 @@ From *How Deception Detection Works* and the Dec 2025 "Turning Tides" paper:
 
 ## Med IUU Risk Tree — compound logic, not multiplication
 
-Adapted from Kpler's April 2026 *How to build a risk tree to assess shadow fleet exposure* for fisheries. Seven branches feed into five tier outcomes. Branches are typed:
+Adapted from Kpler's April 2026 *How to build a risk tree to assess shadow fleet exposure* for fisheries. Eight branches (41 leaves) feed into five tier outcomes. Branches are typed:
 
 - **Gating** (override) — identity, regulatory status, network exposure. Any hit forces a minimum tier regardless of other signals.
-- **Additive** (cumulative) — flag state risk, behavioural history, spatial context. Flags accumulate; three or more escalate one tier.
+- **Additive** (cumulative) — flag state risk, behavioural history, spatial context, fishing activity. Flags accumulate; three or more escalate one tier.
 - **Contextual** (direction-dependent) — authorisation. ICCAT/GFCM rights are opportunity indicators, not exonerations.
 
 ```mermaid
@@ -186,6 +186,7 @@ flowchart LR
         B2["Flag state risk<br/><i>FoC / IUU country / PSC black / recent change</i>"]
         B5["Behavioural history 90d<br/><i>gaps / encounters / loitering / speed / compound flags</i>"]
         B6["Spatial / contextual risk<br/><i>contested EEZ / closed fishery / high-value grounds</i>"]
+        B8["Fishing activity<br/><i>fishing in MPA / closed area / gap→fish / low-effort cell</i>"]
     end
     subgraph CTX["Contextual branches"]
         B4["Fishing authorisation<br/><i>ICCAT / GFCM / flag vs area</i>"]
@@ -198,6 +199,7 @@ flowchart LR
     B5 --> R
     B6 --> R
     B7 --> R
+    B8 --> R
 
     R --> T1[Critical]
     R --> T2[High]
@@ -210,7 +212,7 @@ flowchart LR
     classDef ctx fill:#e8f4ff,stroke:#2e6fb8,color:#0b2947
     classDef tier fill:#f2f2f2,stroke:#888,color:#222
     class B1,B3,B7 gate
-    class B2,B5,B6 add
+    class B2,B5,B6,B8 add
     class B4 ctx
     class T1,T2,T3,T4,T5 tier
 ```
@@ -263,6 +265,18 @@ Two GFCM positive-evidence leaves now implemented in the `authorization` branch:
 
 Plus `authorization_mismatch` hardcoded for obvious cases (IRN/RUS/PRK/SYR have no legitimate fishing rights in EU Med waters).
 
+Two GFW Insights API leaves now implemented in the `authorization` branch (optional, requires Insights toggle):
+
+- **`gfw_iuu_crosscheck`** — GFW's live RFMO IUU list confirms vessel listing, independent of static TMT CSV (high severity)
+- **`gfw_no_rfmo_authorization`** — GFW detected fishing in RFMO areas without known authorization from 40+ registries (medium severity)
+
+Four fishing_activity leaves now implemented (additive branch):
+
+- **`fishing_in_mpa`** — GFW-classified fishing inside any MPA (high severity)
+- **`fishing_in_closed_area`** — two-tier signal: Tier 1 GFW `mpaNoTake` (globally authoritative), Tier 2 curated `closed_area_mpas.csv` (Med-specific gear restrictions). High severity.
+- **`gap_then_fishing_sequence`** — AIS dark 4h+ then fishing within 72h (high severity). Classic IUU evasion signature.
+- **`fishing_in_low_effort_cell`** — EU vessel fishing in bottom 5% FDI effort c-square (medium severity). Anomalous location.
+
 Two additional leaves cover the "unregulated" subset of the FAO IUU framework:
 
 - **`stateless_vessel`** — vessel broadcasting empty/unknown/non-recognised flag value (high severity). Permissive detection.
@@ -276,7 +290,7 @@ sales notes, ERS) — outside the scope of any AIS-based tool.
 
 ### Risk tree branches — need new data
 
-5 of the risk tree's 40 leaf questions remain as future-work stubs:
+5 of the risk tree's 41 leaf questions remain as future-work stubs:
 
 - **`shared_ownership`** — requires vessel beneficial-ownership data (Maritime 2.0 or Equasis)
 - **`mmsi_consistent`** — requires longitudinal MMSI history (GFW Vessels API multi-SSVID, partially available in live mode)

@@ -144,9 +144,12 @@ fishing_in_mpa_note: |
   protected areas — stronger than any of the inference-based signals
   in the behavioural feed — and is therefore reported on its own terms
   rather than being absorbed into a multiplier chain. The risk tree
-  framework fires a dedicated fishing_activity branch at high severity
-  when at least one fishing event for a vessel intersects an MPA, so
-  the signal still propagates into the per-vessel investigation trace.
+  framework fires four fishing_activity leaves: fishing_in_mpa (any MPA,
+  high), fishing_in_closed_area (no-take zone via GFW mpaNoTake or
+  curated CSV, high), gap_then_fishing_sequence (AIS dark then fishing
+  within 72h, high), and fishing_in_low_effort_cell (EU vessel in
+  bottom 5% FDI effort area, medium). All are tree-only — no scoring
+  multiplier.
 
 sanctions_authority_note: |
   Formal fisheries enforcement coverage comes primarily through the
@@ -225,6 +228,18 @@ data_source_provenance:
     status: "GFCM (FAO) register — positive-evidence leaves wired, absence-based signal future work"
     coverage: "24% MMSI coverage, 3% IMO coverage. Static demo with 5 curated vessel states"
     notes: "Two positive-evidence leaves: gfcm_listed_no_licence (medium severity, vessel in register with licence = No) and gfcm_listed_inactive (medium severity, vessel in register marked inactive but AIS active). Absence not interpretable due to coverage limitation."
+
+  - source: "GFW Insights API (v3)"
+    content: "Per-vessel RFMO authorization checks, AIS coverage percentage, live IUU list cross-reference"
+    status: "Optional batch query during snapshot download (toggle: 'Include vessel insights')"
+    coverage: "Queried for Elevated+ vessels in the snapshot. Requires GFW vessel_id UUIDs captured during event parsing."
+    notes: "Two tree-only leaves: gfw_iuu_crosscheck (high — live RFMO IUU list confirms listing, independent of static TMT CSV) and gfw_no_rfmo_authorization (medium — fishing in RFMO areas without known authorization from 40+ registries). AIS coverage percentage displayed in investigation report. Cached to data/api_insights_snapshot.csv."
+
+  - source: "Curated Closed-Area MPAs"
+    content: "52 named Mediterranean no-take zones and gear-specific closures"
+    status: "Tier 2 fallback for fishing_in_closed_area leaf"
+    coverage: "Med-specific GFCM FRAs and national reserves. Tier 1 is GFW's mpaNoTake field (globally authoritative)."
+    notes: "Substring match against fishing event MPA names. Catches gear-specific GFCM restrictions that GFW may not classify as mpaNoTake. File: data/closed_area_mpas.csv."
 
 flag_risk_calibration:
   source: "Poseidon IUU Fishing Risk Index"

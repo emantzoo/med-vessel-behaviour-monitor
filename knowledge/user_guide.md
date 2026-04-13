@@ -1,10 +1,10 @@
 # Med Vessel Behaviour Monitor — User Guide
 
-A short field guide to the four-tab UI, what each chart shows, and how to read it. For the underlying methodology, scoring formula and column glossary see [`methodology.md`](methodology.md) and [`vessel_intelligence_layers.md`](vessel_intelligence_layers.md).
+A short field guide to the UI tabs, what each chart shows, and how to read it. For the underlying methodology, scoring formula and column glossary see [`methodology.md`](methodology.md) and [`vessel_intelligence_layers.md`](vessel_intelligence_layers.md).
 
 ---
 
-## The four top-level tabs
+## The top-level tabs
 
 The app uses four top-level tabs, ordered **investigate → fleet → explain → ask**:
 
@@ -21,6 +21,28 @@ The Map and the OFAC/IUU alert boxes sit *above* the tabs because they are the h
 
 ---
 
+## Data modes and sidebar controls
+
+The sidebar offers three data modes:
+
+- **Static demo** — bundled CSV with ~95 events across 8 demo vessels. No API key needed.
+- **Live GFW** — real-time query to GFW Events API. Requires JWT token.
+- **Snapshot** — download once via API, cache to CSV, reload from disk. Best for reproducible analysis. Snapshot files: `api_events_snapshot.csv`, `api_fishing_snapshot.csv`, optionally `api_insights_snapshot.csv`.
+
+**Sidebar toggles:**
+
+- **Include fishing events** — enables the GFW fishing-events feed (`public-global-fishing-events`). Off by default to speed up initial load.
+- **Include vessel insights** — enables GFW Insights API batch query (RFMO authorization checks, AIS coverage %, live IUU cross-reference). Adds ~1-3 min to snapshot download.
+- **Min duration** slider — filters events below the threshold.
+
+## Map
+
+The Folium map uses FastMarkerCluster for performance (handles 5K+ events). Flagged vessels (IUU/OFAC/ICCAT-matched) keep individual SVG markers for visibility. Low-band (Low risk) events are excluded from the map to reduce noise.
+
+**Marker priority:** OFAC dark red > IUU black > event type default (GAP=red, LOITERING=orange, ENCOUNTER=purple). ICCAT-authorized vessels are not marked separately — authorization is an opportunity indicator, not a risk signal.
+
+---
+
 ## Fleet Analytics → Ranking
 
 The single most important table in the app. One row per vessel, sorted by compounded `risk_score_total` descending.
@@ -29,6 +51,7 @@ The single most important table in the app. One row per vessel, sorted by compou
 
 - **Risk band** — the Kpler *Turning Tides* classification: Low (<50), Emerging (50–60), Elevated (60–80), Severe (80–100), Critical (≥100). Cell background colour matches the map markers.
 - **Compound multiplier** — `risk_score_total / base_score_total`. A value of 1.0x means the vessel's risk is purely behavioural; values above 2x mean structural lookups (IUU, ICCAT, OFAC) dominate.
+- **Avg / Peak risk** — average and maximum per-event risk score. More stable than sum for comparing vessels with different event counts.
 - **Four behavioural flags** (Industrial / Multi-behaviour / Dark port call / Repeat offender) — display-only, never multiplied into the score. See the "How to read this table" expander for definitions.
 - **Two vessel-identity columns** (Vessel class / Type mismatch) — `vessel_class` is a descriptive category (industrial_fishing / artisanal_fishing / carrier / tanker / cargo / support / passenger / other) derived from the GFW Vessels API `shiptypes` field. `type_mismatch` fires when the event-level `vessel_type` and the registry `shiptypes` map to **different** canonical classes — the open-data equivalent of Kpler's "irregular vessel information" Grey Fleet indicator. Both display-only, never scored.
 - **MPA intersection + tier** — sourced from GFW's `regions.mpa` field (WDPA point-in-polygon, server-side). Unlike the four flags, MPA tier *is* multiplied into the base score.
@@ -90,10 +113,22 @@ GFW behavioural events overlaid with EU JRC FDI baseline data — fishing effort
 
 | Expander | Chart |
 |---|---|
-| Fishing activity inside MPAs | Scatter map of `fishing_df[in_mpa==True]` sized by `fishing_hours`, coloured by `mpa_tier`. Display-only. |
+| Fishing events with risk signals | Leaf-differentiated scatter (`go.Scattergeo`): marker shape encodes leaf type (circle = general MPA, triangle = closed area, square = low-effort cell, diamond = no RFMO auth), colour encodes severity (red = high, orange = medium), white border = vessel-level overlay (IUU crosscheck / stateless / unregulated flag). Sized by `fishing_hours`. Display-only. |
 | Geographic risk breakdown | Sub-zone risk bars + port-distance vs risk scatter |
 
 **Static-demo caveat:** the bundled fishing dataset has only ~5 fishing-in-MPA events. Switch to live GFW mode for the full picture; the plot will display a warning when N is small.
+
+---
+
+## Vessel Investigation — risk tree highlights
+
+The per-vessel investigation evaluates 41 leaves across 8 branches. Key branches to know:
+
+- **Fishing Activity** (4 leaves) — `fishing_in_mpa` (any MPA), `fishing_in_closed_area` (no-take via GFW `mpaNoTake` or curated CSV), `gap_then_fishing_sequence` (AIS dark 4h+ then fishing within 72h), `fishing_in_low_effort_cell` (EU vessel in bottom 5% FDI effort area).
+- **Network Exposure** (6 leaves) — encounter partner checked against IUU list, OFAC SDN, weak-cooperation flags (LBY/SYR), distant-water flags, and recurrence patterns.
+- **Authorization** — includes GFW Insights cross-references (`gfw_iuu_crosscheck`, `gfw_no_rfmo_authorization`) when insights data is available, plus FAO unregulated checks (`stateless_vessel`, `unregulated_flag_in_gfcm_area`).
+
+AIS coverage percentage (from GFW Insights API) is shown in the identity section when available.
 
 ---
 
@@ -111,7 +146,7 @@ If a stakeholder asks "where do these numbers come from?" — point them here fi
 
 ## AI Analyst
 
-Gemini 2.5 Flash with a sandboxed code-execution environment. The system prompt loads the entire `knowledge/` directory as RAG context, so the model knows the column names, the multiplier tables, the scoring formula, the McDonald 2024 caveat, and the visualisation catalogue.
+Gemini 2.5 Flash with a sandboxed code-execution environment. The system prompt loads the entire `knowledge/` directory as RAG context, so the model knows the column names, the multiplier tables, the scoring formula, the McDonald 2024 caveat, the visualisation catalogue, and the 41-leaf risk tree framework.
 
 **What the analyst can do:**
 

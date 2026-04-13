@@ -129,6 +129,15 @@ def build_trajectory_fig(
                 annotation=dict(font_size=10, font_color=color),
             )
 
+    # Pad x-axis when events span a very short window (avoids sub-second zoom)
+    t_min, t_max = events["_time"].min(), events["_time"].max()
+    t_span = (t_max - t_min).total_seconds()
+    if t_span < 86400:  # Less than 1 day — pad to +/-2 days
+        pad = pd.Timedelta(days=2)
+        x_range = [t_min - pad, t_max + pad]
+    else:
+        x_range = None  # let Plotly auto-range
+
     fig.update_layout(
         height=400,
         xaxis_title="Event date",
@@ -137,6 +146,8 @@ def build_trajectory_fig(
         legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5),
         margin=dict(l=40, r=80, t=40, b=40),
     )
+    if x_range:
+        fig.update_xaxes(range=x_range)
     return fig
 
 
@@ -561,28 +572,31 @@ def build_repeat_timeline_fig(
 # ── 12. Gap behaviour ───────────────────────────────────────────────
 
 def build_gap_speed_fig(gap_df: pd.DataFrame) -> go.Figure | None:
-    """Speed before vs after AIS gap scatter."""
+    """Implied speed vs distance for AIS gaps."""
     if gap_df is None or gap_df.empty:
         return None
-    if "speed_before_gap" not in gap_df.columns or gap_df["speed_before_gap"].isna().all():
+    spd_col = "gap_implied_speed_knots"
+    dist_col = "gap_distance_km"
+    if spd_col not in gap_df.columns or gap_df[spd_col].isna().all():
         return None
     symbol_col = None
     df_g = gap_df.copy()
+    df_g[spd_col] = pd.to_numeric(df_g[spd_col], errors="coerce")
+    df_g[dist_col] = pd.to_numeric(df_g.get(dist_col, pd.Series(dtype=float)), errors="coerce")
     if "iuu_matched" in df_g.columns:
         df_g["status"] = df_g["iuu_matched"].map({True: "IUU-Listed", False: "Regular"})
         symbol_col = "status"
     fig = px.scatter(
-        df_g, x="speed_before_gap", y="speed_after_gap",
+        df_g, x=dist_col, y=spd_col,
         size="duration_h", color="flag",
         symbol=symbol_col,
         hover_data=["mmsi", "duration_h"] + (["vessel_name"] if "vessel_name" in df_g.columns else []),
-        title="Gap Behaviour: Speed Before vs After AIS Disabling",
-        labels={"speed_before_gap": "Speed Before Gap (kn)", "speed_after_gap": "Speed After Gap (kn)"},
+        title="Gap Behaviour: Implied Speed vs Distance",
+        labels={dist_col: "Gap Distance (km)", spd_col: "Implied Speed (kn)"},
     )
-    fig.add_annotation(x=12, y=1, text="Stopped after gap<br>(possible transfer)",
+    fig.add_annotation(x=0.95, y=0.95, xref="paper", yref="paper",
+                       text="High speed + long distance = evasion risk",
                        showarrow=False, font=dict(size=10, color="red"))
-    fig.add_annotation(x=1, y=12, text="Accelerated after gap<br>(possible evasion)",
-                       showarrow=False, font=dict(size=10, color="orange"))
     return fig
 
 

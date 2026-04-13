@@ -311,6 +311,60 @@ FORBIDDEN_CODE = [
 ]
 
 
+# ========================= EEZ MRGID LOOKUP =========================
+# Marine Regions Gazetteer IDs for Mediterranean EEZs.
+# Source: https://www.marineregions.org/eezmapper.php
+# Used to resolve numeric IDs from GFW's flat-dict regions format
+# into human-readable country names.
+
+EEZ_MRGID_NAMES = {
+    5670: "Albania",
+    5672: "Bulgaria",
+    5673: "Croatia",
+    5677: "France",
+    5679: "Greece",
+    5682: "Italy",
+    5685: "Malta",
+    5689: "Romania",
+    5691: "Montenegro",
+    5693: "Spain",
+    5695: "Ukraine",
+    5697: "Turkey",
+    8366: "Tunisia",
+    8367: "Morocco",
+    8372: "Libya",
+    8373: "Syria",
+    8374: "Lebanon",
+    8375: "Israel",
+    8376: "Cyprus",
+    8378: "Algeria",
+    8490: "Egypt",
+    64430: "Egypt / Libya",
+}
+
+
+def resolve_eez_name(eez_val):
+    """Resolve an EEZ value to a country name.
+
+    Handles both numeric MRGIDs (from GFW flat-dict format) and string
+    names (from GFW list-of-dicts format or static CSV).
+    """
+    if eez_val is None or (isinstance(eez_val, float) and eez_val != eez_val):
+        return None
+    # Try as numeric MRGID
+    try:
+        mrgid = int(float(eez_val))
+        name = EEZ_MRGID_NAMES.get(mrgid)
+        if name:
+            return name
+        return f"EEZ {mrgid}"  # Unknown MRGID — keep numeric with prefix
+    except (ValueError, TypeError):
+        pass
+    # Already a string name
+    s = str(eez_val).strip()
+    return s if s else None
+
+
 # ========================= GEOGRAPHIC HELPERS =========================
 
 def classify_med_zone(lon, lat):

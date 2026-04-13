@@ -13,6 +13,7 @@
 #   gfw_no_rfmo_authorization     — GFW Insights API: fishing without RFMO authorization
 #   fishing_in_closed_area        — fishing inside curated no-take / closed-area MPAs
 #   gap_then_fishing_sequence     — AIS gap 4h+ followed by fishing within 72h
+#   fishing_in_low_effort_cell    — EU vessel fishing in bottom 5% FDI effort c-square
 #
 # Future work (data not loaded):
 #   mmsi_consistent       — needs longitudinal MMSI history (GFW Vessels API multi-SSVID)
@@ -27,8 +28,9 @@ from config import (
     FLAG_RISKS, get_flag_risk, IUU_MULTIPLIERS, ICCAT_MULTIPLIERS, OFAC_MULTIPLIER,
     EU_FLAGS, MED_COASTAL_COOPERATIVE_FLAGS, MED_COASTAL_WEAK_COOPERATION_FLAGS,
     GFCM_PARTY_FLAGS, RECOGNISED_FLAG_VALUES_INVALID,
+    assign_csquare,
 )
-from risk_model import detect_gap_then_fishing_sequence
+from risk_model import detect_gap_then_fishing_sequence, get_low_effort_csquares
 
 
 def investigate_vessel(vessel_identifier, df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_landings, fishing_df=None, closed_area_mpas=None):
@@ -341,11 +343,23 @@ def investigate_vessel(vessel_identifier, df, iuu_df, iccat_df, ofac_df, fdi_eff
 
     # ===== Step 4c: GFW Insights Cross-References =====
     # Uses cached insights from snapshot download (joined onto df_filtered).
+    def _safe_int(val, default=0):
+        """Convert to int, returning default for NaN/None/empty."""
+        if val is None:
+            return default
+        try:
+            if isinstance(val, float) and pd.isna(val):
+                return default
+            return int(val)
+        except (ValueError, TypeError):
+            return default
+
     _cov = primary.get("ais_coverage_pct")
-    _no_auth = int(primary.get("fishing_without_rfmo_auth_events", 0) or 0)
-    _iuu_listed = bool(primary.get("iuu_listed", False))
-    _iuu_times = int(primary.get("iuu_times_listed", 0) or 0)
-    _gap_evts = int(primary.get("gap_events", 0) or 0)
+    _no_auth = _safe_int(primary.get("fishing_without_rfmo_auth_events", 0))
+    _iuu_raw = primary.get("iuu_listed", False)
+    _iuu_listed = bool(_iuu_raw) if not (isinstance(_iuu_raw, float) and pd.isna(_iuu_raw)) else False
+    _iuu_times = _safe_int(primary.get("iuu_times_listed", 0))
+    _gap_evts = _safe_int(primary.get("gap_events", 0))
     _insights_available = _cov is not None and not (isinstance(_cov, float) and pd.isna(_cov))
 
     report["gfw_insights"] = {
@@ -429,15 +443,16 @@ def investigate_vessel(vessel_identifier, df, iuu_df, iccat_df, ofac_df, fdi_eff
     # Gap-specific analysis
     gaps = vessel_events[vessel_events["event_type"] == "GAP"]
     gap_count = len(gaps)
-    avg_speed_before = None
-    avg_speed_after = None
-    if not gaps.empty and "speed_before_gap" in gaps.columns:
-        avg_speed_before = float(gaps["speed_before_gap"].mean()) if gaps["speed_before_gap"].notna().any() else None
-        avg_speed_after = float(gaps["speed_after_gap"].mean()) if gaps["speed_after_gap"].notna().any() else None
+    avg_implied_speed = None
+    n_intentional = 0
+    if not gaps.empty and "gap_implied_speed_knots" in gaps.columns:
+        _spd = pd.to_numeric(gaps["gap_implied_speed_knots"], errors="coerce")
+        avg_implied_speed = float(_spd.mean()) if _spd.notna().any() else None
+        n_intentional = int(gaps.get("gap_intentional_disabling", pd.Series(False)).sum())
         report["behaviour"]["gap_analysis"] = {
             "count": gap_count,
-            "avg_speed_before": avg_speed_before,
-            "avg_speed_after": avg_speed_after,
+            "avg_implied_speed_knots": avg_implied_speed,
+            "intentional_disabling_count": n_intentional,
         }
 
     # Behavioural trace entries
@@ -474,15 +489,17 @@ def investigate_vessel(vessel_identifier, df, iuu_df, iccat_df, ofac_df, fdi_eff
         "rule_fired": has_loitering,
         "note": "Loitering event detected" if has_loitering else "No loitering events",
     })
-    speed_drop_fired = False
-    if avg_speed_before and avg_speed_after and (avg_speed_before - avg_speed_after) > 3:
-        speed_drop_fired = True
+    evasion_fired = n_intentional > 0 or (avg_implied_speed is not None and avg_implied_speed > 8)
     trace.append({
         "branch_id": "behavioural_history", "question_id": "speed_change_at_gap",
-        "answer": "yes" if speed_drop_fired else ("no" if has_gap else "n/a"),
-        "severity": "high" if speed_drop_fired else "none",
-        "rule_fired": speed_drop_fired,
-        "note": f"Speed drop {avg_speed_before:.1f} -> {avg_speed_after:.1f} kn" if speed_drop_fired else "No significant speed change at gap",
+        "answer": "yes" if evasion_fired else ("no" if has_gap else "n/a"),
+        "severity": "high" if evasion_fired else "none",
+        "rule_fired": evasion_fired,
+        "note": (
+            f"High evasion signal: {n_intentional} intentional disabling(s), avg implied speed {avg_implied_speed:.1f}kn"
+            if evasion_fired
+            else "No significant evasion signal at gap"
+        ),
     })
 
     # Kpler-aligned compound / temporal flags (display-only, derived from vessel-level columns)
@@ -684,41 +701,73 @@ def investigate_vessel(vessel_identifier, df, iuu_df, iccat_df, ofac_df, fdi_eff
         "note": fim_note,
     })
 
-    # fishing_in_closed_area — refines fishing_in_mpa to no-take / totally closed areas
-    closed_area_intersections = []
-    if (
-        closed_area_mpas is not None and not closed_area_mpas.empty
-        and fishing_df is not None and not fishing_df.empty
-    ):
+    # fishing_in_closed_area — fishing inside no-take MPAs
+    # Primary signal: GFW's mpaNoTake field (in_no_take_mpa column).
+    # Fallback: substring match against curated closed_area_mpas.csv for
+    # name-based detection (covers GFCM FRAs and national closures that
+    # GFW may not classify as mpaNoTake).
+    no_take_count = 0
+    no_take_mpas = []
+    csv_closed_hits = []
+    if fishing_df is not None and not fishing_df.empty:
         _vessel_fishing = fishing_df[fishing_df["mmsi"].astype(str) == str(mmsi_val)]
-        if not _vessel_fishing.empty and "mpa" in _vessel_fishing.columns:
-            mpas_fished_in = (
-                _vessel_fishing[_vessel_fishing["in_mpa"].fillna(False).astype(bool)]
-                ["mpa"].dropna().str.strip().tolist()
+        if not _vessel_fishing.empty:
+            # Primary: GFW mpaNoTake signal
+            if "in_no_take_mpa" in _vessel_fishing.columns:
+                _no_take_rows = _vessel_fishing[
+                    _vessel_fishing["in_no_take_mpa"].fillna(False).astype(bool)
+                ]
+                no_take_count = len(_no_take_rows)
+                if no_take_count > 0 and "mpa" in _no_take_rows.columns:
+                    no_take_mpas = _no_take_rows["mpa"].dropna().str.strip().tolist()
+
+            # Fallback: curated CSV substring match (catches named FRAs etc.)
+            if (
+                closed_area_mpas is not None and not closed_area_mpas.empty
+                and "mpa" in _vessel_fishing.columns
+            ):
+                mpas_fished_in = (
+                    _vessel_fishing[_vessel_fishing["in_mpa"].fillna(False).astype(bool)]
+                    ["mpa"].dropna().str.strip().tolist()
+                )
+                closed_area_names = set(
+                    closed_area_mpas["mpa_name"].dropna().str.strip()
+                )
+                csv_closed_hits = [
+                    m for m in mpas_fished_in
+                    if any(c in m for c in closed_area_names)
+                ]
+
+    closed_area_fired = no_take_count > 0 or bool(csv_closed_hits)
+    if closed_area_fired:
+        parts = []
+        if no_take_count > 0:
+            parts.append(
+                f"{no_take_count} fishing event(s) in GFW-designated no-take MPA(s)"
             )
-            closed_area_names = set(
-                closed_area_mpas["mpa_name"].dropna().str.strip()
+            if no_take_mpas:
+                parts.append(f"IDs: {', '.join(list(set(no_take_mpas))[:3])}")
+        if csv_closed_hits:
+            parts.append(
+                f"curated closed-area match: {', '.join(list(set(csv_closed_hits))[:3])}"
             )
-            closed_area_intersections = [
-                m for m in mpas_fished_in
-                if any(c in m for c in closed_area_names)
-            ]
+        closed_note = (
+            f"Vessel fishing inside closed/no-take area(s): "
+            f"{'; '.join(parts)}. "
+            f"Direct violation regardless of gear or species."
+        )
+    else:
+        closed_note = "No fishing events inside no-take MPAs (GFW mpaNoTake) or curated closed areas"
 
     trace.append({
         "branch_id": "fishing_activity",
         "question_id": "fishing_in_closed_area",
-        "answer": "yes" if closed_area_intersections else (
+        "answer": "yes" if closed_area_fired else (
             "no" if fishing_section["available"] else "unknown"
         ),
-        "severity": "high" if closed_area_intersections else "none",
-        "rule_fired": bool(closed_area_intersections),
-        "note": (
-            f"Vessel observed fishing inside closed area(s): "
-            f"{', '.join(list(set(closed_area_intersections))[:3])}. "
-            f"Direct violation regardless of gear or species."
-            if closed_area_intersections
-            else "No fishing events inside curated closed areas"
-        ),
+        "severity": "high" if closed_area_fired else "none",
+        "rule_fired": closed_area_fired,
+        "note": closed_note,
     })
 
     # gap_then_fishing_sequence — AIS dark then fishing within 72h
@@ -749,6 +798,50 @@ def investigate_vessel(vessel_identifier, df, iuu_df, iccat_df, ofac_df, fdi_eff
             if gap_fishing_matches
             else "No gap-then-fishing sequences detected (4h+ gap followed by fishing within 72h)"
         ),
+    })
+
+    # fishing_in_low_effort_cell — EU vessel fishing in bottom 5% FDI effort c-square
+    low_effort_cells = get_low_effort_csquares(fdi_effort) if fdi_effort is not None else set()
+    low_effort_hits = []
+    is_eu_flag = str(flag).upper().strip() in EU_FLAGS
+    if (
+        is_eu_flag
+        and low_effort_cells
+        and fishing_df is not None and not fishing_df.empty
+    ):
+        _vf = fishing_df[fishing_df["mmsi"].astype(str) == str(mmsi_val)]
+        if not _vf.empty and "lat" in _vf.columns and "lon" in _vf.columns:
+            for _, frow in _vf.iterrows():
+                _flat, _flon = frow.get("lat"), frow.get("lon")
+                if pd.notna(_flat) and pd.notna(_flon):
+                    csq_lon, csq_lat = assign_csquare(float(_flat), float(_flon))
+                    if (csq_lon, csq_lat) in low_effort_cells:
+                        low_effort_hits.append((csq_lon, csq_lat))
+
+    if low_effort_hits:
+        _unique_cells = list(set(low_effort_hits))[:3]
+        le_note = (
+            f"EU-flagged vessel ({flag}) has {len(low_effort_hits)} fishing event(s) "
+            f"in bottom 5% FDI effort c-square(s): "
+            f"{', '.join(f'({c[0]},{c[1]})' for c in _unique_cells)}. "
+            f"Negligible historical EU activity in these cells."
+        )
+    elif is_eu_flag and fishing_section["available"]:
+        le_note = "EU-flagged vessel — no fishing events in low-effort c-squares"
+    elif not is_eu_flag:
+        le_note = f"Non-EU flag ({flag}) — FDI effort comparison not applicable"
+    else:
+        le_note = "Fishing events dataset not available in current run"
+
+    trace.append({
+        "branch_id": "fishing_activity",
+        "question_id": "fishing_in_low_effort_cell",
+        "answer": "yes" if low_effort_hits else (
+            "no" if (is_eu_flag and fishing_section["available"]) else "unknown"
+        ),
+        "severity": "medium" if low_effort_hits else "none",
+        "rule_fired": bool(low_effort_hits),
+        "note": le_note,
     })
 
     # ===== Network Exposure (associative risk layer) =====
@@ -943,14 +1036,12 @@ def investigate_vessel(vessel_identifier, df, iuu_df, iccat_df, ofac_df, fdi_eff
             "text": "ICCAT-authorized carrier in encounter event — core transshipment scenario. Verify Regional Observer Programme coverage under Rec. 24-05.",
         })
 
-    if has_gap and report["behaviour"].get("gap_analysis", {}).get("avg_speed_before"):
-        avg_before = report["behaviour"]["gap_analysis"]["avg_speed_before"]
-        avg_after = report["behaviour"]["gap_analysis"].get("avg_speed_after", 0)
-        if avg_before and avg_after and (avg_before - avg_after) > 3:
-            hypotheses.append({
-                "level": "medium",
-                "text": "AIS gap pattern shows significant speed drop (>3kn) — consistent with mid-sea operation, either unauthorized fishing or transshipment.",
-            })
+    ga = report["behaviour"].get("gap_analysis", {})
+    if has_gap and (ga.get("intentional_disabling_count", 0) > 0 or (ga.get("avg_implied_speed_knots") or 0) > 8):
+        hypotheses.append({
+            "level": "medium",
+            "text": "AIS gap pattern shows high implied speed or intentional disabling — consistent with evasion, either unauthorized fishing or transshipment.",
+        })
 
     if has_loitering and primary.get("vessel_type", "").upper() in ("CARRIER", "TANKER", "REEFER"):
         hypotheses.append({

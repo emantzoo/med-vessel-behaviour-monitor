@@ -1,0 +1,426 @@
+wdpa_id,name,designation,desig_type,no_take,iucn_cat,iso3
+182720,Parco sommerso di Baia,Others,National,Not Reported,IV,ITA
+15509,Salinas y Arenales de San Pedro del Pinatar,Regional Park,National,Not Reported,II,ESP
+13176,Area marina protetta Penisola del Sinis  - Isola Mal di Ventre,Natural Marine Reserve and Natural Protected Marine Areas,National,Not Reported,IV,ITA
+178271,Bouches De Bonifacio,Corsican Nature Reserve,National,Not Reported,IV,FRA
+13164,Riserva naturale marina Isole Tremiti,Natural Marine Reserve and Natural Protected Marine Areas,National,Not Reported,IV,ITA
+16110,Cap taillat – cap camarat,Land acquired by Conservatoire du Littoral (national seaside and lakeside conservancy),National,Not Reported,IV,FRA
+151243,El Cabo Peñas,Protected Landscape,National,Not Reported,V,ESP
+13170,Riserva naturale marina Isole Egadi,Natural Marine Reserve and Natural Protected Marine Areas,National,Not Reported,IV,ITA
+16516,Rijeka Dubrovačka,Significant Landscape,National,Not Reported,Not Reported,HRV
+20721,Area naturale marina protetta Secche di Tor Paterno,Natural Marine Reserve and Natural Protected Marine Areas,National,Not Reported,IV,ITA
+176812,Pyasachna banka Koketrays,Protected Site,National,Not Reported,VI,BGR
+181966,Butrinti,National Park (category II),National,Not Reported,II,ALB
+182734,Area marina protetta Isola dell'Asinara,Natural Marine Reserve and Natural Protected Marine Areas,National,Not Reported,IV,ITA
+196284,Cabo de Gata-Níjar,Natural Park,National,Not Reported,V,ESP
+13160,Area marina protetta Cinque Terre,Natural Marine Reserve and Natural Protected Marine Areas,National,Not Reported,IV,ITA
+102877,Marismas de Santoña,Wetland of International Importance (Ramsar Site),International,Not Reported,Not Reported,ESP
+182733,Area marina protetta Isole Pelagie,Natural Marine Reserve and Natural Protected Marine Areas,National,Not Reported,IV,ITA
+178838,Area naturale marina protetta Capo Carbonara,Natural Marine Reserve and Natural Protected Marine Areas,National,Not Reported,IV,ITA
+196045,L'arxipèlag de Cabrera,Nacional Park,National,Not Reported,II,ESP
+326112,Rt Madona v Piranu,Natural Monument,National,Not Reported,III,SVN
+20934,Arrecife Barrera de Posidonia,Natural Monument,National,Not Reported,III,ESP
+348792,Illa de Tabarca,Nature Reserve,National,Not Reported,IV,ESP
+330745,Żona fil-Baħar bejn Rdum Majjiesa u Għar Lapsi,Special Areas of Conservation - International Importance,National,Not Reported,IV,MLT
+348851,Estrecho,Natural Park,National,Not Reported,V,ESP
+178830,Santuario per i Mammiferi Marini,International significance Natural Marine Area,National,Not Reported,IV,ITA
+348860,Fons Marins del Cap de Sant Antoni,Nature Reserve,National,Not Reported,Not Assigned,ESP
+349123,Grapissar de Masia Blanca,Protection Plan,National,Not Reported,V,ESP
+349119,Costes del Maresme,Protection Plan,National,Not Reported,V,ESP
+32674,Parco nazionale dell' Arcipelago Toscano,National Park,National,Not Reported,II,ITA
+349187,Acantilados de Maro-Cerro Gordo,Nature Place,National,Not Reported,II,ESP
+349127,Cap de Creus,Natural Park,National,Not Reported,V,ESP
+349430,Serra Gelada,Natural Park,National,Not Reported,II,ESP
+365005,Plemmirio,Specially Protected Areas of Mediterranean Importance (Barcelona Convention),Regional,Not Reported,Not Assigned,ITA
+349166,Alborán,Nature Place,National,Not Reported,II,ESP
+365009,Cabo De Gata Nijar,Specially Protected Areas of Mediterranean Importance (Barcelona Convention),Regional,Not Reported,Not Assigned,ESP
+365006,Isla De Alboran,Specially Protected Areas of Mediterranean Importance (Barcelona Convention),Regional,Not Reported,Not Assigned,ESP
+365007,Cap De Creus,Specially Protected Areas of Mediterranean Importance (Barcelona Convention),Regional,Not Reported,Not Assigned,ESP
+365010,Islas Medas,Specially Protected Areas of Mediterranean Importance (Barcelona Convention),Regional,Not Reported,Not Assigned,ESP
+365013,Fondos Marinos Del Levante Almeriense,Specially Protected Areas of Mediterranean Importance (Barcelona Convention),Regional,Not Reported,Not Assigned,ESP
+348983,"Marismas de Santoña, Victoria y Joyel",Natural Park,National,Not Reported,V,ESP
+365014,Mar Menor y Costa Oriental De La Region De Murcia,Specially Protected Areas of Mediterranean Importance (Barcelona Convention),Regional,Not Reported,Not Assigned,ESP
+365022,Acantilados De Maro Cerro Gordo,Specially Protected Areas of Mediterranean Importance (Barcelona Convention),Regional,Not Reported,Not Assigned,ESP
+389077,Aiguamolls de l`Alt Empordà,Protection Plan,National,Not Reported,VI,ESP
+389087,Cap de Creus,Protection Plan,National,Not Reported,V,ESP
+389088,Cap de Santes Creus-Litoral meridional tarragoní,Protection Plan,National,Not Reported,V,ESP
+378015,Lastovsko otočje,Nature Park,National,Not Reported,Not Reported,HRV
+389228,Costes del Garraf,Protection Plan,National,Not Reported,V,ESP
+389097,Delta de l`Ebre,Protection Plan,National,Not Reported,V,ESP
+390447,Area marina protetta Regno di Nettuno,Natural Marine Reserve and Natural Protected Marine Areas,National,Not Reported,IV,ITA
+390450,Area marina protetta Plemmirio,Natural Marine Reserve and Natural Protected Marine Areas,National,Not Reported,IV,ITA
+390493,Area marina protetta Secche della Meloria,Natural Marine Reserve and Natural Protected Marine Areas,National,Not Reported,IV,ITA
+389221,Castell-Cap Roig,Protection Plan,National,Not Reported,V,ESP
+365015,Pelagos Sanctuary For The Conservation Of Marine Mammals,Specially Protected Areas of Mediterranean Importance (Barcelona Convention),Regional,Not Reported,Not Assigned,FRA;ITA;MCO
+555513696,Karaburun-Sazan Marine National Park,National Park (category II),National,Not Reported,II,ALB
+395189,Med Izolo in Strunjanom - klif,Specialy Protected Area,National,Not Reported,Not Assigned,SVN
+555516591,Kompleks Kaliakra,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,BGR
+389127,Massís de les Cadiretes,Protection Plan,National,Not Reported,V,ESP
+555516592,Aheloy - Ravda - Nesebar,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,BGR
+389302,"Marismas de Santoña, Victoria, Joyel y Ría de Ajo",Natura 2000,National,Not Reported,Not Assigned,ESP
+555523677,Litoral meridional tarragoní,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ESP
+389283,"Marismas de Santoña, Victoria y Joyel",Natura 2000,National,Not Reported,Not Assigned,ESP
+555523681,Grapissar de Masia Blanca,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ESP
+555523679,Costes del Tarragonès,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ESP
+555523638,Costes del Maresme,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ESP
+555523683,Montgó,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,ESP
+555523697,Serra Gelada i Litoral de la Marina Baixa,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,ESP
+555523717,Alguers de Borriana-Nules-Moncofa,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,ESP
+555523868,Fondos Marinos de Punta Entinas-Sabinar,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ESP
+555523869,Fondos Marinos Levante Almeriense,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ESP
+555523899,Estrecho Oriental,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ESP
+555523834,Punta de n'Amer,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ESP
+555523129,"Marismas de Santoña, Victoria y Joyel",Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ESP
+555523900,Fondos Marinos Marismas del Río Palmones,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ESP
+555523878,Arrecifes de Roquetas de Mar,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ESP
+555523926,Acantilados y Fondos Marinos Tesorillo-Salobreña,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ESP
+555523988,Fondos Marinos de La Bahía de Estepona,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ESP
+555523927,Acantilados y Fondos Marinos de Calahonda-Castell de Ferro,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ESP
+555523989,El Saladillo - Punta de Baños,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ESP
+555524049,Valles submarinos del Escarpe de Mazarrón,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ESP
+555527014,"ETHNIKO THALASSIO PARKO ALONNISOU – VOREION SPORADON, ANATOLIKI SKOPELOS",Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,GRC
+555527115,KASTELLORIZO KAI NISIDES RO KAI STRONGYLI KAI PARAKTIA THALASSIA ZONI,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,GRC
+555527061,PARAKTIA THALASSIA ZONI APO AKR. KYLLINI EOS TOUMPI - KALOGRIA,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,GRC
+555523762,Badies de Pollença i Alcúdia,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,ESP
+555524030,Franja Litoral Sumergida de la Región de Murcia,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ESP
+555527038,NISOI PAXOI KAI ANTIPAXOI KAI EVRYTERI THALASSIA PERIOCHI,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,GRC
+555527110,IKARIA - FOURNOI KAI PARAKTIA ZONI,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,GRC
+555527149,"VOREIOANATOLIKO AKRO KRITIS: DIONYSADES, ELASA KAI CHERSONISOS SIDERO (AKRA MAVRO MOURI – VAI – AKRA PLAKAS) KAI THALASSIA ZONI",Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,GRC
+555528194,Fondali Porto Maurizio - San Lorenzo al Mare - Torre dei Marmi,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555526952,"FENGARI SAMOTHRAKIS, ANATOLIKES AKTES, VRACHONISSIDA ZOURAFA KAI THALASSIA ZONI",Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,GRC
+555528195,Fondali Riva Ligure - Cipressa,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555527121,"ARKOI, LEIPSOI, AGATHONISI KAI VRACHONISIDES",Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,GRC
+555528211,Fondali Varazze - Albisola,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555528223,Fondali Finale Ligure,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555528252,Fondali Nervi - Sori,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555528251,Fondali Arenzano - Punta Ivrea,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555528253,Fondali Boccadasse - Nervi,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555528265,Fondali Punta Manara,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555528662,Laguna superiore di Venezia,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555527034,"ESOTERIKO ARCHIPELAGOS IONIOU (MEGANISI, ARKOUDI, ATOKOS, VROMONAS)",Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,GRC
+555528841,Isola di Capraia - area terrestre e marina,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555528881,Isola di Giannutri - area terrestre e marina,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ITA
+555528845,Isola di Montecristo e Formica di Montecristo - area terrestre e marina,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ITA
+555528839,Isola di Gorgona - area terrestre e marina,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ITA
+555528284,Fondali Punta Mesco - Rio Maggiore,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555528984,Colle S. Bartolo,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555529055,Fondali tra Punta del Pecoraro e Capo Linaro,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555529051,Fondali antistanti Punta Morelle,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555529057,Secche di Macchiatonda,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555529060,Fondali tra Torre Astura e Capo Portiere,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555529059,Secche di Tor Paterno,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555529062,Fondali tra Capo Circeo e Terracina,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555529054,Fondali tra Punta S. Agostino e Punta della Mattonara,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555529501,Le Cesine,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555529456,Posidonieto San Vito - Barletta,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555529061,Fondali tra Capo Portiere e Lago di Caprolace (foce),Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555529438,Isole Tremiti,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555529483,Alimini,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555529583,Fondali Crosia-Pietrapaola-Cariati,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555529708,Fondali di Scilla,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555529624,Fondali di Gabella Grande,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555529742,Fondali del Golfo di Custonaci,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555529921,Fondali dell'isola di Capo Passero,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555529839,Fondali di Capo San Marco - Sciacca,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555529988,Capo di Pula,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555529707,Fondali da Punta Pezzo a Capo dell'Armi,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555529957,Isola di Mal di Ventre e Catalano,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ITA
+555529741,Fondali dell'Arcipelago delle Isole Egadi,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555529932,Isola dell'Asinara,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555535203,Med Izolo in Strunjanom - klif,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,SVN
+555529978,Bruncu de Su Monte Moru - Geremeas (Mari Pintau),Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555530255,Żona fil-Baħar bejn Rdum Majjiesa u Għar Lapsi,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,MLT
+555537104,Emine,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,BGR
+555537132,Bakarlaka,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,BGR
+555529827,Fondali dell'Arcipelago delle Isole Eolie,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555537187,ZONI EIDIKIS PROSTASIAS CHERSONISOS AKAMA,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,CYP
+555538227,Cap Enderrocat - Cap Blanc,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ESP
+555538264,Illots de Benidorm i Serra Gelada,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ESP
+555539435,Estuaire de la Bidassoa et baie de Fontarabie,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,FRA
+555538284,Urdaibaiko itsasadarra / Ría de Urdaibai,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ESP
+555539438,Panache de la Gironde,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,FRA
+555539441,Tête de Canyon du Cap Ferret,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,FRA
+555538578,Montgó-Cap de Sant Antoni,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ESP
+555539413,Estuaire et basse vallée de la Charente,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,FRA
+555539439,Au droit de l'étang d'Hourtin-Carcans,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,FRA
+555538283,"Marismas de Santoña, Victoria y Joyel y Ría de Ajo",Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ESP
+555539546,Cap Bear- cap Cerbère,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,FRA
+555539408,"Marais et estuaire de la Seudre, île d'Oléron",Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,FRA
+555539414,Pertuis charentais - Rochebonne,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,FRA
+555539440,Bassin d'Arcachon et banc d'Arguin,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,FRA
+555538448,Cabo Busto-Luanco,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ESP
+555539549,Iles d'Hyères,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,FRA
+555539547,Côte languedocienne,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,FRA
+555539548,Camargue,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,FRA
+555539598,Plateau du Cap Corse,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,FRA
+555539683,"DIAPONTIA NISIA (OTHONOI, EREIKOUSA, MATHRAKI KAI VRACHONISIDES)",Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,GRC
+555539729,"NISIDES LESVOU (SYMPLEGMA TOMARONISION, KODONAS, AGIOS GEORGIOS, GLARONISI, KLP) KAI THALASSIA PERIOCHI)",Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,GRC
+555539726,"LIMNOS, LIMNES CHORTAROLIMNI KAI ALYKI, KOLPOS MOUDROU ELOS DIAPORI KAI CHERSONISOS FAKOS, NISOS SERGITSI KAI NISIDES DIAVATES KOMPIOKASTRIA, TIGANI, KARKALAS, PRASONISI KAI THALASSIA PERIOCHI",Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,GRC
+555539579,"Iles Lavezzi, Bouches de Bonifacio",Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,FRA
+555539784,DIONYSADES NISOI KAI THALASSIA ZONI,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,GRC
+555539754,"ANATOLIKO TMIMA NISOU SYMIS KAI NISIDES KOULOUNDROS SESKLI, TROUMPETO, MARMARAS, KARAVALONISI, MEGALONISI, GIALESINO, OXEIA, CHONDROS, PLATY, NIMOS  KAI THALASSIA PERIOCHI NISOU SYMIS",Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,GRC
+555539769,"NISIDES MYKONOU: RINEIA, CHTAPODIA, KAI TRAGONISI  KAI THALASSIA PERIOCHI",Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,GRC
+555539767,NISIDES PAROU KAI NOTIA ANTIPAROS KAI THALASSIA PERIOCHI,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,GRC
+555539748,"NISIDES KALYMNOU: EPANO NERA, SARI, TELENDOS  KAI THALASSIA PERIOCHI",Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,GRC
+555540242,Laguna di Venezia,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ITA
+555540355,Isola di Capraia - area terrestre e marina,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ITA
+555540411,Colle San Bartolo e litorale pesarese,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ITA
+555540465,Parco Nazionale del Circeo,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ITA
+555540553,Costa Viola,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ITA
+555540567,"Monti Peloritani, Dorsale Curcuraci, Antennamare e area marina dello stretto di Messina",Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ITA
+555540558,Isola di Pantelleria e area marina circostante,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ITA
+555540524,Isole Tremiti,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ITA
+555540569,Arcipelago delle Eolie - area marina e terrestre,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ITA
+555540555,Arcipelago delle Egadi - area marina e terrestre,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ITA
+555540570,Arcipelago delle Pelagie - area marina e terrestre,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ITA
+555540587,"Capo Figari, Cala Sabina, Punta Canigione e Isola Figarolo",Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ITA
+555540589,Capo Caccia,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ITA
+555546022,Tramo Litoral Deba-Zumaia,Protected Landscape,National,Not Reported,V,ESP
+555547183,Golfe Du Lion,Marine Nature Park,National,Not Reported,V,FRA
+555546307,Fortifikazzjonijiet tal-Port,Area of High Landscape Value,National,Not Reported,V,MLT
+555547501,Archipel Des Embiez - Six Fours,Specially Protected Areas of Mediterranean Importance (Barcelona Convention),Regional,Not Reported,Not Assigned,FRA
+555547504,Penisola Del Sinis - Isola Mal Di Ventre,Specially Protected Areas of Mediterranean Importance (Barcelona Convention),Regional,Not Reported,Not Assigned,ITA
+555547502,Cote Bleue,Specially Protected Areas of Mediterranean Importance (Barcelona Convention),Regional,Not Reported,Not Assigned,FRA
+555547505,Capo Carbonara,Specially Protected Areas of Mediterranean Importance (Barcelona Convention),Regional,Part,Not Assigned,ITA
+555546266,Żona fil-Baħar bejn Il-Ponta ta’ San Dimitri (Għawdex) u Il-Qaliet,Special Areas of Conservation - International Importance,National,Not Reported,IV,MLT
+555547508,Natural Reserve of Bouches de Bonifacio,Specially Protected Areas of Mediterranean Importance (Barcelona Convention),Regional,Not Reported,Not Assigned,FRA
+555548901,Cabo de Gata-Níjar,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ESP
+555548999,Estrecho,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ESP
+555549040,Cap de Creus,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ESP
+555549036,Costes del Garraf,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ESP
+555549044,Litoral del Baix Empordà,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ESP
+555549121,Acantilados de Maro-Cerro Gordo,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ESP
+555549096,Cap de Barbaria,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ESP
+555552487,Reserva Marina de Cabo de Palos-Islas Hormigas,Marine Reserve,National,Not Reported,VI,ESP
+555552484,Reserva Marina de la Isla de Tabarca,Marine Reserve,National,Not Reported,VI,ESP
+555548931,Arxipèlag de Cabrera,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ESP
+555548998,Ría de Ribadesella-Ría de Tinamayor,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ESP
+555552486,Reserva Marina de Cabo de Gata-Níjar,Marine Reserve,National,Not Reported,VI,ESP
+555552489,Reserva Marina de Masía Blanca,Marine Reserve,National,Not Reported,VI,ESP
+555556920,Au droit de l'étang d'Hourtin-Carcans,Marine Protected Area (OSPAR),Regional,Not Reported,Not Reported,FRA
+555549042,Massís de les Cadiretes,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ESP
+555557117,Panache de la Gironde,Marine Protected Area (OSPAR),Regional,Not Reported,Not Reported,FRA
+555557118,Panache de la Gironde et plateau rocheux de Cordouan,Marine Protected Area (OSPAR),Regional,Not Reported,Not Reported,FRA
+555556956,Côte Basque rocheuse et extension au Large,Marine Protected Area (OSPAR),Regional,Not Reported,Not Reported,FRA
+555556926,Bassin d'Arcachon et Cap Ferret,Marine Protected Area (OSPAR),Regional,Not Reported,Not Reported,FRA
+555557122,Pertuis charentais,Marine Protected Area (OSPAR),Regional,Not Reported,Not Reported,FRA
+555557123,Pertuis charentais - Rochebonne,Marine Protected Area (OSPAR),Regional,Not Reported,Not Reported,FRA
+555557129,Portion du littoral sableux de la côte Aquitaine,Marine Protected Area (OSPAR),Regional,Not Reported,Not Reported,FRA
+555562410,Tamarit-Punta de la Móra-Costes del Tarragonès,Protection Plan,National,Not Reported,Not Assigned,ESP
+555561999,Bassin D\'Arcachon,Marine Nature Park,National,Not Reported,V,FRA
+555577752,Lastovsko otočje,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,HRV
+555559581,Calanques [Aire D\'Adhésion],National Park - Buffer zone/Area of adhesion,National,Not Reported,V,FRA
+555578591,Podmorje otoka Suska,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,HRV
+555577749,NP Kornati i PP Telašćica,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,HRV
+555559566,Port-Cros [Aire D\'Adhésion],National Park - Buffer zone/Area of adhesion,National,Not Reported,V,FRA
+555578661,Pakleni otoci,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,HRV
+555578638,Z. obala Dugog otoka,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,HRV
+555578073,Cap Enderrocat i cap Blanc,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,ESP
+555578579,Vrsarski otoci,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,HRV
+555561929,Cap Corse Et Agriate,Marine Nature Park,National,Not Reported,V,FRA
+555578662,JI strana o. Visa,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,HRV
+555577753,Pučinski otoci,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,HRV
+555578665,Brusnik i Svetac,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,HRV
+555578691,Brač - podmorje,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,HRV
+555578663,Otok Vis - podmorje,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,HRV
+555578065,Cabo Busto-Luanco,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ESP
+555578794,Park prirode Telašćica,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,HRV
+555578835,Tegnùe di Porto Falconera,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555578825,Park prirode Lastovsko otočje,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,HRV
+555577746,Akvatorij zapadne Istre,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,HRV
+555578664,Biševo more,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,HRV
+555578785,Viški akvatorij,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,HRV
+555578844,Secche della Meloria,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555578853,Fondali Marini di Baia,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555578834,Tegnùe di Chioggia,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555578714,Cres - Lošinj,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,HRV
+555577747,Kvarnerski otoci,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,HRV
+555578867,Fondali del Plemmirio,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555578863,Fondali delle Isole Pelagie,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555580310,NISOS GYAROS KAI THALASSIA ZONI,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,GRC
+555580461,Laguna di Marano e Grado,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ITA
+555580598,Litorale di Gallipoli e Isola S. Andrea,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ITA
+555580583,"Fondali marini di Ischia, Procida e Vivara",Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ITA
+555578886,Żona fil-Baħar bejn Il-Ponta ta’ San Dimitri (Għawdex) u Il-Qaliet,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,MLT
+555580768,Aiguamolls de l'Alt Empordà,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ESP
+555583112,Espacio marino de la Ria de Mundaka-Cabo de Ogoño,Marine Protected Area (OSPAR),Regional,Not Reported,Not Reported,ESP
+555578750,Lastovski i Mljetski kanal,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,HRV
+555580620,Arcipelago La Maddalena,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ITA
+555583114,Espacio marino de Cabo Peñas,Marine Protected Area (OSPAR),Regional,Not Reported,Not Reported,ESP
+555580776,Delta de l'Ebre,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ESP
+555588820,Estrecho,Natura 2000,National,Not Reported,IV,ESP
+555588831,Alborán,Natura 2000,National,Not Reported,IV,ESP
+555588918,Acantilados de Maro-Cerro Gordo,Natura 2000,National,Not Reported,IV,ESP
+555588884,Acantilados y Fondos Marinos de Calahonda-Castell de Ferro,Natura 2000,National,Not Reported,IV,ESP
+555583113,Espacio marino de los Islotes de Portios - Isla Conejera - Isla de Mouro,Marine Protected Area (OSPAR),Regional,Not Reported,Not Reported,ESP
+555588805,Cabo de Gata-Nijar,Natura 2000,National,Not Reported,IV,ESP
+555588883,Acantilados y Fondos Marinos Tesorillo-Salobreña,Natura 2000,National,Not Reported,IV,ESP
+555588857,Fondos Marinos Marismas del Río Palmones,Natura 2000,National,Not Reported,IV,ESP
+555578823,Akvatorij zapadne Istre,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,HRV
+555578747,J. Molat-Dugi-Kornat-Žirje-Zlarin-Murter-Pašman-Ugljan-Rivanj-Sestrunj-Molat,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,HRV
+555589823,Żona fil-Baħar fil-Grigal,Special Protection Areas,National,Not Reported,IV,MLT
+555589824,Żona fil-Baħar fil-Lvant,Special Protection Areas,National,Not Reported,IV,MLT
+555589828,Żona fil-Baħar fil-Lbiċ,Special Protection Areas,National,Not Reported,IV,MLT
+555589831,Żona fil-Baħar fil-Punent,Special Areas of Conservation - International Importance,National,Not Reported,IV,MLT
+555589825,Żona fil-Baħar fix-Xlokk,Special Protection Areas,National,Not Reported,IV,MLT
+555592921,Espacio marino de Cabo Roig,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ESP
+555593029,Sistema de cañones submarinos de Avilés,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,ESP
+555592920,Espacio marino del Cabo de les Hortes,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,ESP
+555593031,Sistema de cañones submarinos occidentales del Golfo de León,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,ESP
+555593035,Espacio marino de Alborán,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,ESP
+555593019,Emona,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,BGR
+555593033,Sur de Almería - Seco de los Olivos,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,ESP
+555589829,Żona fil-Baħar madwar Għawdex,Special Protection Areas,National,Not Reported,IV,MLT
+555593024,Espacio marino de Tabarca,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ESP
+555593036,Espacio marino de Ifac,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,ESP
+555593054,Bahía de Málaga-Cerro Gordo,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ESP
+555593055,Espacio marino de la Isla de Alborán,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ESP
+555593044,Espacio marino de los Islotes de Portios-Isla Conejera-Isla de Mouro,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ESP
+555593057,Espacio marino de los Islotes Litorales de Murcia y Almería,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ESP
+555593061,Espacio marino del Baix Llobregat-Garraf,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ESP
+555593058,Espacio marino de Tabarca-Cabo de Palos,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ESP
+555593056,Bahía de Almería,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ESP
+555593043,Espacio marino de la Ría de Mundaka-Cabo de Ogoño,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ESP
+555593062,Espacio marino de l'Empordà,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ESP
+555593060,Espacio marino del Delta de l'Ebre-Illes Columbretes,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ESP
+555593063,Espacio marino de Formentera y del sur de Ibiza,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ESP
+555593066,Espacio marino del sur de Mallorca y Cabrera,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ESP
+555593032,Canal de Menorca,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,ESP
+555593065,Espacio marino del levante de Ibiza,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ESP
+555593059,Plataforma-talud marinos del Cabo de la Nao,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ESP
+555593037,Espacio marino de la Marina Alta,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ESP
+555593084,ZEPA Espacio marino de Ifac,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ESP
+555596224,Reserva Marina de Cabo Tiñoso,Marine Reserve,National,Not Reported,VI,ESP
+555597404,Ile du grand rouveau - les embiez,Land acquired by Conservatoire du Littoral (national seaside and lakeside conservancy),National,Not Reported,IV,FRA
+555596226,Corredor de migración de cetáceos del Mediterráneo,Marine Protected Area,National,Not Reported,VI,ESP
+555593064,Espacio marino del poniente y norte de Ibiza,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ESP
+555599908,Karaburun-Sazan Marine National Park,Specially Protected Areas of Mediterranean Importance (Barcelona Convention),Regional,Not Reported,Not Assigned,ALB
+555593070,Espacio marino del sureste de Menorca,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ESP
+555623573,Grebeni u Jabučkoj kotlini,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,HRV
+555623617,Żona fil-Baħar fil-Punent,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,MLT
+555623621,Żona fil-Baħar fil-Grigal,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,MLT
+555623623,Żona fil-Baħar fix-Xlokk,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,MLT
+555623622,Żona fil-Baħar fil-Lvant,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,MLT
+555593067,Espacio marino del poniente de Mallorca,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ESP
+555623625,Żona fil-Baħar fil-Lbiċ,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,MLT
+555624204,Cap des Trois Fourches,Wetland of International Importance (Ramsar Site),International,Not Reported,Not Reported,MAR
+555624581,Canionul Viteaz,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,ROU
+555635560,Mers Celtiques - Talus du golfe de Gascogne,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,FRA
+555635568,THALASSIA PERIOCHI THRAKIS,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,GRC
+555635575,"NISIDES ASPRONISOS, ARGKOS, MARAGKOS, REPI, TSOUGKRIA, TSOUGKRIAKI KAI THALASSIA PERIOCHI NISON SKIATHOU KAI SKOPELOU",Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,GRC
+555635570,THALASSIA PERIOCHI KAVALAS - THASOU,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,GRC
+555623626,Żona fil-Baħar madwar Għawdex,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,MLT
+555635578,THALASSIA PERIOCHI DIAPONTION NISON,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,GRC
+555635580,THALASSIA PERIOCHI KAI YFALOI VOREIOANATOLIKIS EVVOIAS,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,GRC
+555635582,THALASSIA PERIOCHI NOTIOU EVVOIKOU KOLPOU,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,GRC
+555635591,NISIDES SARONIKOU KOLPOU KAI THALASSIA PERIOCHI,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,GRC
+555593069,Espacio marino del norte y oeste de Menorca,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ESP
+555635586,THALASSIA ZONI  NOTIAS MANIS,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,GRC
+555643631,Récifs du banc de l'Ichtys et du canyon de Sète,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,FRA
+555635592,THALASSIA PERIOCHI NISIDON TOKMAKIA,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,GRC
+555635587,THALASSIA PERIOCHI NOTIAS MESSINIAS,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,GRC
+555635595,NISIDES VOREION DODEKANISON KAI THALASSIA PERIOCHI,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,GRC
+555635593,THALASSIA PERIOCHI DYTIKIS LESVOU,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,GRC
+555635585,KORINTHIAKOS KOLPOS,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,GRC
+555643632,Grands dauphins du golfe du Lion,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,FRA
+555593068,Espacio marino del norte de Mallorca,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ESP
+555643633,Mers Celtiques - Talus du golfe de Gascogne,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,FRA
+555643635,"Récifs des canyons Lacaze-Duthiers, Pruvot et Bourcart",Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,FRA
+555698152,Jbel Moussa,Biological and Ecological Interest Site,National,Not Reported,Not Applicable,MAR
+555698087,Littoral de Jbel Moussa,Wetland of International Importance (Ramsar Site),International,Not Reported,Not Reported,MAR
+555703201,Sistema de cañones submarinos de Aviles,Marine Protected Area (OSPAR),Regional,Not Reported,Not Reported,ESP
+555721732,Mare della Magna Grecia,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ITA
+555721733,Banchi di Marettimo,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555721734,Fondali dello Zingaro,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555721773,Da Tavolara a Capo Comino,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ITA
+555721769,Tutela del Tursiops truncatus,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555721775,Dall'Isola dell'Asinara all'Argentiera,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555721760,Area Marina di Capo Passero,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ITA
+555721731,Capo Spartivento,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ITA
+555721768,Adriatico settentrionale – Emilia-Romagna,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555589788,Estuaire De La Gironde Et Mer Des Pertuis,Marine Nature Park,National,Not Reported,V,FRA
+555721776,Adriatico Settentrionale Veneto - Delta del Po,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555721783,Fondali di Capo Zafferano,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555721785,Fondali di Torre Salsa,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555721933,THALASSIA PERIOCHI KAVALAS - THASOU,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,GRC
+555722606,Isola di Gorgona - area terrestre e marina,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555722611,Laguna di Marano e Grado,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555721971,Mare della Magna Grecia,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555722572,Isola di Montecristo e Formica di Montecristo - area terrestre e marina,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555722871,Aiguamolls de l'Alt Empordà,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ESP
+555722682,Litorale di Gallipoli e Isola S. Andrea,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555721953,Capo Spartivento,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555722594,Da Tavolara a Capo Comino,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555721936,"ETHNIKO THALASSIO PARKO ALONNISOU – VOREION SPORADON, ANATOLIKI SKOPELOS",Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,GRC
+555722084,Litoral del Baix Empordà,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ESP
+555722669,"Fondali marini di Ischia, Procida e Vivara",Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555722070,Cap de Creus,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ESP
+555722590,Isola di Giannutri - area terrestre e marina,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555722237,NISOS GYAROS KAI THALASSIA ZONI,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,GRC
+555722883,Cabo de Gata-Níjar,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ESP
+555722903,Delta de l'Ebre,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ESP
+555722907,Espacio marino de Tabarca,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,ESP
+555722083,Massís de les Cadiretes,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ESP
+555722953,Costes del Garraf,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ESP
+555722898,Arxipèlag de Cabrera,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ESP
+555722987,Cap de Barbaria,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ESP
+555737603,Park prirode Katič,Nature Park,National,Not Reported,IV,MNE
+555723012,Acantilados de Maro-Cerro Gordo,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ESP
+555723043,Estrecho,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ESP
+555723021,Espacio marino de Cabo Roig,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,ESP
+555756662,CHERSONISOS AKAMA,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,CYP
+555722922,Ría de Ribadesella-Ría de Tinamayor,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ESP
+555737602,Park prirode Platamuni,Nature Park,National,Not Reported,IV,MNE
+555723020,Espacio marino de la Marina Alta,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,ESP
+555756704,Plazh Gradina - Zlatna ribka,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,BGR
+555756522,OCEANID,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,CYP
+555756521,Isola di Mal di Ventre e Catalano,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555756759,Capo Caccia (con le isole Foradada e Piana) e Punta del Giglio,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555756761,"Isola dei Cavoli, Serpentara, Punta Molentis e Campulongu",Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555756855,Ropotamo,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,BGR
+555757255,OCEANID,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,CYP
+555773482,Area marina protetta Capo Spartivento,National Park,National,Not Reported,II,ITA
+555757177,Récifs du talus du golfe de Gascogne,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,FRA
+555756861,Emine - Irakli,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,BGR
+555787484,Kotorsko risanski bay,Emerald Network,Regional,Not Reported,Not Reported,MNE
+555787683,Arcipelago La Maddalena,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555787494,Platamuni,Emerald Network,Regional,Not Reported,Not Reported,MNE
+555786415,Southern Waters of Gibraltar,Emerald Network,Regional,Not Reported,Not Reported,GIB
+555787491,"Spas, Budva",Emerald Network,Regional,Not Reported,Not Reported,MNE
+555787946,Côte Bleue Marine,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,FRA
+555787947,Lagune du Brusc,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,FRA
+555788585,Vallée de la Charente (basse vallée),Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,FRA
+555787975,Plateau du Cap Corse,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,FRA
+555788637,Bassin d'Arcachon et Cap Ferret,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,FRA
+555788635,Estuaire de la Gironde,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,FRA
+555787977,"Bouches de Bonifacio, Iles des Moines",Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,FRA
+555788587,Marais de la Seudre,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,FRA
+555788716,Portion du littoral sableux de la côte aquitaine,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,FRA
+555788715,Panache de la Gironde et plateau rocheux de Cordouan (Système Pertuis Gironde),Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,FRA
+555787976,Grand herbier de la côte orientale,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,FRA
+555788610,Pertuis Charentais,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,FRA
+555789012,Posidonies de la côte palavasienne,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,FRA
+555789021,Cours inférieur de l'Aude,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,FRA
+555789007,Posidonies du cap d'Agde,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,FRA
+555788717,Côte basque rocheuse et extension au large,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,FRA
+555789095,Corniche Varoise,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,FRA
+555789122,Plateau de Pertusato/ Bonifacio et îles Lavezzi,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,FRA
+555789049,Cours inférieur de l'Hérault,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,FRA
+555789061,Côtes sableuses de l'infralittoral Languedocien,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,FRA
+555789084,Camargue,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,FRA
+555790724,Palinuro Seamount,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555789060,Prolongement en mer des Cap et étang de Leucate,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,FRA
+555789089,Rade d'Hyères,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,FRA
+555790725,Tutela del Tursiope Mar Ligure,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,ITA
+555789062,Bancs sableux de l'Espiguette,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,FRA
+555790739,Espacio marino Cañones de Alicante,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,ESP
+555790740,Canal de Ibiza,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,ESP
+63664,Telašćica,Nature Park,National,Not Reported,Not Reported,HRV
+555790737,Espacio Marino Jaizkibel-Capbretón,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,ESP
+555790789,Estrecho Occidental,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ESP
+555790793,Estrecho Occidental,Site of Community Importance (Habitats Directive),Regional,Not Reported,Not Reported,ESP
+68200,Ria de Mundaka-Guernika,Wetland of International Importance (Ramsar Site),International,Not Reported,Not Reported,ESP
+7162,Banc D\'Arguin,National Nature Reserve,National,Not Reported,IV,FRA
+555789099,Cap Martin,Special Areas of Conservation (Habitats Directive),Regional,Not Reported,Not Reported,FRA
+902704,Cap des trois Fourches,Biological and Ecological Interest Site,National,Not Reported,Not Applicable,MAR
+555790694,Corredor migratorio galaico-cantábrico occidental,Special Protection Area (Birds Directive),Regional,Not Reported,Not Reported,ESP

@@ -19,7 +19,7 @@ from config import (
     SPECIES_NAMES,
     classify_risk_band,
 )
-from risk_model import get_fdi_context
+from risk_model import get_fdi_context, attribute_leaves_to_fishing_events
 
 
 def render_daily_trend(df):
@@ -427,7 +427,7 @@ def render_gap_behaviour(df):
             st.warning(f"**{len(iuu_gaps)} AIS gap(s) involve IUU-listed vessels** -- "
                        "highest-priority evasion signals.")
 
-    if not gap_df.empty and "speed_before_gap" in gap_df.columns and gap_df["speed_before_gap"].notna().any():
+    if not gap_df.empty and "gap_implied_speed_knots" in gap_df.columns and gap_df["gap_implied_speed_knots"].notna().any():
         from charts import build_gap_speed_fig, build_gap_duration_distance_fig
 
         fig = build_gap_speed_fig(gap_df)
@@ -1145,118 +1145,419 @@ def render_top_vessels_segmented(df, top_n=10):
 
 
 def render_fishing_in_mpa_map(df, fishing_df):
-    """Scatter of GFW fishing events that fall inside an MPA.
+    """Two-layer fishing-in-MPA scatter: context background + high-signal foreground.
 
-    Sized by fishing_hours, coloured by mpa_tier. Gracefully handles small-N
-    in static demo mode (5 events at last check) by showing a banner inviting
-    the user to switch to live mode for denser data.
+    Background layer: all fishing-in-MPA events as small, faded grey dots
+    (spatial density context).
+    Foreground layer: high-signal events (closed area, low-effort cell,
+    no RFMO auth) as large coloured shape markers with vessel-level
+    overlay borders. Uses ``go.Scattergeo`` for marker-symbol support.
     """
-    st.subheader("Fishing activity inside MPAs")
+    import os
+
+    st.subheader("Fishing events with risk signals")
     st.caption(
-        "GFW classified-fishing events that fell inside a WDPA-listed MPA. "
-        "Display-only -- never scored into risk_score, because GFW's fishing "
-        "classifier applies globally and would otherwise penalise legitimate EU "
-        "fishing. Inside an MPA the same signal becomes the strongest publicly "
-        "available IUU indicator."
+        "Three-layer map. FDI heatmap (coloured squares): declared fishing effort "
+        "by c-square. Density grid (blue circles): binned fishing-in-MPA event "
+        "counts. Foreground (coloured shapes): events that fired high-signal risk "
+        "tree leaves. White border = vessel-level concerns."
     )
     with st.expander("How to read this chart", expanded=False):
         st.markdown(
             """
-- Each dot = one GFW *fishing* event (from the
-  `public-global-fishing-events` feed) whose position fell inside a WDPA
-  MPA polygon. The fishing classification is the Kroodsma 2018 CNN
-  applied per AIS position.
-- **Dot size** = duration of the fishing event in hours.
-- **Dot colour** = MPA tier of the polygon the event fell into:
-  red GFCM FRA, orange-red EU site, orange other WDPA.
-- These events are **never** added to `risk_score`. They are shown as
-  context because GFW's fishing classifier fires on every commercial
-  fishing trip globally -- inside an MPA the same signal flips from
-  background noise into the strongest publicly available IUU indicator.
-- **Cross-reference**: vessels appearing here should match the
-  `fishing_in_mpa_count > 0` column in the Ranking subtab.
-- In static demo mode coverage is sparse (a handful of events). Switch
-  to live GFW mode for the full picture.
-- **AIS-based lower bound.** McDonald et al. 2024 (*Nature*) found
-  approximately 90% of fishing vessels detected by satellite radar inside
-  MPAs do not broadcast AIS. Vessels shown here broadcast openly inside
-  protected areas -- a strong signal precisely because they did not go
-  dark. The true number in violation is higher; this chart captures the
-  tip of the iceberg.
+**FDI effort layer** (coloured squares):
+- EU-declared fishing effort (days) by 0.5x0.5 degree c-square from JRC
+  FDI spatial data (latest year). Colour scale: light yellow (<50 days)
+  to dark red (>2000 days). Provides official effort context.
+
+**Density grid** (blue circles, sized by event count):
+- GFW fishing-in-MPA events binned into 0.25 degree grid cells.
+  Size = event count, colour intensity = total fishing hours.
+  Replaces individual dots for better readability at scale.
+
+**Foreground layer** (large coloured shapes):
+- **Triangle-up (red)**: `fishing_in_closed_area` -- fishing in a no-take
+  MPA (GFW mpaNoTake field) or curated Mediterranean closed area
+- **Square (orange)**: `fishing_in_low_effort_cell` -- EU vessel fishing
+  in a c-square in the bottom 5% of FDI declared effort
+- **Diamond (orange)**: `gfw_no_rfmo_authorization` -- fishing in RFMO
+  area without authorization (GFW Insights cross-check)
+- **White border**: vessel has at least one vessel-level concern --
+  `gfw_iuu_crosscheck`, `stateless_vessel`, or
+  `unregulated_flag_in_gfcm_area`
+
+**Sizing**: foreground markers sized by fishing hours.
+
+These events are **never** added to `risk_score`. They fire risk tree
+leaves but are shown as display-only context.
+
+**AIS-based lower bound.** McDonald et al. 2024 (*Nature*) found ~90%
+of fishing vessels detected by satellite radar inside MPAs do not
+broadcast AIS. This chart captures the tip of the iceberg.
             """
         )
     if fishing_df is None or fishing_df.empty:
         st.info("No GFW fishing events available in current dataset.")
         return
 
-    in_mpa_col = "in_mpa" if "in_mpa" in fishing_df.columns else None
-    mpa_col = "mpa" if "mpa" in fishing_df.columns else (
-        "mpa_name" if "mpa_name" in fishing_df.columns else None
-    )
-    hours_col = "fishing_hours" if "fishing_hours" in fishing_df.columns else (
-        "duration_h" if "duration_h" in fishing_df.columns else None
-    )
-
-    if in_mpa_col is None:
+    if "in_mpa" not in fishing_df.columns:
         st.info("`in_mpa` column not available on fishing_df.")
         return
 
-    fim = fishing_df[fishing_df[in_mpa_col].fillna(False).astype(bool)].copy()
-    n_events = len(fim)
-    n_vessels = fim["mmsi"].nunique() if "mmsi" in fim.columns else 0
+    # Compute in_low_effort_cell flag before leaf attribution
+    from config import assign_csquares_vec
+    _fdi_path = os.path.join(os.path.dirname(__file__), "data", "fdi_effort_med.csv")
+    if "in_low_effort_cell" not in fishing_df.columns and os.path.exists(_fdi_path):
+        _fdi = pd.read_csv(_fdi_path)
+        _latest_yr = _fdi["year"].max()
+        _fdi_agg = (
+            _fdi[_fdi["year"] == _latest_yr]
+            .groupby(["rectangle_lon", "rectangle_lat"])["totfishdays"]
+            .sum().reset_index()
+        )
+        _low_set = set(
+            zip(_fdi_agg.loc[_fdi_agg["totfishdays"] < 10, "rectangle_lon"],
+                _fdi_agg.loc[_fdi_agg["totfishdays"] < 10, "rectangle_lat"])
+        )
+        _csq_lon, _csq_lat = assign_csquares_vec(fishing_df["lat"], fishing_df["lon"])
+        fishing_df = fishing_df.copy()
+        fishing_df["in_low_effort_cell"] = [
+            (lo, la) in _low_set for lo, la in zip(_csq_lon, _csq_lat)
+        ]
 
-    if n_events == 0:
-        st.info("No fishing-in-MPA events in current dataset.")
+    # Compute vessel-level unregulated flag directly on fishing_df
+    # (for vessels not in df_filtered — only 608 overlap out of 3221)
+    from config import GFCM_PARTY_FLAGS
+    if "flag" in fishing_df.columns:
+        _fish_flag = fishing_df["flag"].fillna("").str.upper().str.strip()
+        if "vessel_unregulated_flag_direct" not in fishing_df.columns:
+            fishing_df["vessel_unregulated_flag_direct"] = ~_fish_flag.isin(GFCM_PARTY_FLAGS) & (_fish_flag != "")
+
+    # Apply leaf attribution
+    closed_area_csv = os.path.join(
+        os.path.dirname(__file__), "data", "closed_area_mpas.csv"
+    )
+    enriched = attribute_leaves_to_fishing_events(
+        fishing_df, df, closed_area_csv_path=closed_area_csv
+    )
+
+    # Split into background (general MPA) and foreground (high-signal)
+    bg_mask = enriched["leaf_fishing_in_mpa"]  # all fishing inside any MPA
+    # Include non-GFCM flag vessels as foreground (unregulated fishing signal)
+    _unreg_direct = (
+        enriched["vessel_unregulated_flag_direct"].fillna(False).astype(bool)
+        if "vessel_unregulated_flag_direct" in enriched.columns
+        else pd.Series(False, index=enriched.index)
+    )
+    fg_mask = (
+        enriched["leaf_fishing_in_closed_area"]
+        | enriched["leaf_fishing_in_low_effort_cell"]
+        | enriched["leaf_gfw_no_rfmo_authorization"]
+        | _unreg_direct
+    )
+
+    bg_df = enriched[bg_mask].copy()
+    fg_df = enriched[fg_mask].copy()
+
+    n_bg = len(bg_df)
+    n_fg = len(fg_df)
+
+    if n_bg == 0 and n_fg == 0:
+        st.info("No fishing events trigger fishing-related risk leaves in current dataset.")
         return
 
-    if n_events < 8:
+    if n_bg < 8 and n_fg == 0:
+        n_v = bg_df["mmsi"].nunique() if "mmsi" in bg_df.columns else 0
         st.warning(
-            f"Showing {n_events} fishing-in-MPA event(s) across {n_vessels} vessel(s) "
+            f"Showing {n_bg} fishing-in-MPA event(s) across {n_v} vessel(s) "
             "from the static demo dataset. Switch to live GFW mode for denser coverage."
         )
 
-    tier_colors = {
-        "gfcm_fra": "#8B0000",
-        "eu_site": "#E45756",
-        "general": "#F58518",
-        "": "#888888",
+    # Prepare foreground data
+    SHAPE_MAP = {
+        "fishing_in_closed_area": "triangle-up",
+        "gfw_no_rfmo_authorization": "diamond",
+        "fishing_in_low_effort_cell": "square",
+        "unregulated_flag": "diamond-open",
     }
-    if "mpa_tier" in fim.columns:
-        fim["_tier"] = fim["mpa_tier"].fillna("").astype(str)
-    else:
-        fim["_tier"] = ""
+    SEVERITY_COLORS = {
+        "high": "#E45756",
+        "medium": "#F58518",
+        "low": "#4C78A8",
+    }
+    LEAF_LABELS = {
+        "fishing_in_closed_area": "Closed area (no-take / curated)",
+        "gfw_no_rfmo_authorization": "No RFMO authorization",
+        "fishing_in_low_effort_cell": "Low-effort c-square",
+        "unregulated_flag": "Non-GFCM flag",
+    }
 
-    if hours_col and hours_col in fim.columns:
-        fim["_hours"] = pd.to_numeric(fim[hours_col], errors="coerce").fillna(0.0)
-        size_col = "_hours"
-    else:
-        fim["_hours"] = 1.0
-        size_col = "_hours"
+    hours_col = (
+        "fishing_hours" if "fishing_hours" in enriched.columns
+        else "duration_h" if "duration_h" in enriched.columns
+        else None
+    )
 
-    hover_cols = [c for c in ["vessel_name", "flag", mpa_col, "_hours", "date"] if c and c in fim.columns]
+    fig = go.Figure()
 
-    fig = px.scatter_map(
-        fim,
-        lat="lat", lon="lon",
-        color="_tier",
-        color_discrete_map=tier_colors,
-        size=size_col, size_max=22,
-        hover_data=hover_cols,
-        zoom=4, height=500,
+    # --- Layer 1: FDI effort heatmap (0.5° c-squares, subtle green wash) ---
+    import numpy as np
+    if os.path.exists(_fdi_path):
+        _fdi_bg = pd.read_csv(_fdi_path)
+        _fdi_yr = _fdi_bg["year"].max()
+        _fdi_cells = (
+            _fdi_bg[_fdi_bg["year"] == _fdi_yr]
+            .groupby(["rectangle_lon", "rectangle_lat"])["totfishdays"]
+            .sum().reset_index()
+        )
+        if not _fdi_cells.empty:
+            _fdi_cells["_cx"] = _fdi_cells["rectangle_lon"] + 0.25
+            _fdi_cells["_cy"] = _fdi_cells["rectangle_lat"] + 0.25
+            _days = _fdi_cells["totfishdays"].values
+            # Log-normalised intensity for colour + size
+            _log_days = np.log1p(_days)
+            _ld_min, _ld_max = _log_days.min(), _log_days.max()
+            if _ld_max > _ld_min:
+                _fdi_t = (_log_days - _ld_min) / (_ld_max - _ld_min)
+            else:
+                _fdi_t = np.full_like(_log_days, 0.5)
+            # Green palette (won't clash with orange/red foreground or blue density)
+            _fdi_colors = [
+                f"rgba({int(200 - 140 * t)},{int(210 - 60 * t)},{int(180 - 130 * t)},{0.12 + 0.20 * t:.2f})"
+                for t in _fdi_t
+            ]
+            # Tiny markers — purely a background tint
+            _fdi_sizes = (3 + 3 * _fdi_t).tolist()
+            _fdi_hover = [
+                f"FDI c-square ({_fdi_yr})<br>"
+                f"Fishing days: {d:,.0f}<br>"
+                f"Lon: {lo:.1f} Lat: {la:.1f}"
+                for d, lo, la in zip(_days, _fdi_cells["_cx"], _fdi_cells["_cy"])
+            ]
+            fig.add_trace(go.Scattergeo(
+                lat=_fdi_cells["_cy"].tolist(),
+                lon=_fdi_cells["_cx"].tolist(),
+                mode="markers",
+                marker=dict(
+                    size=_fdi_sizes,
+                    symbol="square",
+                    color=_fdi_colors,
+                    line=dict(width=0),
+                ),
+                text=_fdi_hover,
+                hovertemplate="%{text}<extra></extra>",
+                name=f"FDI effort ({_fdi_yr})",
+            ))
+
+    # --- Layer 2: Grid-binned fishing-in-MPA density (0.5° bins) ---
+    if n_bg > 0:
+        _bin_size = 0.5
+        _bg_bin_lon = np.floor(bg_df["lon"].values / _bin_size) * _bin_size + _bin_size / 2
+        _bg_bin_lat = np.floor(bg_df["lat"].values / _bin_size) * _bin_size + _bin_size / 2
+        _bg_hours = pd.to_numeric(
+            bg_df[hours_col] if hours_col and hours_col in bg_df.columns
+            else pd.Series(1.0, index=bg_df.index),
+            errors="coerce"
+        ).fillna(0).values
+        _bin_df = pd.DataFrame({
+            "bin_lon": _bg_bin_lon,
+            "bin_lat": _bg_bin_lat,
+            "hours": _bg_hours,
+        })
+        _bins = _bin_df.groupby(["bin_lon", "bin_lat"]).agg(
+            count=("hours", "size"),
+            total_hours=("hours", "sum"),
+        ).reset_index()
+        # Log-scaled size: 6-28px (much more visible)
+        _log_cnt = np.log1p(_bins["count"].values)
+        _lc_min, _lc_max = _log_cnt.min(), _log_cnt.max()
+        if _lc_max > _lc_min:
+            _bins["_size"] = 6 + 22 * (_log_cnt - _lc_min) / (_lc_max - _lc_min)
+        else:
+            _bins["_size"] = 12.0
+        # Colour: light to dark blue based on total hours (log)
+        _log_hrs = np.log1p(_bins["total_hours"].values)
+        _lh_min, _lh_max = _log_hrs.min(), _log_hrs.max()
+        if _lh_max > _lh_min:
+            _bins["_intensity"] = (_log_hrs - _lh_min) / (_lh_max - _lh_min)
+        else:
+            _bins["_intensity"] = 0.5
+        _bin_colors = [
+            f"rgba({int(100 - 60*t)},{int(160 - 40*t)},{int(230 - 30*t)},{0.35 + 0.45*t:.2f})"
+            for t in _bins["_intensity"]
+        ]
+        _bin_hover = [
+            f"Fishing-in-MPA grid cell<br>"
+            f"Events: {int(cnt):,}<br>"
+            f"Total hours: {hrs:,.0f}h"
+            for cnt, hrs in zip(_bins["count"], _bins["total_hours"])
+        ]
+        fig.add_trace(go.Scattergeo(
+            lat=_bins["bin_lat"].tolist(),
+            lon=_bins["bin_lon"].tolist(),
+            mode="markers",
+            marker=dict(
+                size=_bins["_size"].tolist(),
+                color=_bin_colors,
+                symbol="circle",
+                line=dict(width=0.8, color="rgba(50,100,180,0.5)"),
+            ),
+            text=_bin_hover,
+            hovertemplate="%{text}<extra></extra>",
+            name=f"MPA fishing density ({n_bg:,} events, {len(_bins)} cells)",
+        ))
+
+    # --- Foreground layer: high-signal events with shapes ---
+    if n_fg > 0:
+        # Determine primary leaf (excluding fishing_in_mpa from foreground)
+        def _fg_primary(row):
+            if row.get("leaf_fishing_in_closed_area"):
+                return "fishing_in_closed_area", "high"
+            if row.get("leaf_gfw_no_rfmo_authorization"):
+                return "gfw_no_rfmo_authorization", "medium"
+            if row.get("leaf_fishing_in_low_effort_cell"):
+                return "fishing_in_low_effort_cell", "medium"
+            if row.get("vessel_unregulated_flag_direct") or row.get("vessel_unregulated_flag"):
+                return "unregulated_flag", "low"
+            return "fishing_in_mpa", "low"  # fallback
+
+        pairs = fg_df.apply(_fg_primary, axis=1)
+        fg_df["_fg_leaf"] = [p[0] for p in pairs]
+        fg_df["_fg_severity"] = [p[1] for p in pairs]
+
+        # Vessel-level overlay
+        fg_df["_vessel_overlay"] = (
+            fg_df.get("vessel_iuu_crosscheck", pd.Series(False, index=fg_df.index)).fillna(False)
+            | fg_df.get("vessel_stateless", pd.Series(False, index=fg_df.index)).fillna(False)
+            | fg_df.get("vessel_unregulated_flag", pd.Series(False, index=fg_df.index)).fillna(False)
+        )
+
+        # Size from fishing hours
+        if hours_col and hours_col in fg_df.columns:
+            fg_df["_hours"] = pd.to_numeric(
+                fg_df[hours_col], errors="coerce"
+            ).fillna(1.0).clip(lower=0.5)
+        else:
+            fg_df["_hours"] = 1.0
+
+        h_min, h_max = fg_df["_hours"].min(), fg_df["_hours"].max()
+        if h_max > h_min:
+            fg_df["_size"] = 10 + 14 * (fg_df["_hours"] - h_min) / (h_max - h_min)
+        else:
+            fg_df["_size"] = 14.0
+
+        # Build hover text
+        mpa_col = "mpa" if "mpa" in fg_df.columns else None
+
+        def _hover(row):
+            parts = [
+                f"<b>{row.get('vessel_name', 'Unknown')}</b>",
+                f"Flag: {row.get('flag', 'N/A')}",
+                f"Date: {row.get('date', '')}",
+                f"Fishing hours: {row['_hours']:.1f}h",
+                f"<b>Leaf: {row['_fg_leaf']}</b> ({row['_fg_severity']})",
+            ]
+            if mpa_col and row.get(mpa_col):
+                parts.append(f"MPA: {row[mpa_col]}")
+            if row["_vessel_overlay"]:
+                overlays = []
+                if row.get("vessel_iuu_crosscheck"):
+                    overlays.append("IUU crosscheck")
+                if row.get("vessel_stateless"):
+                    overlays.append("stateless")
+                if row.get("vessel_unregulated_flag"):
+                    overlays.append("unregulated flag")
+                parts.append(
+                    f"<b>Vessel signals:</b> {', '.join(overlays)}"
+                )
+            return "<br>".join(parts)
+
+        fg_df["_hover"] = fg_df.apply(_hover, axis=1)
+
+        # One trace per leaf type for clean legend
+        for leaf_id in ["fishing_in_closed_area", "gfw_no_rfmo_authorization",
+                        "fishing_in_low_effort_cell", "unregulated_flag"]:
+            subset = fg_df[fg_df["_fg_leaf"] == leaf_id]
+            if subset.empty:
+                continue
+            shape = SHAPE_MAP[leaf_id]
+            color = SEVERITY_COLORS.get(
+                subset["_fg_severity"].iloc[0], "#F58518"
+            )
+            line_widths = [
+                2.5 if vo else 0.5 for vo in subset["_vessel_overlay"]
+            ]
+            line_colors = [
+                "white" if vo else "rgba(0,0,0,0.3)"
+                for vo in subset["_vessel_overlay"]
+            ]
+            fig.add_trace(go.Scattergeo(
+                lat=subset["lat"].tolist(),
+                lon=subset["lon"].tolist(),
+                mode="markers",
+                marker=dict(
+                    size=subset["_size"].tolist(),
+                    symbol=shape,
+                    color=color,
+                    opacity=0.9,
+                    line=dict(width=line_widths, color=line_colors),
+                ),
+                text=subset["_hover"].tolist(),
+                hovertemplate="%{text}<extra></extra>",
+                name=LEAF_LABELS.get(leaf_id, leaf_id),
+            ))
+
+    fig.update_geos(
+        resolution=50,
+        showcountries=True,
+        countrycolor="rgba(0,0,0,0.2)",
+        showcoastlines=True,
+        coastlinecolor="rgba(0,0,0,0.3)",
+        showland=True,
+        landcolor="rgb(243,243,243)",
+        showocean=True,
+        oceancolor="rgb(220,232,245)",
+        lonaxis=dict(range=[-7, 37]),
+        lataxis=dict(range=[29, 47]),
+        projection_type="mercator",
     )
     fig.update_layout(
-        map_style="open-street-map",
+        height=520,
         margin=dict(l=0, r=0, t=10, b=0),
-        legend_title_text="MPA tier",
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=-0.15,
+            xanchor="center",
+            x=0.5,
+        ),
     )
-    st.plotly_chart(fig, width="stretch")
+    st.plotly_chart(fig, use_container_width=True)
 
-    if hours_col and hours_col in fim.columns:
-        total_h = float(pd.to_numeric(fim[hours_col], errors="coerce").fillna(0).sum())
-        st.markdown(
-            f"**Total fishing-in-MPA hours:** {total_h:.1f}h across "
-            f"**{n_events} events** from **{n_vessels} vessels**."
-        )
+    # Summary panel
+    n_fg_vessels = fg_df["mmsi"].nunique() if n_fg > 0 and "mmsi" in fg_df.columns else 0
+    n_bg_vessels = bg_df["mmsi"].nunique() if n_bg > 0 and "mmsi" in bg_df.columns else 0
+    n_overlay = (
+        fg_df[fg_df["_vessel_overlay"]]["mmsi"].nunique()
+        if n_fg > 0 and "_vessel_overlay" in fg_df.columns else 0
+    )
+
+    st.markdown(
+        f"**Density grid:** {n_bg:,} fishing-in-MPA events across "
+        f"{n_bg_vessels:,} vessels (binned into 0.25 degree cells). "
+        f"**Foreground:** {n_fg:,} high-signal events across "
+        f"{n_fg_vessels:,} vessels."
+        + (f" {n_overlay} vessel(s) with vessel-level concerns "
+           f"(IUU / stateless / unregulated)."
+           if n_overlay > 0 else "")
+    )
+
+    if n_fg > 0:
+        leaf_counts = fg_df["_fg_leaf"].value_counts()
+        parts = [
+            f"`{leaf}`: {count}" for leaf, count in leaf_counts.items()
+        ]
+        st.markdown("**High-signal events by leaf:** " + " | ".join(parts))
 
 
 def render_vessel_class_composition(df):
@@ -1722,15 +2023,10 @@ def render_vessel_investigation(df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_l
                 f"**GFW Insights confirms vessel on RFMO IUU list** "
                 f"({_iuu_times} listing(s)). Cross-check with our static IUU CSV."
             )
-    elif _vessel_id:
-        st.caption(
-            "GFW Insights not cached for this vessel. "
-            "Enable 'Include vessel insights' and re-download the snapshot, "
-            "or the vessel may not have scored Elevated+ during download."
-        )
     else:
         st.caption(
-            "GFW Insights unavailable (no GFW vessel ID — static demo data or vessel not in GFW registry)."
+            "GFW Insights not available. This section is optional — "
+            "all core analysis (fishing, MPA, flag-RFMO, ICCAT) works without it."
         )
 
     # Step 5: Fisheries Context — compact summary table (one row per event)
@@ -1795,9 +2091,11 @@ def render_vessel_investigation(df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_l
     st.write(f"**Date range:** {report['behaviour']['unique_dates']} unique dates")
     if "gap_analysis" in report["behaviour"]:
         ga = report["behaviour"]["gap_analysis"]
-        if ga["avg_speed_before"] and ga["avg_speed_after"]:
-            speed_drop = ga["avg_speed_before"] - ga["avg_speed_after"]
-            st.write(f"**Gap speed analysis:** before={ga['avg_speed_before']:.1f}kn, after={ga['avg_speed_after']:.1f}kn (drop: {speed_drop:.1f}kn)")
+        if ga.get("avg_implied_speed_knots"):
+            parts = [f"implied speed={ga['avg_implied_speed_knots']:.1f}kn"]
+            if ga.get("intentional_disabling_count"):
+                parts.append(f"{ga['intentional_disabling_count']} flagged as intentional")
+            st.write(f"**Gap analysis ({ga['count']} gaps):** {', '.join(parts)}")
 
     # Step 6b: behavioural flags (display-only, do not multiply into risk_score)
     st.markdown("### 6b. Behavioural Flags")

@@ -48,7 +48,7 @@ Related views are grouped one level down via subtabs, and secondary diagnostic c
 
 ### Open with the map (30 seconds)
 
-Open the live app. Let the map load with the static dataset. Point out the color-coded markers: "Red is AIS gaps — vessels going dark. Orange is loitering. Purple is encounters between vessels. The black markers are vessels matched against the IUU vessel blacklist. Blue markers are ICCAT-authorized vessels doing something suspicious. The dark red markers are OFAC-sanctioned vessels — the highest compliance priority."
+Open the live app. Let the map load with the static dataset. Point out the color-coded markers: "Red is AIS gaps — vessels going dark. Orange is loitering. Purple is encounters between vessels. The black markers are vessels matched against the IUU vessel blacklist. The dark red markers are OFAC-sanctioned vessels — the highest compliance priority. Low-risk events are filtered out of the map to keep the signal clean."
 
 Don't explain every marker. Let them absorb the visual, then move to specifics.
 
@@ -66,7 +66,7 @@ This demonstrates: multi-source cross-referencing, identity matching, risk compo
 
 ### Show an ICCAT-authorized vessel (60 seconds)
 
-Click on a blue marker (FRIO NARUTO). "This vessel is ICCAT-authorized as a carrier — meaning it's legally permitted to transship tuna in the Med. It appeared in an encounter event. The risk model gives it a 1.4x multiplier because authorized carriers have the infrastructure and cover to launder unauthorized catch through legitimate channels. The question an analyst should ask is: was this transshipment under ICCAT Regional Observer Programme coverage? If not, why not?"
+Select FRIO NARUTO from the Vessel Investigation dropdown (or find it in the Ranking table — it carries an ICCAT authorization label). "This vessel is ICCAT-authorized as a carrier — meaning it's legally permitted to transship tuna in the Med. It appeared in an encounter event. The risk model gives it a 1.4x multiplier because authorized carriers have the infrastructure and cover to launder unauthorized catch through legitimate channels. ICCAT-authorized vessels no longer get separate blue map markers — authorization is an opportunity indicator, not a risk signal, so they're rendered like any other vessel by event type. The question an analyst should ask is: was this transshipment under ICCAT Regional Observer Programme coverage? If not, why not?"
 
 This demonstrates: understanding that authorization is an opportunity indicator, not exoneration. This is a nuanced analytical point that shows domain depth.
 
@@ -93,11 +93,13 @@ This demonstrates: spatial analysis capability, understanding of EU fisheries da
 
 Switch to the **Vessel Investigation** tab. Open the "Risk Assessment Framework (methodology)" expander at the top.
 
-The graphviz diagram renders showing the full Mediterranean IUU risk tree — seven branches (identity, flag risk, regulatory status, authorization, behavioural history, spatial context, network exposure) feeding into five tier outcomes (Critical, High, Elevated, Moderate, Low). Walk through it briefly:
+The graphviz diagram renders showing the full Mediterranean IUU risk tree — eight branches (identity, flag risk, regulatory status, authorization, behavioural history, spatial context, network exposure, fishing activity) feeding into five tier outcomes (Critical, High, Elevated, Moderate, Low). Walk through it briefly:
 
 "I read your April blog post on building risk trees for shadow fleet exposure. The methodology transfers cleanly to IUU fishing — same playbook, weak flags, dark vessels, opaque ownership, suspicious encounters. I built the Mediterranean IUU equivalent. The structure has three branch types: gating branches like identity verification and sanctions status that override everything else, additive branches like flag risk and behavioural history that contribute cumulatively, and contextual branches like fishing authorization that don't fit either category cleanly."
 
 "The compound logic matters. A flag of convenience alone tells you nothing. A flag of convenience plus an AIS gap plus an encounter with a reefer near the Libyan EEZ tells you a lot. The framework encodes those combinations explicitly rather than flattening them into a multiplicative score."
+
+"Since you last saw the tree, I've added a fishing activity branch with four leaves that analyse GFW-classified fishing events: fishing inside any MPA, fishing inside a no-take zone — using GFW's own mpaNoTake signal as primary and a curated CSV for Med-specific closures as fallback — a gap-then-fishing evasion sequence, and an anomalous-location detector for EU vessels fishing in the bottom 5% of FDI effort cells. Plus two FAO 'unregulated' leaves: stateless vessel and non-GFCM-party flag in the Med. That brings the tree to 41 leaves across 8 branches."
 
 Collapse the framework expander. Then select KOOSHA 4 from the dropdown, click Run Investigation.
 
@@ -129,7 +131,7 @@ Explain while it runs: "This is what an analyst would do manually — cross-refe
 
 **What to say about the architecture:**
 
-"The RAG approach means the AI doesn't hallucinate about maritime concepts — it has specific, curated knowledge about IUU indicators, GFCM regulations, ICCAT observer programmes, OFAC sanctions programs, and the investigation workflow itself. The live dataframe schema is injected into the system prompt so the AI knows exactly what columns are available and what's queryable. For vessel-specific queries, it also receives a STRUCTURED EVIDENCE block — the full deterministic risk tree trace from `investigation.py`, showing which of the 34 leaves fired and at what severity. The AI is instructed not to contradict those results."
+"The RAG approach means the AI doesn't hallucinate about maritime concepts — it has specific, curated knowledge about IUU indicators, GFCM regulations, ICCAT observer programmes, OFAC sanctions programs, and the investigation workflow itself. The live dataframe schema is injected into the system prompt so the AI knows exactly what columns are available and what's queryable. For vessel-specific queries, it also receives a STRUCTURED EVIDENCE block — the full deterministic risk tree trace from `investigation.py`, showing which of the 41 leaves fired and at what severity. The AI is instructed not to contradict those results."
 
 "The sandbox is important — generated code can only read the data and produce visualisations. It can't modify the source dataframes, access the filesystem, or make network calls. That matters when you're executing AI-generated code against compliance-sensitive data."
 
@@ -193,8 +195,8 @@ The six Kpler risk layers are: formal sanctions status, behavioural indicators, 
 
 Med Vessel Monitor implements four and a half of these six layers:
 
-1. **Formal sanctions status** — TMT Combined IUU List, ICCAT IUU list, OFAC SDN screening
-2. **Behavioural indicators** — GFW gap, encounter, loitering events, aligned with Miller et al. 2018 methodology
+1. **Formal sanctions status** — TMT Combined IUU List, ICCAT IUU list, OFAC SDN screening, GFW Insights API live IUU cross-reference, plus FAO "unregulated" detection (stateless vessels, non-GFCM-party flags)
+2. **Behavioural indicators** — GFW gap, encounter, loitering events aligned with Miller et al. 2018, plus fishing activity analysis (fishing in no-take MPAs via GFW `mpaNoTake`, gap-then-fishing evasion sequences, anomalous fishing locations)
 3. **Associative risk** — five encounter-partner leaves in the risk tree's network_exposure branch: partner name matched against IUU list (high), partner name matched against OFAC SDN (critical), partner flag in weak-cooperation Med coastal set (LBY/SYR, medium), partner flag in distant-water/non-Med FoC set (medium), encounter pattern recurrence (same counterparty 2+ times within 90 days, medium). First-degree only — fleet-network propagation and ownership graph still out of scope.
 4. **Geographic risk** — GSA-based hotspot weighting, shore distance factor
 5. **Cargo risk** — ICCAT species multipliers (BFT 1.3x, SWO/ALB 1.2x, carrier 1.4x) as the fisheries-cargo equivalent
@@ -224,6 +226,9 @@ What you have that their Compliance API doesn't:
 - FDI fisheries baseline (catch/effort per c-square)
 - ICCAT authorization cross-reference
 - Species-level economic context
+- GFW fishing activity analysis (no-take MPA detection, gap-then-fishing evasion, anomalous location detection)
+- FAO "unregulated" fishing detection (stateless vessels, non-GFCM-party flags)
+- GFW Insights API cross-references (RFMO authorization from 40+ registries, live IUU list)
 - AI natural language querying across all sources
 
 What they have that you don't:
@@ -316,6 +321,11 @@ data_loading.py     → All data ingestion. Loaders, all @st.cache_data:
                       - load_iccat_vessels() → 9,203 Med-authorized vessels
                       - load_ofac_vessels() → OFAC SDN sanctioned vessels
                       - lookup_vessel_imos() → GFW Vessels API, MMSI→IMO
+                      - load_closed_area_mpas() → curated no-take/closed
+                        MPAs (Tier 2 fallback for fishing_in_closed_area)
+                      - download_insights_snapshot() → GFW Insights API v3
+                        batch query (RFMO auth, AIS coverage, IUU cross-ref)
+                      - load_snapshot_insights() → cached Insights API data
 
 risk_model.py       → All scoring and matching logic:
                       - compute_risk_score() → base behavioural risk per event
@@ -326,11 +336,21 @@ risk_model.py       → All scoring and matching logic:
                       - match_iccat_vessels() → applies ICCAT to all rows
                       - check_ofac_match() → MMSI→IMO→name (no fuzzy)
                       - match_ofac_vessels() → applies OFAC to all rows
+                      - detect_gap_then_fishing_sequence() → AIS dark then
+                        fishing within 72h (IUU evasion signature)
+                      - get_low_effort_csquares() → bottom 5% FDI effort
+                        c-squares for anomalous-location detection
 
 investigation.py    → Deterministic vessel investigation (rule-based, no LLM):
                       - investigate_vessel() → multi-step structured report
-                      - Reads all 5 dataframes, applies rule-based logic
+                      - Evaluates 41 risk tree leaves across 8 branches
+                      - Reads all dataframes, applies rule-based logic
                       - Returns structured dict for UI rendering
+                      - Fishing activity branch: fishing_in_mpa,
+                        fishing_in_closed_area (two-tier: mpaNoTake + CSV),
+                        gap_then_fishing_sequence, fishing_in_low_effort_cell
+                      - GFW Insights leaves: gfw_iuu_crosscheck,
+                        gfw_no_rfmo_authorization (when insights available)
                       - No API calls, no LLM, instant results
                       - Used by the Vessel Investigation top-level tab
                       - For vessel-specific AI analyst queries, the risk tree
@@ -346,7 +366,8 @@ risk_tree.py        → Med IUU Risk Tree framework rendering:
                         risk tree blog post
 
 data/risk_tree_framework.yaml → Analytical framework specification:
-                      - 7 branches (gate / additive / contextual types)
+                      - 8 branches (gate / additive / contextual types)
+                      - 41 leaf questions (36 wired, 5 future work)
                       - Compound logic rules for tier assignment
                       - 5 tier outcomes (Critical → Low)
                       - Documented methodology, not executable code
@@ -394,7 +415,8 @@ exports.py          → Export helpers for analyst workflow:
 
 ```
 1.  Load data         load_live_data() or load_static_data()
-2.  Load reference    load_fdi_*(), load_iuu_vessels(), load_iccat_vessels(), load_ofac_vessels()
+2.  Load reference    load_fdi_*(), load_iuu_vessels(), load_iccat_vessels(), load_ofac_vessels(),
+                      load_closed_area_mpas()
 3.  Filter            duration >= min_duration slider
 4.  Score             compute_risk_score() → base risk_score column
 5.  Spatialise        assign_csquare() → csq_lon, csq_lat columns
@@ -404,9 +426,10 @@ exports.py          → Export helpers for analyst workflow:
 9.  ICCAT match       match_iccat_vessels() → iccat_* columns, risk *= iccat_multiplier
 10. OFAC match        match_ofac_vessels() → ofac_* columns, risk *= ofac_multiplier
 11. Classify band     classify_risk_band() → risk_band column (Low..Critical)
-12. Render map        Folium markers (priority: OFAC > IUU > ICCAT > event type)
-13. Render tabs       4 top-level tabs (with subtabs) dispatched with df_filtered + reference data
-14. AI analyst        Gemini with RAG + sandboxed code execution + risk tree trace (per vessel)
+12. Join fishing      aggregate_fishing_in_mpa() + GFW Insights (optional)
+13. Render map        Folium markers (priority: OFAC > IUU > ICCAT > event type)
+14. Render tabs       4 top-level tabs (with subtabs) dispatched with df_filtered + reference data
+15. AI analyst        Gemini with RAG + sandboxed code execution + 41-leaf risk tree trace
 ```
 
 ### Identity Matching Chain
@@ -457,15 +480,15 @@ The `base_risk_score` column preserves the pre-multiplier behavioural score, ena
 ```
 Dark red = OFAC-sanctioned vessel (highest priority, overrides all)
 Black    = IUU-listed vessel (overrides event color)
-Blue     = ICCAT-authorized vessel
 Red      = AIS GAP event
 Orange   = LOITERING event
 Purple   = ENCOUNTER event
+(Low-band events excluded from map; ICCAT markers removed — authorization is not risk)
 ```
 
 ## Key Numbers to Know
 
-- 5 data sources cross-referenced (GFW, FDI, IUU, ICCAT, OFAC), with GFW providing three distinct feeds (Events API, `regions.mpa` WDPA intersection, `public-global-fishing-events` CNN classifier)
+- 6 data sources cross-referenced (GFW, FDI, IUU, ICCAT, OFAC, GFCM register), with GFW providing four distinct feeds (Events API, `regions.mpa` WDPA intersection, `public-global-fishing-events` CNN classifier, Insights API v3)
 - 95 demo events across 4 top-level tabs (Fleet Analytics has 4 subtabs; secondary charts in expanders)
 - 369 IUU vessels (213 currently listed, 150 GFCM-listed)
 - 9,203 ICCAT Med-authorized vessels
@@ -474,8 +497,8 @@ Purple   = ENCOUNTER event
 - 3-level identity matching: MMSI → IMO → vessel name
 - Risk formula: 8 multiplicative factors compounding independently, then classified into 5 Kpler-aligned bands
 - GFW methodology aligned with Miller et al. 2018
-- 10-step structured investigation workflow — deterministic risk tree trace feeds LLM-powered (RAG) analysis
-- Risk tree framework with 7 branches and 5 tier outcomes — adapted from Kpler's April 2026 shadow fleet methodology
+- 10-step structured investigation workflow — deterministic 41-leaf risk tree trace feeds LLM-powered (RAG) analysis
+- Risk tree framework with 8 branches, 41 leaves, and 5 tier outcomes — adapted from Kpler's April 2026 shadow fleet methodology
 
 ## The One Thing to Communicate
 

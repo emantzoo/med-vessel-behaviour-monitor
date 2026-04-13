@@ -16,7 +16,7 @@ These elements sit above the four tabs because they carry the highest-priority s
 
 **Visual encoding (triple):**
 - **Shape** = behaviour type: circle (AIS gap), square (loitering), triangle (encounter)
-- **Fill colour** = listing status, priority order: OFAC dark red > IUU black > ICCAT blue > clean (coloured by risk band)
+- **Fill colour** = listing status, priority order: OFAC dark red > IUU black > clean (coloured by event type). Low-band events excluded from map.
 - **Size** = risk band: Low (14 px) → Emerging (17 px) → Elevated (20 px) → Severe (24 px) → Critical (28 px)
 - **Dashed amber outline** = dark port call candidate (loitering within 10 km of shore)
 
@@ -176,7 +176,7 @@ Red alert banner if any event involves an IUU-listed vessel. Expandable table wi
 
 | Expander | Chart | What it answers |
 |----------|-------|-----------------|
-| Fishing activity inside MPAs | Scatter map of fishing-in-MPA events (sized by hours, coloured by MPA tier) | Where is fishing happening inside protected areas? |
+| Fishing events with risk signals | Leaf-differentiated scatter (shape = leaf type, colour = severity, white border = vessel-level overlay). Sized by fishing hours. | Where is fishing happening inside protected areas, and which risk leaves fired? |
 | Geographic risk breakdown | Sub-zone risk bars + port-distance scatter | Which Mediterranean zones and port distances carry the most risk? |
 
 ---

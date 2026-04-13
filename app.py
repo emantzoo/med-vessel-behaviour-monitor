@@ -118,8 +118,9 @@ include_fishing = st.sidebar.toggle(
 
 include_insights = st.sidebar.toggle(
     "Include vessel insights (GFW)", value=False,
-    help="Download GFW Insights API data for Elevated+ vessels: RFMO authorization, "
-         "AIS coverage, IUU list cross-reference. Adds ~1-2 min to snapshot download.",
+    help="Optional: queries GFW Insights API per vessel for AIS coverage % and "
+         "live IUU list cross-check. Supplementary only — all fishing, MPA, "
+         "flag-RFMO, and ICCAT analysis works without this. Slow (~5-10 min).",
 )
 
 if token:
@@ -133,10 +134,10 @@ if token:
                 f"Existing: {ev_n} events + {fish_n} fishing{ins_text}, "
                 f"saved {snap_date:%Y-%m-%d %H:%M}"
             )
-        if st.button("Download 10 days from API", key="dl_snapshot"):
+        if st.button("Download 30 days from API", key="dl_snapshot"):
             from datetime import timedelta
             end_dt = datetime.today()
-            start_dt = end_dt - timedelta(days=10)
+            start_dt = end_dt - timedelta(days=30)
             bar = st.progress(0, text="Starting download...")
             try:
                 ev_df, fish_df = download_api_snapshot(
@@ -145,7 +146,7 @@ if token:
                     progress=lambda pct, msg: bar.progress(
                         min(pct, 0.80 if include_insights else 1.0), text=msg),
                 )
-                # Insights: score → filter Elevated+ → resolve identity IDs → batch query
+                # Insights: score → filter Elevated+ → use event vessel_id → batch query
                 if include_insights and ev_df is not None and not ev_df.empty:
                     bar.progress(0.82, text="Scoring events for insights filter...")
                     from config import FLAG_RISKS
@@ -156,19 +157,12 @@ if token:
                         .dropna().unique().tolist()
                     )
                     if elevated_mmsis:
-                        # Resolve MMSI → identity vessel_id via Vessels API
-                        bar.progress(0.84, text=f"Resolving {len(elevated_mmsis)} Elevated+ vessel IDs...")
-                        _meta = lookup_vessel_metadata(
-                            elevated_mmsis, token,
-                            progress_callback=lambda c, t: bar.progress(
-                                0.84 + 0.06 * c / max(t, 1),
-                                text=f"Resolving vessel IDs: {c}/{t}"),
-                        )
-                        # Build (identity_vessel_id, mmsi) pairs
+                        # Use vessel_id already captured in event parsing (no extra API call)
+                        _elevated = ev_df[ev_df["mmsi"].isin(elevated_mmsis)].drop_duplicates("mmsi")
                         _vid_pairs = [
-                            (v.get("vessel_id"), m)
-                            for m, v in _meta.items()
-                            if v.get("vessel_id")
+                            (row["vessel_id"], row["mmsi"])
+                            for _, row in _elevated.iterrows()
+                            if row.get("vessel_id") and str(row["vessel_id"]).strip()
                         ]
                         if _vid_pairs:
                             bar.progress(0.90, text=f"Fetching insights for {len(_vid_pairs)} vessels...")
@@ -403,8 +397,8 @@ with col1:
         fg_ofac = MarkerCluster(name="OFAC Sanctioned", show=True)
         fg_fdi = folium.FeatureGroup(name="FDI Fishing Effort", show=show_fdi_layer)
 
-        # FDI fishing effort choropleth layer (only near events)
-        if not fdi_effort.empty and "csq_lon" in df_map.columns:
+        # FDI fishing effort choropleth layer — all Med c-squares
+        if not fdi_effort.empty:
             latest_year = fdi_effort["year"].max()
             fdi_agg = (
                 fdi_effort[fdi_effort["year"] == latest_year]
@@ -412,30 +406,24 @@ with col1:
                 .sum()
                 .reset_index()
             )
-            event_lons = df_map["lon"].values
-            event_lats = df_map["lat"].values
             for _, cell in fdi_agg.iterrows():
                 sw_lon = cell["rectangle_lon"]
                 sw_lat = cell["rectangle_lat"]
-                centre_lon_cell = sw_lon + 0.25
-                centre_lat_cell = sw_lat + 0.25
-                if not ((abs(event_lons - centre_lon_cell) < 1.0) & (abs(event_lats - centre_lat_cell) < 1.0)).any():
-                    continue
                 days = cell["totfishdays"]
                 if days >= 2000:
-                    color = "#e31a1c"
+                    color, opacity = "#e31a1c", 0.35
                 elif days >= 500:
-                    color = "#fd8d3c"
+                    color, opacity = "#fd8d3c", 0.30
                 elif days >= 50:
-                    color = "#fecc5c"
+                    color, opacity = "#fecc5c", 0.25
                 else:
-                    color = "#ffffb2"
+                    color, opacity = "#ffffb2", 0.15
                 folium.Rectangle(
                     bounds=[[sw_lat, sw_lon], [sw_lat + 0.5, sw_lon + 0.5]],
                     color=color,
                     fill=True,
                     fill_color=color,
-                    fill_opacity=0.2,
+                    fill_opacity=opacity,
                     weight=0,
                     popup=f"Fishing days ({latest_year}): {days:,.0f}",
                 ).add_to(fg_fdi)
@@ -854,8 +842,8 @@ with tab_overview:
             f"({df_tab['mmsi'].nunique()} vessels). Clear pills to reset."
         )
 
-    sub_ranking, sub_exploration, sub_map, sub_fisheries = st.tabs([
-        "Ranking", "Exploration", "Trends & Patterns", "Fisheries Context",
+    sub_ranking, sub_exploration, sub_map, sub_fisheries, sub_fishing = st.tabs([
+        "Ranking", "Exploration", "Trends & Patterns", "Fisheries Context", "Fishing Activity",
     ])
 
     with sub_ranking:
@@ -1014,11 +1002,79 @@ high-value stocks. See also the **Vessel Investigation** tab for per-vessel FDI 
         )
         render_fisheries_context(df_tab, fdi_effort, fdi_landings)
 
-        with st.expander("Fishing activity inside MPAs", expanded=False):
-            render_fishing_in_mpa_map(df_tab, fishing_df)
-
         with st.expander("Geographic risk breakdown"):
             render_geographic_risk(df_tab)
+
+    with sub_fishing:
+        with st.expander("Tab guide", expanded=False):
+            st.markdown("""\
+**What it shows:** GFW-classified fishing events (CNN model) with risk signal attribution. \
+Separate from behavioural events (gaps, encounters, loitering) — these are actual fishing detections.
+
+**Data:** GFW `public-global-fishing-events` feed, cross-referenced against WDPA marine protected \
+areas, FDI low-effort cells, and flag-RFMO authorization status.
+
+**Two views:**
+- **Scatter map** -- background (grey dots) = all fishing inside MPAs; foreground (coloured shapes) = \
+events that fire risk tree leaves (closed area, low-effort cell, non-GFCM flag).
+- **Vessel table** -- one row per fishing vessel with event counts, MPA fishing, and flag status. \
+Includes fishing-only vessels not visible in the behavioural Ranking tab.""")
+
+        if fishing_df is not None and not fishing_df.empty:
+            from config import GFCM_PARTY_FLAGS
+
+            # Shared pill filters for both map and table
+            _fc1, _fc2, _fc3, _fc4 = st.columns(4)
+            _pill_mpa = _fc1.toggle("In MPA only", key="fa_mpa")
+            _pill_nongfcm = _fc2.toggle("Non-GFCM flag", key="fa_nongfcm")
+            _pill_beh = _fc3.toggle("With behavioural", key="fa_beh")
+            _pill_fishonly = _fc4.toggle("Fishing-only", key="fa_fishonly")
+
+            _beh_mmsi = set(df_tab["mmsi"].astype(str).unique()) if not df_tab.empty else set()
+            _fish_filt = fishing_df.copy()
+            _fish_filt["_has_beh"] = _fish_filt["mmsi"].astype(str).isin(_beh_mmsi)
+            _fish_filt["_non_gfcm"] = ~_fish_filt["flag"].fillna("").str.upper().str.strip().isin(GFCM_PARTY_FLAGS)
+
+            if _pill_mpa:
+                _fish_filt = _fish_filt[_fish_filt["in_mpa"].fillna(False).astype(bool)]
+            if _pill_nongfcm:
+                _fish_filt = _fish_filt[_fish_filt["_non_gfcm"]]
+            if _pill_beh:
+                _fish_filt = _fish_filt[_fish_filt["_has_beh"]]
+            if _pill_fishonly:
+                _fish_filt = _fish_filt[~_fish_filt["_has_beh"]]
+
+            st.caption(
+                f"{len(_fish_filt):,} / {len(fishing_df):,} fishing events "
+                f"({_fish_filt['mmsi'].nunique():,} vessels)."
+            )
+
+            # Scatter map (filtered)
+            render_fishing_in_mpa_map(df_tab, _fish_filt)
+
+            # Vessel table (aggregated from filtered events)
+            with st.expander("Fishing vessel table", expanded=True):
+                _fv = _fish_filt.groupby(["mmsi", "vessel_name", "flag"]).agg(
+                    events=("date", "size"),
+                    total_hours=("fishing_hours", "sum"),
+                    in_mpa_events=("in_mpa", "sum"),
+                ).reset_index()
+                _fv["total_hours"] = _fv["total_hours"].round(1)
+                _fv["in_mpa_events"] = _fv["in_mpa_events"].astype(int)
+                _fv["non_gfcm_flag"] = ~_fv["flag"].fillna("").str.upper().str.strip().isin(GFCM_PARTY_FLAGS)
+                _fv["has_behavioural"] = _fv["mmsi"].astype(str).isin(_beh_mmsi)
+                _fv = _fv.sort_values("in_mpa_events", ascending=False)
+                st.dataframe(
+                    _fv.rename(columns={
+                        "mmsi": "MMSI", "vessel_name": "Vessel", "flag": "Flag",
+                        "events": "Fishing events", "total_hours": "Total hours",
+                        "in_mpa_events": "In MPA", "non_gfcm_flag": "Non-GFCM",
+                        "has_behavioural": "Behavioural",
+                    }),
+                    use_container_width=True, hide_index=True,
+                )
+        else:
+            st.info("No fishing events available. Enable 'Include fishing events' and download.")
 
 with tab_investigation:
     with st.expander("Tab guide", expanded=False):
@@ -1069,7 +1125,7 @@ every number in the dashboard. No event data is used -- this tab is pure methodo
 
 **Contents:**
 - **Risk-tree framework** -- interactive Graphviz diagram of the Mediterranean IUU Risk Tree \
-(8 branches, 28 leaves, compound logic for tier assignment).
+(8 branches, 41 leaves, compound logic for tier assignment).
 - **Risk formula** -- annotated scoring equation: \
 `risk = (duration_h ^ 0.75) x event_weight x flag_multiplier x shore_factor x mpa_multiplier \
 x event_factors x iuu_multiplier x iccat_multiplier x ofac_multiplier`.

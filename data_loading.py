@@ -8,7 +8,15 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 
-from config import classify_med_zone, classify_mpa_tier
+from config import classify_med_zone, classify_mpa_tier, resolve_eez_name
+
+# WDPA ID → name lookup (for resolving numeric MPA IDs from fishing events API)
+_WDPA_LOOKUP_PATH = os.path.join(os.path.dirname(__file__), "data", "wdpa_mpa_lookup.csv")
+_WDPA_NAMES = {}
+if os.path.exists(_WDPA_LOOKUP_PATH):
+    _wdpa_df = pd.read_csv(_WDPA_LOOKUP_PATH, dtype={"wdpa_id": str})
+    _WDPA_NAMES = dict(zip(_wdpa_df["wdpa_id"], _wdpa_df["name"]))
+    del _wdpa_df
 
 
 # ========================= RAG KNOWLEDGE BASE =========================
@@ -106,8 +114,8 @@ def load_static_data():
     gap_mask = df["event_type"] == "GAP"
     gap_n = gap_mask.sum()
     df.loc[gap_mask, "gap_distance_km"] = np.round(rng.uniform(10, 500, gap_n), 1)
-    df.loc[gap_mask, "speed_before_gap"] = np.round(rng.uniform(0.5, 14, gap_n), 1)
-    df.loc[gap_mask, "speed_after_gap"] = np.round(rng.uniform(0.5, 14, gap_n), 1)
+    df.loc[gap_mask, "gap_implied_speed_knots"] = np.round(rng.uniform(0.5, 14, gap_n), 1)
+    df.loc[gap_mask, "gap_intentional_disabling"] = rng.choice([True, False], gap_n, p=[0.2, 0.8])
 
     enc_mask = df["event_type"] == "ENCOUNTER"
     enc_n = enc_mask.sum()
@@ -251,6 +259,17 @@ def load_snapshot_events():
     df["mpa"] = df["mpa"].fillna("")
     df["mpa_tier"] = df["mpa_tier"].fillna("")
     df["in_mpa"] = df["in_mpa"].fillna(False).astype(bool)
+    # Resolve numeric EEZ MRGIDs to country names (for old snapshots)
+    if "eez" in df.columns:
+        df["eez"] = df["eez"].map(resolve_eez_name)
+    # Rename legacy gap columns from old snapshots
+    _rename = {}
+    if "speed_before_gap" in df.columns and "gap_implied_speed_knots" not in df.columns:
+        _rename["speed_before_gap"] = "gap_implied_speed_knots"
+    if "speed_after_gap" in df.columns and "gap_intentional_disabling" not in df.columns:
+        _rename["speed_after_gap"] = "gap_intentional_disabling"
+    if _rename:
+        df = df.rename(columns=_rename)
     return df
 
 
@@ -263,12 +282,13 @@ def load_snapshot_fishing():
     if "vessel_id" not in df.columns:
         df["vessel_id"] = ""
     df["vessel_id"] = df["vessel_id"].fillna("")
-    for col, default in [("mpa", ""), ("mpa_tier", ""), ("in_mpa", False)]:
+    for col, default in [("mpa", ""), ("mpa_tier", ""), ("in_mpa", False), ("in_no_take_mpa", False)]:
         if col not in df.columns:
             df[col] = default
     df["mpa"] = df["mpa"].fillna("")
     df["mpa_tier"] = df["mpa_tier"].fillna("")
     df["in_mpa"] = df["in_mpa"].fillna(False).astype(bool)
+    df["in_no_take_mpa"] = df["in_no_take_mpa"].fillna(False).astype(bool)
     return df
 
 
@@ -330,8 +350,11 @@ def fetch_vessel_insights(token, vessel_id, start_date, end_date):
 
 
 def download_insights_snapshot(token, start_date, end_date, vessel_records,
-                               concurrency=5, progress=None):
-    """Batch-query GFW Insights API for a list of vessels. Save to CSV.
+                               concurrency=10, progress=None):
+    """Query GFW Insights API for a list of vessels concurrently. Save to CSV.
+
+    Sends one vessel per POST (GFW API does not reliably support multi-vessel
+    batches) but runs up to *concurrency* requests in parallel via aiohttp.
 
     vessel_records: list of (vessel_id, mmsi) tuples.
     Returns DataFrame with one row per vessel.
@@ -340,7 +363,6 @@ def download_insights_snapshot(token, start_date, end_date, vessel_records,
     try:
         import aiohttp
     except ImportError:
-        # Fall back to sequential if aiohttp not installed
         return _download_insights_sequential(token, start_date, end_date,
                                              vessel_records, progress)
 
@@ -354,6 +376,7 @@ def download_insights_snapshot(token, start_date, end_date, vessel_records,
         return pd.DataFrame()
 
     all_rows = []
+    _done = {"n": 0}
 
     async def fetch_one(session, sem, vid, mmsi):
         async with sem:
@@ -369,21 +392,18 @@ def download_insights_snapshot(token, start_date, end_date, vessel_records,
                         all_rows.append(_parse_single_insight(vid, mmsi, raw))
             except Exception:
                 pass
+            finally:
+                _done["n"] += 1
+                if progress:
+                    progress(_done["n"], len(unique))
 
     async def _run():
         sem = asyncio.Semaphore(concurrency)
         connector = aiohttp.TCPConnector(limit=concurrency)
         async with aiohttp.ClientSession(connector=connector) as session:
-            total = len(unique)
-            # Process in chunks for progress reporting
-            chunk_size = max(concurrency * 2, 20)
-            for i in range(0, total, chunk_size):
-                chunk = unique[i:i + chunk_size]
-                await asyncio.gather(*[
-                    fetch_one(session, sem, vid, mmsi) for vid, mmsi in chunk
-                ])
-                if progress:
-                    progress(min(i + chunk_size, total), total)
+            await asyncio.gather(*[
+                fetch_one(session, sem, vid, mmsi) for vid, mmsi in unique
+            ])
 
     try:
         asyncio.run(_run())
@@ -490,6 +510,7 @@ def _parse_events_df(raw_df):
         # 1. List of dicts: [{"dataset": "public-mpa-all", "name": "..."}]
         # 2. Flat dict:     {"mpa": [id1], "eez": [...], "rfmo": [...]}
         mpa_names, rfmo_names, mpa_ids = [], [], []
+        _has_no_take = False
         regions = r.get("regions")
         if isinstance(regions, list):
             # Format 1: list of region dicts
@@ -508,10 +529,9 @@ def _parse_events_df(raw_df):
                         rfmo_names.append(str(name))
         elif isinstance(regions, dict):
             # Format 2: flat dict with array values
-            _has_no_take = False
             eez_ids = regions.get("eez")
             if isinstance(eez_ids, list) and eez_ids:
-                row_dict["eez"] = str(eez_ids[0])
+                row_dict["eez"] = resolve_eez_name(eez_ids[0]) or str(eez_ids[0])
             _seen_ids = set()
             for key in ("mpa", "mpaNoTake", "mpaNoTakePartial"):
                 ids = regions.get(key)
@@ -526,10 +546,23 @@ def _parse_events_df(raw_df):
             rfmo_ids = regions.get("rfmo")
             if isinstance(rfmo_ids, list):
                 rfmo_names.extend(str(i) for i in rfmo_ids)
+        # Resolve numeric WDPA IDs to names via lookup table
+        if mpa_ids and not mpa_names:
+            for mid in mpa_ids:
+                resolved = _WDPA_NAMES.get(mid)
+                if resolved:
+                    mpa_names.append(resolved)
         row_dict["mpa"] = "; ".join(mpa_names) if mpa_names else "; ".join(mpa_ids)
         row_dict["mpa_ids"] = "; ".join(mpa_ids) if mpa_ids else ""
         row_dict["rfmo"] = "; ".join(rfmo_names) if rfmo_names else ""
         row_dict["in_mpa"] = bool(mpa_names or mpa_ids)
+        # Persist the no-take signal from GFW's mpaNoTake field
+        if not _has_no_take and mpa_names:
+            _joined = " | ".join(str(n).lower() for n in mpa_names)
+            _has_no_take = any(
+                kw in _joined for kw in ("no-take", "no take", "integral reserve", "zone a")
+            )
+        row_dict["in_no_take_mpa"] = _has_no_take
         if mpa_names:
             row_dict["mpa_tier"] = classify_mpa_tier(mpa_names)
         elif mpa_ids:
@@ -537,21 +570,22 @@ def _parse_events_df(raw_df):
         else:
             row_dict["mpa_tier"] = ""
 
-        event_info = r.get("event_info") if isinstance(r.get("event_info"), dict) else {}
-
         if row_dict["event_type"] == "GAP":
-            row_dict["gap_distance_km"] = event_info.get("distanceKm")
-            row_dict["speed_before_gap"] = event_info.get("speedBeforeKnots")
-            row_dict["speed_after_gap"] = event_info.get("speedAfterKnots")
+            gap_info = r.get("gap") if isinstance(r.get("gap"), dict) else {}
+            row_dict["gap_distance_km"] = gap_info.get("distanceKm")
+            row_dict["gap_implied_speed_knots"] = gap_info.get("impliedSpeedKnots")
+            row_dict["gap_intentional_disabling"] = gap_info.get("intentionalDisabling")
         elif row_dict["event_type"] == "ENCOUNTER":
-            enc_vessel = event_info.get("vessel") if isinstance(event_info.get("vessel"), dict) else {}
+            enc_info = r.get("encounter") if isinstance(r.get("encounter"), dict) else {}
+            enc_vessel = enc_info.get("vessel") if isinstance(enc_info.get("vessel"), dict) else {}
             row_dict["encounter_vessel_name"] = enc_vessel.get("name")
             row_dict["encounter_vessel_flag"] = enc_vessel.get("flag")
-            row_dict["encounter_median_distance_km"] = event_info.get("medianDistanceKm")
-            row_dict["encounter_median_speed_knots"] = event_info.get("medianSpeedKnots")
+            row_dict["encounter_median_distance_km"] = enc_info.get("medianDistanceKilometers")
+            row_dict["encounter_median_speed_knots"] = enc_info.get("medianSpeedKnots")
         elif row_dict["event_type"] == "LOITERING":
-            row_dict["loitering_total_distance_km"] = event_info.get("totalDistanceKm")
-            row_dict["loitering_avg_speed_knots"] = event_info.get("averageSpeedKnots")
+            loit_info = r.get("loitering") if isinstance(r.get("loitering"), dict) else {}
+            row_dict["loitering_total_distance_km"] = loit_info.get("totalDistanceKm")
+            row_dict["loitering_avg_speed_knots"] = loit_info.get("averageSpeedKnots")
 
         rows.append(row_dict)
 
@@ -597,6 +631,7 @@ def _parse_fishing_df(raw_df):
         # 1. List of dicts: [{"dataset": "public-mpa-all", "name": "..."}]
         # 2. Flat dict:     {"mpa": [id1, id2], "mpaNoTake": [...], ...}
         mpa_names, mpa_ids = [], []
+        _has_no_take = False
         regions = r.get("regions")
         if isinstance(regions, list):
             # Format 1: list of region dicts (same as behavioural events)
@@ -609,7 +644,6 @@ def _parse_fishing_df(raw_df):
         elif isinstance(regions, dict):
             # Format 2: flat dict with array values (fishing events v3)
             # mpaNoTake/mpaNoTakePartial are subsets of mpa — deduplicate
-            _has_no_take = False
             _seen_ids = set()
             for key in ("mpa", "mpaNoTake", "mpaNoTakePartial"):
                 ids = regions.get(key)
@@ -621,15 +655,26 @@ def _parse_fishing_df(raw_df):
                             _seen_ids.add(sid)
                     if key in ("mpaNoTake", "mpaNoTakePartial"):
                         _has_no_take = True
-            row["_has_no_take"] = _has_no_take
+        # Resolve numeric WDPA IDs to names via lookup table
+        if mpa_ids and not mpa_names:
+            for mid in mpa_ids:
+                resolved = _WDPA_NAMES.get(mid)
+                if resolved:
+                    mpa_names.append(resolved)
         row["mpa"] = "; ".join(mpa_names) if mpa_names else "; ".join(mpa_ids)
         row["mpa_ids"] = "; ".join(mpa_ids)
         row["in_mpa"] = bool(mpa_names or mpa_ids)
+        # Persist the no-take signal from GFW's mpaNoTake field
+        if not _has_no_take and mpa_names:
+            _joined = " | ".join(str(n).lower() for n in mpa_names)
+            _has_no_take = any(
+                kw in _joined for kw in ("no-take", "no take", "integral reserve", "zone a")
+            )
+        row["in_no_take_mpa"] = _has_no_take
         if mpa_names:
             row["mpa_tier"] = classify_mpa_tier(mpa_names)
         elif mpa_ids:
-            # IDs without names: use no-take flag for tier
-            row["mpa_tier"] = "gfcm_fra" if row.get("_has_no_take") else "general"
+            row["mpa_tier"] = "gfcm_fra" if _has_no_take else "general"
         else:
             row["mpa_tier"] = ""
         rows.append(row)
@@ -675,16 +720,17 @@ def load_fishing_events_static():
     csv_path = os.path.join(os.path.dirname(__file__), "data", "med_fishing_static.csv")
     if os.path.exists(csv_path):
         df = pd.read_csv(csv_path, parse_dates=["date"])
-        for col, default in [("mpa", ""), ("mpa_tier", ""), ("in_mpa", False)]:
+        for col, default in [("mpa", ""), ("mpa_tier", ""), ("in_mpa", False), ("in_no_take_mpa", False)]:
             if col not in df.columns:
                 df[col] = default
         df["mpa"] = df["mpa"].fillna("")
         df["mpa_tier"] = df["mpa_tier"].fillna("")
         df["in_mpa"] = df["in_mpa"].fillna(False).astype(bool)
+        df["in_no_take_mpa"] = df["in_no_take_mpa"].fillna(False).astype(bool)
         return df
     return pd.DataFrame(columns=[
         "date", "vessel_name", "mmsi", "lat", "lon",
-        "fishing_hours", "mpa", "mpa_tier", "in_mpa",
+        "fishing_hours", "mpa", "mpa_tier", "in_mpa", "in_no_take_mpa",
     ])
 
 
@@ -805,29 +851,26 @@ def lookup_vessel_metadata(mmsi_list, token, progress_callback=None):
                 elif isinstance(st_val, str) and st_val.strip():
                     meta["shiptypes"] = st_val.strip()
 
-    async def _lookup_all():
-        for i, mmsi in enumerate(unique_mmsis):
+    _progress_counter = {"done": 0}
+
+    async def _lookup_one(mmsi, sem):
+        """Resolve a single MMSI under concurrency limiter."""
+        async with sem:
             try:
                 resp = await client.vessels.search_vessels(
                     where=f"ssvid = '{mmsi}'"
                 )
                 vessels = resp.df() if hasattr(resp, 'df') else pd.DataFrame()
                 if vessels.empty:
-                    if progress_callback:
-                        progress_callback(i + 1, total)
-                    continue
+                    return
 
                 meta = {"imo": None, "length_m": None, "tonnage_gt": None,
                         "shiptypes": None, "vessel_id": None}
-                # Preferred: registry_info, then fall back to self_reported_info.
-                # Walk both lists for every field independently -- IMO and length
-                # may come from different entries on the same vessel.
                 for _, v in vessels.iterrows():
                     _harvest(v.get("registry_info") or v.get("registryInfo"), meta)
                 for _, v in vessels.iterrows():
                     _harvest(v.get("self_reported_info") or v.get("selfReportedInfo"), meta)
 
-                # Extract GFW identity vessel_id (for Insights API)
                 if not meta.get("vessel_id"):
                     for _, v in vessels.iterrows():
                         for src_key in ("combined_sources_info", "combinedSourcesInfo",
@@ -845,17 +888,20 @@ def lookup_vessel_metadata(mmsi_list, token, progress_callback=None):
                         if meta.get("vessel_id"):
                             break
 
-                # Only retain the row if at least one field resolved
                 if any(meta.get(k) for k in ("imo", "length_m", "tonnage_gt", "shiptypes", "vessel_id")):
                     result[mmsi] = meta
 
-                await asyncio.sleep(0.2)  # Rate limit courtesy
-
             except Exception:
-                continue  # Skip vessel, don't fail batch
+                pass  # Skip vessel, don't fail batch
             finally:
+                _progress_counter["done"] += 1
                 if progress_callback:
-                    progress_callback(i + 1, total)
+                    progress_callback(_progress_counter["done"], total)
+
+    async def _lookup_all():
+        sem = asyncio.Semaphore(10)  # Up to 10 concurrent API calls
+        tasks = [_lookup_one(mmsi, sem) for mmsi in unique_mmsis]
+        await asyncio.gather(*tasks)
 
     try:
         asyncio.run(_lookup_all())
