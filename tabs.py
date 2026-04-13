@@ -1157,25 +1157,26 @@ def render_fishing_in_mpa_map(df, fishing_df):
 
     st.subheader("Fishing events with risk signals")
     st.caption(
-        "Three-layer map. FDI heatmap (coloured squares): declared fishing effort "
-        "by c-square. Density grid (blue circles): binned fishing-in-MPA event "
-        "counts. Foreground (coloured shapes): events that fired high-signal risk "
-        "tree leaves. White border = vessel-level concerns."
+        "Three-layer interactive map. FDI heatmap (coloured rectangles): declared "
+        "fishing effort by c-square. Clustered circles (blue clusters): all "
+        "fishing-in-MPA events — click to expand. Foreground (coloured shapes): "
+        "events that fired high-signal risk tree leaves. White border = vessel-level "
+        "concerns. Use the layer control (top-right) to toggle layers."
     )
     with st.expander("How to read this chart", expanded=False):
         st.markdown(
             """
-**FDI effort layer** (coloured squares):
+**FDI effort layer** (coloured rectangles):
 - EU-declared fishing effort (days) by 0.5x0.5 degree c-square from JRC
-  FDI spatial data (latest year). Colour scale: light yellow (<50 days)
-  to dark red (>2000 days). Provides official effort context.
+  FDI spatial data (latest year). Colour scale: pale yellow (<50 days)
+  to dark red (>2000 days). Toggle off via layer control.
 
-**Density grid** (blue circles, sized by event count):
-- GFW fishing-in-MPA events binned into 0.25 degree grid cells.
-  Size = event count, colour intensity = total fishing hours.
-  Replaces individual dots for better readability at scale.
+**Clustered background** (blue cluster circles):
+- All GFW fishing-in-MPA events. FastMarkerCluster groups nearby events
+  at low zoom; click a cluster to expand it, or zoom in to individual
+  markers. Shows total event density without overplotting.
 
-**Foreground layer** (large coloured shapes):
+**Foreground layer** (shaped markers — not clustered):
 - **Triangle-up (red)**: `fishing_in_closed_area` -- fishing in a no-take
   MPA (GFW mpaNoTake field) or curated Mediterranean closed area
 - **Square (orange)**: `fishing_in_low_effort_cell` -- EU vessel fishing
@@ -1298,10 +1299,19 @@ broadcast AIS. This chart captures the tip of the iceberg.
         else None
     )
 
-    fig = go.Figure()
-
-    # --- Layer 1: FDI effort heatmap (0.5° c-squares, subtle green wash) ---
+    import folium
     import numpy as np
+    from folium.plugins import FastMarkerCluster
+    from streamlit_folium import st_folium
+
+    fmap = folium.Map(
+        location=[38.0, 18.0],
+        zoom_start=5,
+        tiles="CartoDB positron",
+        prefer_canvas=True,
+    )
+
+    # --- Layer 1: FDI effort heatmap (Folium Rectangles, same palette as main map) ---
     if os.path.exists(_fdi_path):
         _fdi_bg = pd.read_csv(_fdi_path)
         _fdi_yr = _fdi_bg["year"].max()
@@ -1310,106 +1320,43 @@ broadcast AIS. This chart captures the tip of the iceberg.
             .groupby(["rectangle_lon", "rectangle_lat"])["totfishdays"]
             .sum().reset_index()
         )
-        if not _fdi_cells.empty:
-            _fdi_cells["_cx"] = _fdi_cells["rectangle_lon"] + 0.25
-            _fdi_cells["_cy"] = _fdi_cells["rectangle_lat"] + 0.25
-            _days = _fdi_cells["totfishdays"].values
-            # Log-normalised intensity for colour + size
-            _log_days = np.log1p(_days)
-            _ld_min, _ld_max = _log_days.min(), _log_days.max()
-            if _ld_max > _ld_min:
-                _fdi_t = (_log_days - _ld_min) / (_ld_max - _ld_min)
+        for _, cell in _fdi_cells.iterrows():
+            sw_lon = cell["rectangle_lon"]
+            sw_lat = cell["rectangle_lat"]
+            days = cell["totfishdays"]
+            if days >= 2000:
+                color, opacity = "#e31a1c", 0.35
+            elif days >= 500:
+                color, opacity = "#fd8d3c", 0.30
+            elif days >= 50:
+                color, opacity = "#fecc5c", 0.25
             else:
-                _fdi_t = np.full_like(_log_days, 0.5)
-            # Green palette (won't clash with orange/red foreground or blue density)
-            _fdi_colors = [
-                f"rgba({int(200 - 140 * t)},{int(210 - 60 * t)},{int(180 - 130 * t)},{0.12 + 0.20 * t:.2f})"
-                for t in _fdi_t
-            ]
-            # Tiny markers — purely a background tint
-            _fdi_sizes = (3 + 3 * _fdi_t).tolist()
-            _fdi_hover = [
-                f"FDI c-square ({_fdi_yr})<br>"
-                f"Fishing days: {d:,.0f}<br>"
-                f"Lon: {lo:.1f} Lat: {la:.1f}"
-                for d, lo, la in zip(_days, _fdi_cells["_cx"], _fdi_cells["_cy"])
-            ]
-            fig.add_trace(go.Scattergeo(
-                lat=_fdi_cells["_cy"].tolist(),
-                lon=_fdi_cells["_cx"].tolist(),
-                mode="markers",
-                marker=dict(
-                    size=_fdi_sizes,
-                    symbol="square",
-                    color=_fdi_colors,
-                    line=dict(width=0),
-                ),
-                text=_fdi_hover,
-                hovertemplate="%{text}<extra></extra>",
-                name=f"FDI effort ({_fdi_yr})",
-            ))
+                color, opacity = "#ffffb2", 0.15
+            folium.Rectangle(
+                bounds=[[sw_lat, sw_lon], [sw_lat + 0.5, sw_lon + 0.5]],
+                color=color,
+                fill=True,
+                fill_color=color,
+                fill_opacity=opacity,
+                weight=0,
+                tooltip=f"FDI effort ({int(_fdi_yr)}): {days:,.0f} fishing days",
+            ).add_to(fmap)
 
-    # --- Layer 2: Grid-binned fishing-in-MPA density (0.5° bins) ---
+    # --- Layer 2: Background clustering — all fishing-in-MPA events ---
     if n_bg > 0:
-        _bin_size = 0.5
-        _bg_bin_lon = np.floor(bg_df["lon"].values / _bin_size) * _bin_size + _bin_size / 2
-        _bg_bin_lat = np.floor(bg_df["lat"].values / _bin_size) * _bin_size + _bin_size / 2
-        _bg_hours = pd.to_numeric(
-            bg_df[hours_col] if hours_col and hours_col in bg_df.columns
-            else pd.Series(1.0, index=bg_df.index),
-            errors="coerce"
-        ).fillna(0).values
-        _bin_df = pd.DataFrame({
-            "bin_lon": _bg_bin_lon,
-            "bin_lat": _bg_bin_lat,
-            "hours": _bg_hours,
-        })
-        _bins = _bin_df.groupby(["bin_lon", "bin_lat"]).agg(
-            count=("hours", "size"),
-            total_hours=("hours", "sum"),
-        ).reset_index()
-        # Log-scaled size: 6-28px (much more visible)
-        _log_cnt = np.log1p(_bins["count"].values)
-        _lc_min, _lc_max = _log_cnt.min(), _log_cnt.max()
-        if _lc_max > _lc_min:
-            _bins["_size"] = 6 + 22 * (_log_cnt - _lc_min) / (_lc_max - _lc_min)
-        else:
-            _bins["_size"] = 12.0
-        # Colour: light to dark blue based on total hours (log)
-        _log_hrs = np.log1p(_bins["total_hours"].values)
-        _lh_min, _lh_max = _log_hrs.min(), _log_hrs.max()
-        if _lh_max > _lh_min:
-            _bins["_intensity"] = (_log_hrs - _lh_min) / (_lh_max - _lh_min)
-        else:
-            _bins["_intensity"] = 0.5
-        _bin_colors = [
-            f"rgba({int(100 - 60*t)},{int(160 - 40*t)},{int(230 - 30*t)},{0.35 + 0.45*t:.2f})"
-            for t in _bins["_intensity"]
-        ]
-        _bin_hover = [
-            f"Fishing-in-MPA grid cell<br>"
-            f"Events: {int(cnt):,}<br>"
-            f"Total hours: {hrs:,.0f}h"
-            for cnt, hrs in zip(_bins["count"], _bins["total_hours"])
-        ]
-        fig.add_trace(go.Scattergeo(
-            lat=_bins["bin_lat"].tolist(),
-            lon=_bins["bin_lon"].tolist(),
-            mode="markers",
-            marker=dict(
-                size=_bins["_size"].tolist(),
-                color=_bin_colors,
-                symbol="circle",
-                line=dict(width=0.8, color="rgba(50,100,180,0.5)"),
-            ),
-            text=_bin_hover,
-            hovertemplate="%{text}<extra></extra>",
-            name=f"MPA fishing density ({n_bg:,} events, {len(_bins)} cells)",
-        ))
+        bg_coords = list(zip(bg_df["lat"].tolist(), bg_df["lon"].tolist()))
+        FastMarkerCluster(
+            data=bg_coords,
+            name=f"MPA fishing events ({n_bg:,})",
+            options={
+                "maxClusterRadius": 40,
+                "disableClusteringAtZoom": 9,
+                "spiderfyOnMaxZoom": True,
+            },
+        ).add_to(fmap)
 
-    # --- Foreground layer: high-signal events with shapes ---
+    # --- Layer 3: Foreground — high-signal events with SVG DivIcon shapes ---
     if n_fg > 0:
-        # Determine primary leaf (excluding fishing_in_mpa from foreground)
         def _fg_primary(row):
             if row.get("leaf_fishing_in_closed_area"):
                 return "fishing_in_closed_area", "high"
@@ -1419,120 +1366,98 @@ broadcast AIS. This chart captures the tip of the iceberg.
                 return "fishing_in_low_effort_cell", "medium"
             if row.get("vessel_unregulated_flag_direct") or row.get("vessel_unregulated_flag"):
                 return "unregulated_flag", "low"
-            return "fishing_in_mpa", "low"  # fallback
+            return "fishing_in_mpa", "low"
 
         pairs = fg_df.apply(_fg_primary, axis=1)
         fg_df["_fg_leaf"] = [p[0] for p in pairs]
         fg_df["_fg_severity"] = [p[1] for p in pairs]
 
-        # Vessel-level overlay
         fg_df["_vessel_overlay"] = (
             fg_df.get("vessel_iuu_crosscheck", pd.Series(False, index=fg_df.index)).fillna(False)
             | fg_df.get("vessel_stateless", pd.Series(False, index=fg_df.index)).fillna(False)
             | fg_df.get("vessel_unregulated_flag", pd.Series(False, index=fg_df.index)).fillna(False)
         )
 
-        # Size from fishing hours
         if hours_col and hours_col in fg_df.columns:
-            fg_df["_hours"] = pd.to_numeric(
-                fg_df[hours_col], errors="coerce"
-            ).fillna(1.0).clip(lower=0.5)
+            fg_df["_hours"] = pd.to_numeric(fg_df[hours_col], errors="coerce").fillna(1.0).clip(lower=0.5)
         else:
             fg_df["_hours"] = 1.0
 
-        h_min, h_max = fg_df["_hours"].min(), fg_df["_hours"].max()
-        if h_max > h_min:
-            fg_df["_size"] = 10 + 14 * (fg_df["_hours"] - h_min) / (h_max - h_min)
-        else:
-            fg_df["_size"] = 14.0
+        # SVG shape templates keyed by leaf
+        def _make_icon(leaf_id, severity, overlay):
+            color = {"high": "#E45756", "medium": "#F58518"}.get(severity, "#4C78A8")
+            border = "white" if overlay else "#333"
+            bw = 3 if overlay else 1
+            if leaf_id == "fishing_in_closed_area":
+                # triangle-up
+                svg = (
+                    f'<svg width="20" height="20" xmlns="http://www.w3.org/2000/svg">'
+                    f'<polygon points="10,2 19,18 1,18" fill="{color}" '
+                    f'stroke="{border}" stroke-width="{bw}"/></svg>'
+                )
+            elif leaf_id == "fishing_in_low_effort_cell":
+                # square
+                svg = (
+                    f'<svg width="18" height="18" xmlns="http://www.w3.org/2000/svg">'
+                    f'<rect x="1" y="1" width="16" height="16" fill="{color}" '
+                    f'stroke="{border}" stroke-width="{bw}"/></svg>'
+                )
+            elif leaf_id in ("gfw_no_rfmo_authorization", "unregulated_flag"):
+                # diamond
+                svg = (
+                    f'<svg width="20" height="20" xmlns="http://www.w3.org/2000/svg">'
+                    f'<polygon points="10,1 19,10 10,19 1,10" fill="{color}" '
+                    f'stroke="{border}" stroke-width="{bw}"/></svg>'
+                )
+            else:
+                svg = (
+                    f'<svg width="14" height="14" xmlns="http://www.w3.org/2000/svg">'
+                    f'<circle cx="7" cy="7" r="6" fill="{color}" '
+                    f'stroke="{border}" stroke-width="{bw}"/></svg>'
+                )
+            return folium.DivIcon(
+                html=svg,
+                icon_size=(20, 20),
+                icon_anchor=(10, 10),
+            )
 
-        # Build hover text
         mpa_col = "mpa" if "mpa" in fg_df.columns else None
+        fg_layer = folium.FeatureGroup(name=f"High-signal events ({n_fg:,})", show=True)
 
-        def _hover(row):
-            parts = [
+        for _, row in fg_df.iterrows():
+            leaf_id = row["_fg_leaf"]
+            severity = row["_fg_severity"]
+            overlay = bool(row["_vessel_overlay"])
+            hours = row["_hours"]
+            popup_parts = [
                 f"<b>{row.get('vessel_name', 'Unknown')}</b>",
                 f"Flag: {row.get('flag', 'N/A')}",
                 f"Date: {row.get('date', '')}",
-                f"Fishing hours: {row['_hours']:.1f}h",
-                f"<b>Leaf: {row['_fg_leaf']}</b> ({row['_fg_severity']})",
+                f"Fishing hours: {hours:.1f}h",
+                f"<b>Leaf: {LEAF_LABELS.get(leaf_id, leaf_id)}</b> ({severity})",
             ]
             if mpa_col and row.get(mpa_col):
-                parts.append(f"MPA: {row[mpa_col]}")
-            if row["_vessel_overlay"]:
-                overlays = []
+                popup_parts.append(f"MPA: {row[mpa_col]}")
+            if overlay:
+                ov = []
                 if row.get("vessel_iuu_crosscheck"):
-                    overlays.append("IUU crosscheck")
+                    ov.append("IUU crosscheck")
                 if row.get("vessel_stateless"):
-                    overlays.append("stateless")
+                    ov.append("stateless")
                 if row.get("vessel_unregulated_flag"):
-                    overlays.append("unregulated flag")
-                parts.append(
-                    f"<b>Vessel signals:</b> {', '.join(overlays)}"
-                )
-            return "<br>".join(parts)
+                    ov.append("unregulated flag")
+                popup_parts.append(f"<b>Vessel signals:</b> {', '.join(ov)}")
+            folium.Marker(
+                location=[row["lat"], row["lon"]],
+                icon=_make_icon(leaf_id, severity, overlay),
+                popup=folium.Popup("<br>".join(popup_parts), max_width=280),
+                tooltip=f"{row.get('vessel_name', '?')} — {LEAF_LABELS.get(leaf_id, leaf_id)}",
+            ).add_to(fg_layer)
 
-        fg_df["_hover"] = fg_df.apply(_hover, axis=1)
+        fg_layer.add_to(fmap)
 
-        # One trace per leaf type for clean legend
-        for leaf_id in ["fishing_in_closed_area", "gfw_no_rfmo_authorization",
-                        "fishing_in_low_effort_cell", "unregulated_flag"]:
-            subset = fg_df[fg_df["_fg_leaf"] == leaf_id]
-            if subset.empty:
-                continue
-            shape = SHAPE_MAP[leaf_id]
-            color = SEVERITY_COLORS.get(
-                subset["_fg_severity"].iloc[0], "#F58518"
-            )
-            line_widths = [
-                2.5 if vo else 0.5 for vo in subset["_vessel_overlay"]
-            ]
-            line_colors = [
-                "white" if vo else "rgba(0,0,0,0.3)"
-                for vo in subset["_vessel_overlay"]
-            ]
-            fig.add_trace(go.Scattergeo(
-                lat=subset["lat"].tolist(),
-                lon=subset["lon"].tolist(),
-                mode="markers",
-                marker=dict(
-                    size=subset["_size"].tolist(),
-                    symbol=shape,
-                    color=color,
-                    opacity=0.9,
-                    line=dict(width=line_widths, color=line_colors),
-                ),
-                text=subset["_hover"].tolist(),
-                hovertemplate="%{text}<extra></extra>",
-                name=LEAF_LABELS.get(leaf_id, leaf_id),
-            ))
-
-    fig.update_geos(
-        resolution=50,
-        showcountries=True,
-        countrycolor="rgba(0,0,0,0.2)",
-        showcoastlines=True,
-        coastlinecolor="rgba(0,0,0,0.3)",
-        showland=True,
-        landcolor="rgb(243,243,243)",
-        showocean=True,
-        oceancolor="rgb(220,232,245)",
-        lonaxis=dict(range=[-7, 37]),
-        lataxis=dict(range=[29, 47]),
-        projection_type="mercator",
-    )
-    fig.update_layout(
-        height=520,
-        margin=dict(l=0, r=0, t=10, b=0),
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=-0.15,
-            xanchor="center",
-            x=0.5,
-        ),
-    )
-    st.plotly_chart(fig, use_container_width=True)
+    folium.LayerControl(collapsed=False).add_to(fmap)
+    st_folium(fmap, use_container_width=True, height=520, returned_objects=[])
 
     # Summary panel
     n_fg_vessels = fg_df["mmsi"].nunique() if n_fg > 0 and "mmsi" in fg_df.columns else 0
@@ -1543,8 +1468,8 @@ broadcast AIS. This chart captures the tip of the iceberg.
     )
 
     st.markdown(
-        f"**Density grid:** {n_bg:,} fishing-in-MPA events across "
-        f"{n_bg_vessels:,} vessels (binned into 0.25 degree cells). "
+        f"**Clustered background:** {n_bg:,} fishing-in-MPA events across "
+        f"{n_bg_vessels:,} vessels (click clusters to expand). "
         f"**Foreground:** {n_fg:,} high-signal events across "
         f"{n_fg_vessels:,} vessels."
         + (f" {n_overlay} vessel(s) with vessel-level concerns "
