@@ -111,6 +111,31 @@ sanctions are the most severe compliance flag.
 Risk tree leaf: **ofac_sanctioned** (regulatory_status branch, gate). Automatic Critical tier.
 - eu_sanctioned -- future work (needs EU Consolidated Financial Sanctions List)
 
+### Step 4b: Unregulated Fishing Detection (FAO category)
+
+Two leaves address the "unregulated" subset of the FAO IUU framework:
+
+1. **stateless_vessel** (high severity) — vessel broadcasting an empty,
+   unknown, or non-recognised flag value. Operating outside any state's
+   regulatory authority by FAO definition. Detection is permissive: only
+   fires on explicit placeholder values (empty, UNK, ZZZ, etc.) to
+   minimise false positives.
+
+2. **unregulated_flag_in_gfcm_area** (medium severity) — vessel flagged to
+   a state that is not a GFCM contracting party or cooperating
+   non-contracting party. Mediterranean fishing under no applicable
+   regional conservation measures. The EU is a collective GFCM contracting
+   party, so all EU member states are covered. Typically fires for
+   distant-water fishing nations or non-cooperating states operating in
+   the area.
+
+Both are tree-only leaves (no scoring impact). Mutually exclusive by
+design (stateless precludes GFCM-party check). Together with the existing
+illegal-fishing detection (behavioural signals, formal listings, MPA
+intersection), this completes coverage of two of the three FAO IUU
+categories. The third — unreported fishing — requires catch declaration
+data not available in open sources.
+
 ### Step 5: Fisheries Context
 Look up FDI baseline for the c-square(s) where events occurred. Report
 fishing days, top species, gear types, and whether the activity makes

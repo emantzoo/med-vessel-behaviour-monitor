@@ -108,7 +108,7 @@ This is a deliberate discipline worth calling out in an R&C conversation: the sc
 
 The scoring pipeline answers "how risky is this vessel's behaviour?" The risk tree answers a different question: **"what kind of risk is it, and what should we investigate next?"**
 
-The risk tree is a hierarchical framework with **8 branches** and **34 leaf questions**, defined in `data/risk_tree_framework.yaml`. It drives the per-vessel investigation trace in the Vessel Investigation tab — each branch is evaluated for the selected vessel, coloured by severity, and rendered as expandable cards plus an interactive icicle chart.
+The risk tree is a hierarchical framework with **8 branches** and **36 leaf questions**, defined in `data/risk_tree_framework.yaml`. It drives the per-vessel investigation trace in the Vessel Investigation tab — each branch is evaluated for the selected vessel, coloured by severity, and rendered as expandable cards plus an interactive icicle chart.
 
 ### The three branch types
 
@@ -124,7 +124,7 @@ The risk tree is a hierarchical framework with **8 branches** and **34 leaf ques
    - **Fishing Activity** — GFW-classified fishing events inside MPAs (the strongest publicly available IUU signal).
 
 3. **Contextual branches** (direction-dependent) — the answer changes interpretation depending on what other branches found:
-   - **Fishing Authorization Status** — ICCAT/GFCM authorization is an opportunity indicator, not exoneration. A carrier authorized for bluefin paired with suspicious AIS behaviour is *more* concerning, not less.
+   - **Fishing Authorization Status** — ICCAT/GFCM authorization is an opportunity indicator, not exoneration. A carrier authorized for bluefin paired with suspicious AIS behaviour is *more* concerning, not less. This branch also covers the FAO "unregulated" category: **stateless_vessel** (high — vessel broadcasting empty/unknown flag, outside any state's regulatory authority) and **unregulated_flag_in_gfcm_area** (medium — vessel flagged to a non-GFCM contracting party, fishing under no applicable regional conservation measures). Together with existing illegal-fishing detection, these complete coverage of two of three FAO IUU categories.
 
 ### How it differs from the scoring pipeline
 

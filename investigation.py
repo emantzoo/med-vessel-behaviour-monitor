@@ -7,6 +7,8 @@
 #   encounter_weak_cooperation_partner — partner flag in {LBY, SYR}
 #   encounter_distant_water_partner    — partner flag not EU / not Med coastal
 #   authorization_mismatch      — hardcoded flag check (IRN/RUS/PRK/SYR)
+#   stateless_vessel            — flag in RECOGNISED_FLAG_VALUES_INVALID (FAO unregulated)
+#   unregulated_flag_in_gfcm_area — flag not in GFCM_PARTY_FLAGS / EU_FLAGS (FAO unregulated)
 #
 # Future work (data not loaded):
 #   mmsi_consistent       — needs longitudinal MMSI history (GFW Vessels API multi-SSVID)
@@ -20,6 +22,7 @@ import pandas as pd
 from config import (
     FLAG_RISKS, get_flag_risk, IUU_MULTIPLIERS, ICCAT_MULTIPLIERS, OFAC_MULTIPLIER,
     EU_FLAGS, MED_COASTAL_COOPERATIVE_FLAGS, MED_COASTAL_WEAK_COOPERATION_FLAGS,
+    GFCM_PARTY_FLAGS, RECOGNISED_FLAG_VALUES_INVALID,
 )
 
 
@@ -283,6 +286,46 @@ def investigate_vessel(vessel_identifier, df, iuu_df, iccat_df, ofac_df, fdi_eff
         "severity": "high" if no_fishing_rights else "none",
         "rule_fired": no_fishing_rights,
         "note": f"{flag}-flagged vessel has no legitimate fishing rights in EU Med waters" if no_fishing_rights else "Flag has legitimate fishing access",
+    })
+
+    # stateless_vessel (FAO unregulated fishing category)
+    is_stateless = flag in RECOGNISED_FLAG_VALUES_INVALID
+    trace.append({
+        "branch_id": "authorization", "question_id": "stateless_vessel",
+        "answer": "yes" if is_stateless else "no",
+        "severity": "high" if is_stateless else "none",
+        "rule_fired": is_stateless,
+        "note": (
+            f"Flag value '{flag or '(empty)'}' — not a recognised national registry. "
+            f"Stateless under FAO definition."
+            if is_stateless
+            else f"Vessel has recognised flag ({flag})"
+        ),
+    })
+
+    # unregulated_flag_in_gfcm_area (FAO unregulated fishing category)
+    # Only fires when flag is recognised AND outside GFCM membership.
+    # EU collective party status covers all EU member states.
+    is_unregulated_flag = (
+        not is_stateless
+        and flag not in GFCM_PARTY_FLAGS
+        and flag not in EU_FLAGS
+    )
+    trace.append({
+        "branch_id": "authorization", "question_id": "unregulated_flag_in_gfcm_area",
+        "answer": "yes" if is_unregulated_flag else "no",
+        "severity": "medium" if is_unregulated_flag else "none",
+        "rule_fired": is_unregulated_flag,
+        "note": (
+            f"Flag {flag} is not a GFCM contracting party or EU member state. "
+            f"Fishing in GFCM area under no applicable conservation measures."
+            if is_unregulated_flag
+            else (
+                f"Flag {flag} is a GFCM party or EU member"
+                if not is_stateless
+                else "Stateless (handled by stateless_vessel leaf)"
+            )
+        ),
     })
 
     # ===== Step 5: Fisheries Context =====

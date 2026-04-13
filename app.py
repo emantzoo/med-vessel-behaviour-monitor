@@ -315,13 +315,12 @@ with col1:
         # Layer toggles are organised by listing status so the user can isolate,
         # e.g., all ICCAT-authorised events regardless of behaviour type.
         from config import RISK_BAND_COLORS
-        from folium.plugins import FastMarkerCluster
+        from folium.plugins import FastMarkerCluster, MarkerCluster
 
         band_size_px = {"Low": 5, "Emerging": 6, "Elevated": 7, "Severe": 9, "Critical": 11}
 
-        fg_iccat = folium.FeatureGroup(name="ICCAT Authorized", show=True)
-        fg_iuu = folium.FeatureGroup(name="IUU-Listed", show=True)
-        fg_ofac = folium.FeatureGroup(name="OFAC Sanctioned", show=True)
+        fg_iuu = MarkerCluster(name="IUU-Listed", show=True)
+        fg_ofac = MarkerCluster(name="OFAC Sanctioned", show=True)
         fg_fdi = folium.FeatureGroup(name="FDI Fishing Effort", show=show_fdi_layer)
 
         # FDI fishing effort choropleth layer (only near events)
@@ -367,13 +366,13 @@ with col1:
             for csq_lon_v, csq_lat_v in df_filtered[["csq_lon", "csq_lat"]].drop_duplicates().values:
                 fdi_cache[(csq_lon_v, csq_lat_v)] = get_fdi_context(csq_lon_v, csq_lat_v, fdi_effort, fdi_landings)
 
-        # Separate flagged (IUU/ICCAT/OFAC) from clean events.
+        # Separate flagged (IUU/OFAC) from clean events.
         # Flagged vessels get full DivIcon markers with SVG shapes.
         # Clean events use FastMarkerCluster (client-side JS) for performance.
+        # ICCAT-authorized vessels are compliant — no special map markers.
         _is_flagged = (
             df_map.get("ofac_sanctioned", pd.Series(False, index=df_map.index)).fillna(False).astype(bool)
             | df_map.get("iuu_matched", pd.Series(False, index=df_map.index)).fillna(False).astype(bool)
-            | df_map.get("iccat_authorized", pd.Series(False, index=df_map.index)).fillna(False).astype(bool)
         )
         df_flagged = df_map[_is_flagged]
         df_clean = df_map[~_is_flagged]
@@ -442,26 +441,20 @@ with col1:
                 continue
             is_ofac = row.get("ofac_sanctioned", False)
             is_iuu = row.get("iuu_matched", False)
-            is_iccat = row.get("iccat_authorized", False)
             vname = row.get("vessel_name", "")
 
             if is_ofac:
                 fill = "#8B0000"
                 target = fg_ofac
-            elif is_iuu:
+            else:
                 fill = "#000000"
                 target = fg_iuu
-            else:
-                fill = "#1f77b4"
-                target = fg_iccat
 
             listings = []
             if is_ofac:
                 listings.append("OFAC")
             if is_iuu:
                 listings.append("IUU")
-            if is_iccat:
-                listings.append("ICCAT")
             listing_txt = ", ".join(listings)
 
             tooltip = f"{vname or '(unknown)'} | {row['event_type']} | {row['flag']} | risk {row['risk_score']:.1f} | {listing_txt}"
@@ -480,7 +473,6 @@ with col1:
 
         # Add all layer groups to map (FDI first so it renders behind markers)
         fg_fdi.add_to(m)
-        fg_iccat.add_to(m)
         fg_iuu.add_to(m)
         fg_ofac.add_to(m)
         folium.LayerControl(collapsed=True).add_to(m)
@@ -516,7 +508,6 @@ with col1:
             f'{_legend_svg("circle", fill="#f39c12")} Loitering&ensp;'
             f'{_legend_svg("circle", fill="#9b59b6")} Encounter&emsp;'
             '<b>Flagged vessels</b> (SVG shapes):&ensp;'
-            f'{_legend_svg("circle", fill="#1f77b4")} ICCAT&ensp;'
             f'{_legend_svg("circle", fill="#000000")} IUU&ensp;'
             f'{_legend_svg("circle", fill="#8B0000")} OFAC<br/>'
             '<b>Risk band</b> (marker size):&ensp;'
@@ -636,9 +627,21 @@ with col1:
         st.info("No events match the selected filters.")
 
 with col2:
-    st.metric("Mediterranean Behavioral Risk Index", f"{total_risk:.0f}")
     if not df_filtered.empty:
-        st.metric("Events", len(df_filtered))
+        _band_counts = df_filtered["risk_band"].value_counts() if "risk_band" in df_filtered.columns else pd.Series(dtype=int)
+        _n_low = int(_band_counts.get("Low", 0))
+        _n_elevated_plus = int(_band_counts.get("Elevated", 0)) + int(_band_counts.get("Severe", 0)) + int(_band_counts.get("Critical", 0))
+        _n_map = len(df_filtered) - _n_low
+        _avg_risk = df_filtered["risk_score"].mean()
+        _max_risk = df_filtered["risk_score"].max()
+        st.metric("Avg Risk Score", f"{_avg_risk:.1f}", help="Mean risk score per event across the fleet")
+        st.metric("Peak Risk Score", f"{_max_risk:.1f}", help="Highest single-event risk score")
+        st.metric("Total Events", len(df_filtered))
+        st.caption(
+            f"On map: **{_n_map}** (Emerging+)  \n"
+            f"Hidden: {_n_low} Low-band  \n"
+            f"Elevated/Severe/Critical: **{_n_elevated_plus}**"
+        )
         st.metric("Unique Vessels", df_filtered["mmsi"].nunique())
         st.metric("Flags", df_filtered["flag"].nunique())
         if "iuu_matched" in df_filtered.columns:

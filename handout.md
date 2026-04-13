@@ -263,9 +263,20 @@ Two GFCM positive-evidence leaves now implemented in the `authorization` branch:
 
 Plus `authorization_mismatch` hardcoded for obvious cases (IRN/RUS/PRK/SYR have no legitimate fishing rights in EU Med waters).
 
+Two additional leaves cover the "unregulated" subset of the FAO IUU framework:
+
+- **`stateless_vessel`** — vessel broadcasting empty/unknown/non-recognised flag value (high severity). Permissive detection.
+- **`unregulated_flag_in_gfcm_area`** — vessel flagged to a non-GFCM contracting party or EU member state (medium severity). Mutually exclusive with stateless_vessel.
+
+**FAO IUU framework coverage:** the six-layer Kpler framework primarily
+addresses the "illegal" subset of FAO's IUU definition. The tool extends
+to the "unregulated" subset through these two leaves. The "unreported"
+subset requires catch declaration data not in open sources (logbooks,
+sales notes, ERS) — outside the scope of any AIS-based tool.
+
 ### Risk tree branches — need new data
 
-5 of the risk tree's 34 leaf questions remain as future-work stubs:
+5 of the risk tree's 36 leaf questions remain as future-work stubs:
 
 - **`shared_ownership`** — requires vessel beneficial-ownership data (Maritime 2.0 or Equasis)
 - **`mmsi_consistent`** — requires longitudinal MMSI history (GFW Vessels API multi-SSVID, partially available in live mode)

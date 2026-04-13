@@ -254,6 +254,56 @@ MED_COASTAL_WEAK_COOPERATION_FLAGS = {
     "SYR",  # Syria -- conflict-affected, weak enforcement capacity
 }
 
+# ========================= FAO UNREGULATED FISHING REFERENCES =========================
+
+# GFCM Contracting Parties + Cooperating Non-Contracting Parties (CNCPs)
+# Source: https://www.fao.org/gfcm/about/members/en/
+# Vessels flagged to states NOT in this set (and not EU members), fishing
+# in the GFCM area, are engaged in unregulated fishing under the FAO IUU
+# framework. The EU is a collective contracting party — individual EU
+# member states are covered via EU_FLAGS.
+# Last verified: April 2026. Update if GFCM membership changes.
+GFCM_PARTY_FLAGS = {
+    "ALB",  # Albania
+    "DZA",  # Algeria
+    "BGR",  # Bulgaria
+    "HRV",  # Croatia
+    "CYP",  # Cyprus
+    "EGY",  # Egypt
+    "FRA",  # France
+    "GRC",  # Greece
+    "ISR",  # Israel
+    "ITA",  # Italy
+    "JPN",  # Japan
+    "LBN",  # Lebanon
+    "LBY",  # Libya
+    "MLT",  # Malta
+    "MCO",  # Monaco
+    "MNE",  # Montenegro
+    "MAR",  # Morocco
+    "ROU",  # Romania
+    "SVN",  # Slovenia
+    "ESP",  # Spain
+    "SYR",  # Syria
+    "TUN",  # Tunisia
+    "TUR",  # Turkey
+    # No CNCPs as of April 2026 (Bosnia-Herzegovina, Georgia, Ukraine
+    # have been observers but not CNCPs to the GFCM Agreement).
+}
+
+# Flag values treated as stateless / non-recognised registry.
+# Permissive by design — any other AIS flag value is treated as recognised.
+# False negatives preferred over false positives.
+RECOGNISED_FLAG_VALUES_INVALID = {
+    "",       # Empty flag field
+    "UNK",    # GFW's "unknown" placeholder
+    "ZZZ",    # Common placeholder for unidentified
+    "NULL",   # Null marker
+    "NONE",   # Explicit none
+    "0",      # Numeric zero placeholder
+    "XXX",    # Catch-all placeholder
+}
+
 FORBIDDEN_CODE = [
     "import os", "import sys", "subprocess", "eval(", "open(",
     "__import__", "exec(", "shutil", "pathlib", "requests",

@@ -150,6 +150,27 @@ framework:
         - id: authorization_mismatch
           text: "Does the vessel's flag have legitimate fishing rights in the area where it was observed?"
           escalation: "Iranian or Russian vessels in EU waters have no legitimate fishing rights."
+        - id: stateless_vessel
+          text: "Is the vessel broadcasting an empty, unknown, or non-recognised flag value?"
+          weight: high
+          escalation: "Stateless vessel — outside any state's regulatory authority. FAO unregulated."
+          note: >
+            Permissive detection: fires only on explicit placeholder values
+            (empty, UNK, ZZZ, etc.) to minimise false positives. High severity
+            is consistent with authorization_mismatch (also high) — stateless
+            is a stronger regulatory-absence signal than wrong-state flag.
+        - id: unregulated_flag_in_gfcm_area
+          text: "Is the vessel flagged to a state that is not a GFCM contracting party?"
+          weight: medium
+          escalation: "Non-GFCM-party flag fishing in Med — no applicable conservation measures."
+          note: >
+            Fires when flag is recognised (not stateless) AND outside GFCM
+            membership. The EU is a collective GFCM contracting party, so all
+            27 EU member states (e.g. ITA, GRC, DEU) are covered even if not
+            individually listed in GFCM_PARTY_FLAGS — the check tests both
+            GFCM_PARTY_FLAGS and EU_FLAGS. Typically fires for distant-water
+            nations (USA, CHN, KOR) or non-cooperating states (IRN, RUS)
+            operating in the area without GFCM cooperation status.
 
     - id: behavioural_history
       name: "Behavioural History (last 90 days)"
