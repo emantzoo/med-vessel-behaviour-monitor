@@ -863,7 +863,14 @@ metadata in live mode and from the static profile in demo mode.
         filters_active=filters_active,
     )
 
-    col_e1, col_e2 = st.columns(2)
+    from exports import generate_fleet_summary_html
+    fleet_html = generate_fleet_summary_html(
+        vessel_summary_df=vessel_df,
+        df_events=df,
+        filters_active=filters_active,
+    )
+
+    col_e1, col_e2, col_e3 = st.columns(3)
     with col_e1:
         fn_csv = f"fleet_summary_{_dt.utcnow().strftime('%Y%m%d_%H%M')}.csv"
         st.download_button(
@@ -879,6 +886,14 @@ metadata in live mode and from the static profile in demo mode.
             data=cover_md,
             file_name=fn_md,
             mime="text/markdown",
+        )
+    with col_e3:
+        fn_html = f"fleet_summary_{_dt.utcnow().strftime('%Y%m%d_%H%M')}.html"
+        st.download_button(
+            label="Download fleet report (HTML)",
+            data=fleet_html,
+            file_name=fn_html,
+            mime="text/html",
         )
 
     with st.expander("Preview cover sheet"):
@@ -1252,31 +1267,13 @@ def render_risk_band_distribution(df):
         st.info("No data.")
         return
 
-    vessel_totals = df.groupby("mmsi")["risk_score"].sum()
-    if vessel_totals.empty:
+    from charts import build_risk_band_fig
+
+    fig = build_risk_band_fig(df)
+    if fig is None:
         st.info("No vessel-level risk in current filter window.")
         return
 
-    bands = vessel_totals.apply(classify_risk_band)
-    band_order = ["Low", "Emerging", "Elevated", "Severe", "Critical"]
-    counts = bands.value_counts().reindex(band_order, fill_value=0)
-
-    fig = go.Figure()
-    for band in band_order:
-        fig.add_trace(go.Bar(
-            x=[band], y=[int(counts[band])],
-            marker_color=RISK_BAND_COLORS.get(band, "#888"),
-            text=[int(counts[band])], textposition="outside",
-            name=band, showlegend=False,
-            hovertemplate=f"<b>{band}</b><br>Vessels: %{{y}}<extra></extra>",
-        ))
-    fig.update_layout(
-        height=320,
-        xaxis_title="Risk band",
-        yaxis_title="Vessel count",
-        title="Vessels per risk band",
-        margin=dict(l=20, r=20, t=50, b=20),
-    )
     st.plotly_chart(fig, use_container_width=True)
     st.markdown(
         "**Bands:** Low <50 | Emerging 50-60 | Elevated 60-80 | Severe 80-100 | Critical >=100. "
@@ -1394,46 +1391,12 @@ def render_top_vessels_segmented(df, top_n=10):
 - The hover shows exact base and amplifier values for each row.
             """
         )
-    if df.empty or "base_risk_score" not in df.columns:
-        st.info("Base risk score not available in current dataset.")
+    from charts import build_top_vessels_fig
+
+    fig = build_top_vessels_fig(df, top_n)
+    if fig is None:
+        st.info("Base risk score not available or no vessels in current filter window.")
         return
-
-    g = df.groupby("mmsi").agg(
-        vessel_name=("vessel_name", lambda s: next((x for x in s.dropna() if x), "")),
-        flag=("flag", lambda s: next((x for x in s.dropna() if x), "")),
-        base_total=("base_risk_score", "sum"),
-        risk_total=("risk_score", "sum"),
-    ).reset_index()
-    g["structural_delta"] = (g["risk_total"] - g["base_total"]).clip(lower=0)
-    g = g.sort_values("risk_total", ascending=False).head(top_n)
-    if g.empty:
-        st.info("No vessels in current filter window.")
-        return
-
-    g["label"] = g.apply(
-        lambda r: f"{r['vessel_name'] or r['mmsi']} ({r['flag']})", axis=1
-    )
-    g = g.iloc[::-1]  # plotly horizontal bars draw bottom-up
-
-    fig = go.Figure()
-    fig.add_trace(go.Bar(
-        y=g["label"], x=g["base_total"], name="Behavioural base",
-        orientation="h", marker_color="#4C78A8",
-        hovertemplate="<b>%{y}</b><br>Behavioural base: %{x:.1f}<extra></extra>",
-    ))
-    fig.add_trace(go.Bar(
-        y=g["label"], x=g["structural_delta"], name="Structural amplifier",
-        orientation="h", marker_color="#E45756",
-        hovertemplate="<b>%{y}</b><br>Structural amplifier: %{x:.1f}<extra></extra>",
-    ))
-    fig.update_layout(
-        barmode="stack",
-        height=max(280, 38 * len(g) + 80),
-        title=f"Top {len(g)} vessels by compounded risk score",
-        xaxis_title="Risk score",
-        legend=dict(orientation="h", yanchor="bottom", y=-0.25, xanchor="center", x=0.5),
-        margin=dict(l=20, r=20, t=50, b=20),
-    )
     st.plotly_chart(fig, use_container_width=True)
     st.markdown(
         "**Read:** vessels with a long red segment owe most of their score to "
@@ -1745,110 +1708,30 @@ def render_vessel_trajectory(vessel_events: pd.DataFrame, vessel_summary_row: di
             "which event type dominated that section? That's the behavioural arc."
         )
 
-    if vessel_events is None or vessel_events.empty:
+    from charts import build_trajectory_fig
+
+    fig = build_trajectory_fig(vessel_events, vessel_summary_row)
+    if fig is None:
         st.info("No events for this vessel in the current filter window.")
         return
-
-    time_col = "start_time" if "start_time" in vessel_events.columns else "date"
-    if time_col not in vessel_events.columns or "risk_score" not in vessel_events.columns:
-        st.info("Required columns missing for trajectory visualisation.")
-        return
-
-    events = vessel_events.copy()
-    events["_time"] = pd.to_datetime(events[time_col], errors="coerce")
-    events = events.dropna(subset=["_time", "risk_score"]).sort_values("_time")
-
-    if events.empty:
-        st.info("No valid events with timestamps.")
-        return
-
-    events["cumulative_risk"] = events["risk_score"].cumsum()
-
-    color_map = {
-        "GAP": "#4C78A8",
-        "ENCOUNTER": "#E45756",
-        "LOITERING": "#F58518",
-        "FISHING": "#54A24B",
-    }
-
-    fig = go.Figure()
-
-    # Cumulative line
-    fig.add_trace(go.Scatter(
-        x=events["_time"],
-        y=events["cumulative_risk"],
-        mode="lines",
-        name="Cumulative risk",
-        line=dict(color="#2d2d2d", width=2),
-        hoverinfo="skip",
-    ))
-
-    # Event markers by type
-    for event_type, group in events.groupby("event_type"):
-        hover_text = []
-        for _, row in group.iterrows():
-            parts = [
-                f"<b>{row['event_type']}</b>",
-                f"{row['_time'].strftime('%Y-%m-%d')}",
-                f"Risk: {row['risk_score']:.1f}",
-                f"Cumulative: {row['cumulative_risk']:.1f}",
-            ]
-            if "duration_h" in row.index and pd.notna(row.get("duration_h")):
-                parts.append(f"Duration: {row['duration_h']:.1f}h")
-            if "in_mpa" in row.index and row.get("in_mpa"):
-                parts.append("Inside MPA")
-            hover_text.append("<br>".join(parts))
-
-        fig.add_trace(go.Scatter(
-            x=group["_time"],
-            y=group["cumulative_risk"],
-            mode="markers",
-            name=event_type,
-            marker=dict(color=color_map.get(event_type, "#888"), size=10,
-                        line=dict(color="white", width=1)),
-            text=hover_text,
-            hovertemplate="%{text}<extra></extra>",
-        ))
-
-    # Band threshold reference lines
-    band_thresholds = [
-        (50, "Emerging", "#4C78A8"),
-        (60, "Elevated", "#F58518"),
-        (80, "Severe", "#E45756"),
-        (100, "Critical", "#8B0000"),
-    ]
-    y_max = max(events["cumulative_risk"].max(), 100) * 1.05
-    for threshold, label, color in band_thresholds:
-        if threshold <= y_max:
-            fig.add_hline(
-                y=threshold, line_dash="dash", line_color=color,
-                line_width=1, opacity=0.6,
-                annotation_text=label,
-                annotation_position="right",
-                annotation=dict(font_size=10, font_color=color),
-            )
-
-    fig.update_layout(
-        height=400,
-        xaxis_title="Event date",
-        yaxis_title="Cumulative risk score",
-        hovermode="closest",
-        legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5),
-        margin=dict(l=40, r=80, t=40, b=40),
-    )
 
     st.plotly_chart(fig, use_container_width=True)
 
     # Summary caption
-    final_cum = events["cumulative_risk"].iloc[-1]
-    event_count = len(events)
-    first_date = events["_time"].iloc[0].strftime("%Y-%m-%d")
-    last_date = events["_time"].iloc[-1].strftime("%Y-%m-%d")
-    st.markdown(
-        f"**Trajectory summary:** {event_count} events between {first_date} and "
-        f"{last_date}, accumulating to total risk {final_cum:.1f}. "
-        "Band crossings readable from where the line intersects the dashed thresholds."
-    )
+    time_col = "start_time" if "start_time" in vessel_events.columns else "date"
+    events = vessel_events.copy()
+    events["_time"] = pd.to_datetime(events[time_col], errors="coerce")
+    events = events.dropna(subset=["_time", "risk_score"]).sort_values("_time")
+    if not events.empty:
+        final_cum = events["risk_score"].cumsum().iloc[-1]
+        event_count = len(events)
+        first_date = events["_time"].iloc[0].strftime("%Y-%m-%d")
+        last_date = events["_time"].iloc[-1].strftime("%Y-%m-%d")
+        st.markdown(
+            f"**Trajectory summary:** {event_count} events between {first_date} and "
+            f"{last_date}, accumulating to total risk {final_cum:.1f}. "
+            "Band crossings readable from where the line intersects the dashed thresholds."
+        )
 
 
 def render_vessel_investigation(df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_landings, fishing_df=None):
@@ -2300,123 +2183,17 @@ def render_vessel_investigation(df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_l
         # the same palette as the card view above.
         with st.expander("Show interactive risk tree (click to drill in)", expanded=False):
             try:
-                _PLOTLY_SEV_COLORS = {
-                    "none": "#81C784",
-                    "low": "#FFF176",
-                    "medium": "#FFB74D",
-                    "high": "#E57373",
-                    "critical": "#B71C1C",
-                }
-                _PLOTLY_SEV_RANK = {"none": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}
-                _PLOTLY_BRANCH_NAMES = {
-                    "identity": "Identity Verification",
-                    "flag_risk": "Flag State Risk",
-                    "regulatory_status": "Regulatory Status",
-                    "authorization": "Fishing Authorization",
-                    "behavioural_history": "Behavioural History",
-                    "spatial_context": "Spatial / Contextual",
-                    "network_exposure": "Network Exposure",
-                }
+                from charts import build_icicle_fig
 
-                # Build icicle arrays: labels, parents, values, colours, hover text.
-                # `ids` gives each node a unique key so Plotly does not
-                # collapse duplicate question_ids across branches; `labels`
-                # hold the *display* text that appears on the chart.
-                root_id = "__root__"
-                root_label = f"{report['identity']['vessel_name']} ({report['assessment']['threat_level']})"
-                ids = [root_id]
-                labels = [root_label]
-                parents = [""]
-                # With branchvalues="remainder", root can have intrinsic
-                # value 0 and children stack on top of it.
-                values = [0]
-                colors = ["#CFD8DC"]  # neutral for root
-                display_labels = [root_label]
-                hovers = [f"Final tier: {report['assessment']['threat_level']}"]
-
-                # Group trace entries by branch so we can build parent nodes
-                from collections import OrderedDict
-                _branches_for_icicle = OrderedDict()
-                for entry in report["trace"]:
-                    bid = entry["branch_id"]
-                    if bid not in _branches_for_icicle:
-                        _branches_for_icicle[bid] = []
-                    _branches_for_icicle[bid].append(entry)
-
-                for bid, entries in _branches_for_icicle.items():
-                    branch_name = _PLOTLY_BRANCH_NAMES.get(bid, bid)
-                    fired_count = sum(1 for e in entries if e.get("rule_fired"))
-                    total = len(entries)
-                    # Branch colour = worst severity in the branch
-                    worst_sev = max(
-                        (e.get("severity", "none") for e in entries),
-                        key=lambda s: _PLOTLY_SEV_RANK.get(s, 0),
-                        default="none",
-                    )
-                    branch_id = f"branch::{bid}"
-                    branch_display = f"{branch_name} ({fired_count}/{total})"
-                    ids.append(branch_id)
-                    labels.append(branch_display)
-                    parents.append(root_id)
-                    # Intrinsic value 0 — children (leaves, each value 1)
-                    # stack on top via branchvalues="remainder", so the
-                    # branch's visual size equals its number of leaves.
-                    values.append(0)
-                    colors.append(_PLOTLY_SEV_COLORS.get(worst_sev, "#CFD8DC"))
-                    display_labels.append(branch_display)
-                    hovers.append(f"{branch_name}<br>{fired_count}/{total} rules fired")
-
-                    # Leaf nodes: one per question. Use a unique `id` so
-                    # Plotly keeps them distinct across branches; the
-                    # displayed label stays clean.
-                    for idx, e in enumerate(entries):
-                        leaf_display = e.get("question_id", "?").replace("_", " ").title()
-                        leaf_id = f"leaf::{bid}::{idx}::{e.get('question_id', '?')}"
-                        sev = e.get("severity", "none")
-                        fired = e.get("rule_fired", False)
-                        ids.append(leaf_id)
-                        labels.append(leaf_display)
-                        parents.append(branch_id)
-                        values.append(1)
-                        colors.append(_PLOTLY_SEV_COLORS.get(sev, "#CFD8DC"))
-                        display_labels.append(leaf_display)
-                        note = str(e.get("note", "")).replace("<", "&lt;").replace(">", "&gt;")
-                        ans = str(e.get("answer", "?")).upper()
-                        fired_tag = " | RULE FIRED" if fired else ""
-                        hovers.append(
-                            f"<b>{leaf_display}</b><br>"
-                            f"Answer: {ans}<br>"
-                            f"Severity: {sev.title()}{fired_tag}<br>"
-                            f"{note}"
-                        )
-
-                import plotly.graph_objects as go
-                fig_icicle = go.Figure(go.Icicle(
-                    ids=ids,
-                    labels=labels,
-                    parents=parents,
-                    values=values,
-                    branchvalues="remainder",
-                    marker=dict(colors=colors, line=dict(color="white", width=1)),
-                    customdata=hovers,
-                    hovertemplate="%{customdata}<extra></extra>",
-                    tiling=dict(orientation="h"),
-                    root=dict(color="#FAFAFA"),
-                    textfont=dict(size=17, family="Helvetica, Arial, sans-serif"),
-                    insidetextfont=dict(size=17, family="Helvetica, Arial, sans-serif"),
-                    outsidetextfont=dict(size=17, family="Helvetica, Arial, sans-serif"),
-                    pathbar=dict(textfont=dict(size=16)),
-                ))
-                fig_icicle.update_layout(
-                    height=750,
-                    margin=dict(l=0, r=0, t=40, b=0),
-                    uniformtext=dict(minsize=14, mode="hide"),
-                    title=dict(
-                        text="Click a branch to zoom in; click the breadcrumb at the top to zoom out.",
-                        font=dict(size=14, color="#555"),
-                    ),
+                fig_icicle = build_icicle_fig(
+                    trace=report["trace"],
+                    vessel_name=report["identity"]["vessel_name"],
+                    threat_level=report["assessment"]["threat_level"],
                 )
-                st.plotly_chart(fig_icicle, use_container_width=True)
+                if fig_icicle:
+                    st.plotly_chart(fig_icicle, use_container_width=True)
+                else:
+                    st.info("No risk tree data for this vessel.")
             except Exception as e:
                 st.warning(f"Icicle render error: {e}")
 
@@ -2485,15 +2262,33 @@ def render_vessel_investigation(df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_l
         trace=report.get("trace", []),
     )
 
-    safe_name = str(case_row["vessel_name"]).replace(" ", "_").replace("/", "_")[:50]
-    fn = f"case_file_{safe_name}_{_dt.utcnow().strftime('%Y%m%d')}.md"
-
-    st.download_button(
-        label="Download case file (Markdown)",
-        data=case_md,
-        file_name=fn,
-        mime="text/markdown",
+    from exports import generate_vessel_case_html
+    case_html = generate_vessel_case_html(
+        mmsi=investigated_mmsi,
+        vessel_summary_row=case_row,
+        vessel_events=vessel_rows_for_flags,
+        trace=report.get("trace", []),
     )
+
+    safe_name = str(case_row["vessel_name"]).replace(" ", "_").replace("/", "_")[:50]
+    fn_md = f"case_file_{safe_name}_{_dt.utcnow().strftime('%Y%m%d')}.md"
+    fn_html = f"case_file_{safe_name}_{_dt.utcnow().strftime('%Y%m%d')}.html"
+
+    col_d1, col_d2 = st.columns(2)
+    with col_d1:
+        st.download_button(
+            label="Download case file (Markdown)",
+            data=case_md,
+            file_name=fn_md,
+            mime="text/markdown",
+        )
+    with col_d2:
+        st.download_button(
+            label="Download case file (HTML)",
+            data=case_html,
+            file_name=fn_html,
+            mime="text/html",
+        )
 
     with st.expander("Preview case file"):
         st.markdown(case_md)
