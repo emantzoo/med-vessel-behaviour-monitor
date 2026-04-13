@@ -189,7 +189,7 @@ Red alert banner if any event involves an IUU-listed vessel. Expandable table wi
 
 **Contents:**
 - **Risk-tree framework** — interactive Graphviz diagram of the Mediterranean IUU Risk Tree with all branches and leaves.
-- **Risk formula** — prose + code block: `risk = (duration_h ^ 0.75) x event_weight x flag_multiplier x shore_factor x event_factors x iuu_multiplier x iccat_multiplier x ofac_multiplier`.
+- **Risk formula** — prose + code block: `risk = (duration_h ^ 0.75) x event_weight x flag_multiplier x shore_factor x mpa_multiplier x event_factors x iuu_multiplier x iccat_multiplier x ofac_multiplier`.
 - **Scoring pipeline diagram** — end-to-end Graphviz showing data flow from GFW API to final risk band.
 - **Risk band definitions** — table: band name, lower/upper bounds, meaning.
 - **Multiplier tables** — flag risk, IUU listing (GFCM 3.0x / other RFMO 2.0x), ICCAT authorization (carrier 1.4x / BFT 1.3x / SWO-ALB 1.2x), OFAC sanctions (2.5x), MPA tier.

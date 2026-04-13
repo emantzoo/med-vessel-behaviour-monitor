@@ -906,8 +906,8 @@ every number in the dashboard. No event data is used -- this tab is pure methodo
 - **Risk-tree framework** -- interactive Graphviz diagram of the Mediterranean IUU Risk Tree \
 (8 branches, 28 leaves, compound logic for tier assignment).
 - **Risk formula** -- annotated scoring equation: \
-`risk = (duration_h ^ 0.75) x event_weight x flag_multiplier x shore_factor x event_factors \
-x iuu_multiplier x iccat_multiplier x ofac_multiplier`.
+`risk = (duration_h ^ 0.75) x event_weight x flag_multiplier x shore_factor x mpa_multiplier \
+x event_factors x iuu_multiplier x iccat_multiplier x ofac_multiplier`.
 - **Scoring pipeline diagram** -- end-to-end Graphviz showing data flow from GFW API event \
 through spatial join, IUU/ICCAT/OFAC matching, to final risk band.
 - **Risk band definitions** -- Low (<50), Emerging (50-60), Elevated (60-80), Severe (80-100), \
@@ -967,7 +967,7 @@ with st.sidebar.expander("Methodology & About"):
 Risk model replicates Global Fishing Watch transshipment detection
 methodology (Miller et al. 2018).
 
-`risk = duration^0.75 x event_weight x flag_mult x shore_factor x event_factors x iuu_mult x iccat_mult x ofac_mult`
+`risk = duration^0.75 x event_weight x flag_mult x shore_factor x mpa_mult x event_factors x iuu_mult x iccat_mult x ofac_mult`
 
 **Encounter factors** (GFW criteria):
 - Proximity: <500m = 1.8x (GFW threshold)
