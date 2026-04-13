@@ -227,7 +227,11 @@ def investigate_vessel(vessel_identifier, df, iuu_df, iccat_df, ofac_df, fdi_eff
         "note": "Requires GFCM Record of Authorised Vessels (partial public availability); data prep analogous to ICCAT",
         "status": "future_work",
     })
-    # Authorization mismatch: check if flag has no fishing rights in Med
+    # Authorization mismatch: check if flag has no fishing rights in Med.
+    # Known imprecision: RUS had bilateral Med fishing agreements pre-2022;
+    # post-sanctions the flag is included here. Acceptable because this leaf
+    # is tree-only (never multiplied into the numeric score) — analyst
+    # context flag, not a score input.
     no_fishing_rights = flag in ("IRN", "RUS", "PRK", "SYR")
     trace.append({
         "branch_id": "authorization", "question_id": "authorization_mismatch",
