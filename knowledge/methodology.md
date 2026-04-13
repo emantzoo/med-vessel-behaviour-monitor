@@ -24,6 +24,7 @@ risk = (duration_h ^ 0.75)
      x event_weight
      x flag_multiplier
      x shore_distance_factor
+     x mpa_tier_multiplier
      x event_specific_factors
 ```
 
@@ -155,7 +156,8 @@ not affect the score. This preserves the base-vs-compound decomposition
 
 ### Step 7: Risk Score Decomposition
 Break down risk_score into: base (duration^0.75), event weight, flag
-multiplier, shore factor, event-specific factors, IUU/ICCAT/OFAC multipliers.
+multiplier, shore factor, MPA tier multiplier, event-specific factors,
+IUU/ICCAT/OFAC multipliers.
 
 Key columns: base_risk_score (behavioural + spatial, pre-lookup) vs
 risk_score (final compounded). compound_multiplier = sum(risk_score) /

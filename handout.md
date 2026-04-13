@@ -260,7 +260,7 @@ Plus `authorization_mismatch` hardcoded for obvious cases (IRN/RUS/PRK/SYR have 
 
 ### Risk tree branches — need new data
 
-6 of the risk tree's 31 leaf questions remain as future-work stubs:
+6 of the risk tree's 32 leaf questions remain as future-work stubs:
 
 - **`shared_ownership`** — requires vessel beneficial-ownership data (Maritime 2.0 or Equasis)
 - **`mmsi_consistent`** — requires longitudinal MMSI history (GFW Vessels API multi-SSVID, partially available in live mode)

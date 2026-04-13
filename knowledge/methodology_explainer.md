@@ -20,7 +20,7 @@ base = (duration^0.75) × event_weight × flag_multiplier × shore_factor × mpa
 
 - **Duration^0.75** — longer events are riskier, with diminishing returns. A 10-hour gap isn't 10x worse than a 1-hour gap; the exponent dampens linear dominance of long events.
 - **Event weight** — encounters 5.0, gaps 3.2, loitering 2.0. Encounters weighted heaviest because they are the direct transshipment signal.
-- **Flag multiplier** — risky flags amplify (Russia 2.8, Iran 2.4, North Korea 3.0, Syria 2.0); flags of convenience add a modest bump (Panama 1.2, Liberia 1.3, Marshall Islands 1.2).
+- **Flag multiplier** — derived from the Poseidon IUU Fishing Risk Index (152 coastal states, 10 Flag-responsibility indicators averaged, mapped linearly to a multiplier via `1.0 + (mean_score - 1.0) * 0.3`). Sanctions/conflict states score high organically (RUS 1.93x, IRN 1.63x, PRK 1.26x, SYR 1.24x); flags of convenience also score high due to weak oversight indicators (PAN 1.81x, LBR 1.48x, MHL 1.39x). Flags not in the Index receive 1.0x (neutral).
 - **Shore factor** — offshore events are riskier for transshipment (>20nm gets 1.5x, 10-20nm gets 1.2x, inshore gets 0.8x). Aligned with Miller et al. 2018 criteria.
 - **MPA intersection tier** — applied per event from GFW's `regions.mpa` field (pre-computed point-in-polygon against WDPA). Three regulatory tiers, classified by config substring match on the MPA name:
   - `gfcm_fra` — GFCM Fisheries Restricted Area, legally binding under Council Reg (EC) 1967/2006: **2.0×**
@@ -89,13 +89,14 @@ This decomposition enables the base-vs-compounded narrative move: *"this vessel'
 
 ## Vessel-level behavioural flags (display-only)
 
-Three compound/temporal flags are computed per vessel and surfaced in the Vessel Summary and Vessel Investigation tabs:
+Four compound/temporal flags are computed per vessel and surfaced in the Vessel Summary and Vessel Investigation tabs:
 
 - **`multi_behaviour_flag`** — vessel shows two or more distinct event types (gap, encounter, loitering) in the window. Compound indicator.
 - **`dark_port_call_candidate`** — at least one LOITERING event within 10 km of shore. AIS-inferred, not satellite-verified (hence "candidate"). Also rendered on the Folium map as a dashed amber outline.
 - **`repeat_offender_90d`** — two or more events within any 90-day rolling window. Captures exposure drift over time.
+- **`vessel_type_mismatch`** — event-level vessel_type and registry shiptypes map to different canonical classes (e.g. fishing vessel broadcasting as cargo). Identity misrepresentation signal.
 
-These mirror three of the six core inputs in Kpler's October 2025 *Deceptive Shipping Practices* predictive model.
+These mirror four of the six core inputs in Kpler's October 2025 *Deceptive Shipping Practices* predictive model.
 
 **Critically, these flags are not multiplied into the risk score.** The underlying signal — loitering duration, shore distance, event type, event frequency — is already captured at the event level by the base scoring formula. Folding the flag back in as a multiplier would double-count. The flags are display-only triage signals, not scoring inputs.
 
@@ -107,14 +108,14 @@ This is a deliberate discipline worth calling out in an R&C conversation: the sc
 
 The scoring pipeline answers "how risky is this vessel's behaviour?" The risk tree answers a different question: **"what kind of risk is it, and what should we investigate next?"**
 
-The risk tree is a hierarchical framework with **8 branches** and **31 leaf questions**, defined in `data/risk_tree_framework.yaml`. It drives the per-vessel investigation trace in the Vessel Investigation tab — each branch is evaluated for the selected vessel, coloured by severity, and rendered as expandable cards plus an interactive icicle chart.
+The risk tree is a hierarchical framework with **8 branches** and **32 leaf questions**, defined in `data/risk_tree_framework.yaml`. It drives the per-vessel investigation trace in the Vessel Investigation tab — each branch is evaluated for the selected vessel, coloured by severity, and rendered as expandable cards plus an interactive icicle chart.
 
 ### The three branch types
 
 1. **Gate branches** (override) — any positive answer forces a minimum tier regardless of other branches. These are hard stops:
    - **Identity Verification** — is the vessel identifiable? Missing IMO + name changes = Elevated minimum.
    - **Regulatory Status** — is the vessel on any sanctions or IUU list? OFAC = Critical. GFCM IUU = High.
-   - **Network Exposure** — five leaves: encounter partner name matched against IUU list (high) and OFAC SDN (critical), encounter partner flag in weak-cooperation Med coastal set LBY/SYR (medium), encounter partner flag in distant-water/non-Med FoC set (medium), and shared ownership (future work). Direct encounter with a sanctioned vessel = Critical.
+   - **Network Exposure** — six leaves (five wired, one future work): encounter partner name matched against IUU list (high) and OFAC SDN (critical), encounter partner flag in weak-cooperation Med coastal set LBY/SYR (medium), encounter partner flag in distant-water/non-Med FoC set (medium), encounter pattern recurrence — 2+ encounters with same counterparty within 90-day window (medium), and shared ownership (future work). Direct encounter with a sanctioned vessel = Critical.
 
 2. **Additive branches** (cumulative) — each positive answer contributes to tier escalation. Three or more flags raised escalates one tier:
    - **Flag State Risk** — high-risk IUU country, flag of convenience, recent flag change, PSC blacklist.
@@ -152,7 +153,7 @@ The final tier is not a simple sum of branch scores. It follows compound rules w
 
 ### What the risk tree does not do (yet)
 
-6 of the 31 leaf questions remain as future-work stubs, each annotated with
+6 of the 32 leaf questions remain as future-work stubs, each annotated with
 `status: future_work` and a `data_requirement` note in both the YAML and
 `investigation.py` documenting exactly what data source would enable it:
 
@@ -195,7 +196,7 @@ This is the strongest literature anchor in the model. The GFW Events API impleme
 
 **Duration exponent (0.75)** — a heuristic choice to dampen linear dominance of long-duration events while preserving monotonicity. Not empirically calibrated against enforcement outcomes. Calibration would require a fisheries designation dataset that doesn't exist at comparable scale to Kpler's sanctions data.
 
-**Flag risk multipliers** — derived from the ITF flags of convenience list, Paris/Tokyo MoU White/Grey/Black performance lists, and expert judgement on shadow fleet exposure (Russia, Iran, Syria, North Korea prominent in reporting). The hierarchy is defensible; the specific values are calibrated by domain reasoning rather than empirical fit.
+**Flag risk multipliers** — derived from the Poseidon IUU Fishing Risk Index (https://iuufishingindex.net/), covering 152 coastal states. The 10 Flag-responsibility indicators per country (vulnerability, prevalence, response) are averaged and mapped linearly to a multiplier: `1.0 + (mean_score - 1.0) * 0.3`. Sanctions/conflict states and flags of convenience score high organically because the Index captures weak governance, enforcement gaps, and oversight deficits — no manual flag list is hardcoded. Regenerated from the latest Index via `scripts/prepare_iuu_risk_index.py`.
 
 **ICCAT risk tiers** — hierarchy reflects domain judgement about opportunity for IUU behaviour: carriers > bluefin (highest-value Med species) > swordfish/albacore. The "opportunity not exoneration" framing is an analytical choice grounded in the conditional-multiplier principle.
 
@@ -217,7 +218,7 @@ This is the same shape as Kpler's approach: their October 2025 whitepaper acknow
 
 ### "How does your app estimate risk?" — short version
 
-*"Two steps. Step one, each AIS event gets a base behavioural score from duration, event type, flag, shore distance, and event-specific factors like proximity and speed. Step two, structural multipliers from IUU listings, ICCAT authorisation, and OFAC sanctions amplify the base score — but only amplify, never substitute. A vessel with no suspicious behaviour carries no score regardless of authorisation status. Final scores are aggregated per vessel and classified into bands from Low to Critical at ≥100, mirroring Kpler's December 2025 vocabulary."*
+*"Two steps. Step one, each AIS event gets a base behavioural score from duration, event type, flag, shore distance, MPA intersection tier, and event-specific factors like proximity and speed. Step two, structural multipliers from IUU listings, ICCAT authorisation, and OFAC sanctions amplify the base score — but only amplify, never substitute. A vessel with no suspicious behaviour carries no score regardless of authorisation status. Final scores are aggregated per vessel and classified into bands from Low to Critical at ≥100, mirroring Kpler's December 2025 vocabulary."*
 
 ### "Where does the methodology come from?" — short version
 
