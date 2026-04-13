@@ -224,8 +224,52 @@ def investigate_vessel(vessel_identifier, df, iuu_df, iccat_df, ofac_df, fdi_eff
     trace.append({
         "branch_id": "authorization", "question_id": "gfcm_authorized",
         "answer": "unknown", "severity": "none", "rule_fired": False,
-        "note": "Requires GFCM Record of Authorised Vessels (partial public availability); data prep analogous to ICCAT",
+        "note": (
+            "Absence-based authorisation signal requires enrichment of GFCM register "
+            "MMSI coverage (currently 24%). Positive-evidence leaves "
+            "(gfcm_listed_no_licence, gfcm_listed_inactive) are wired below."
+        ),
         "status": "future_work",
+    })
+    # GFCM positive-evidence leaves — fire only when vessel is in the register
+    gfcm_registered = primary.get("gfcm_registered", False)
+    gfcm_registered = gfcm_registered is True or str(gfcm_registered).strip().lower() == "true"
+    gfcm_vrn = str(primary.get("gfcm_vrn", "")).strip()
+    gfcm_licence = str(primary.get("gfcm_licence_indicator", "")).strip().lower()
+    gfcm_operational = str(primary.get("gfcm_operational_status", "")).strip().lower()
+    gfcm_gears = str(primary.get("gfcm_authorised_gears", "")).strip()
+
+    gfcm_no_licence_fires = gfcm_registered and gfcm_licence == "no"
+    trace.append({
+        "branch_id": "authorization", "question_id": "gfcm_listed_no_licence",
+        "answer": "yes" if gfcm_no_licence_fires else "no",
+        "severity": "medium" if gfcm_no_licence_fires else "none",
+        "rule_fired": gfcm_no_licence_fires,
+        "note": (
+            f"Vessel in GFCM register (VRN: {gfcm_vrn}) with licence_indicator = 'No'. "
+            f"Authorised gears: {gfcm_gears or 'none recorded'}. Direct regulatory mismatch."
+            if gfcm_no_licence_fires
+            else "Not flagged by GFCM register as unlicensed"
+        ),
+    })
+
+    gfcm_inactive_fires = (
+        gfcm_registered
+        and gfcm_operational == "no"
+        and len(vessel_events) > 0
+    )
+    trace.append({
+        "branch_id": "authorization", "question_id": "gfcm_listed_inactive",
+        "answer": "yes" if gfcm_inactive_fires else "no",
+        "severity": "medium" if gfcm_inactive_fires else "none",
+        "rule_fired": gfcm_inactive_fires,
+        "note": (
+            f"Vessel in GFCM register (VRN: {gfcm_vrn}) marked operational_status = 'No', "
+            f"but GFW observed {len(vessel_events)} events. "
+            f"Register stale or vessel operating when inactive."
+            if gfcm_inactive_fires
+            else "Not flagged as inactive with active AIS observations"
+        ),
     })
     # Authorization mismatch: check if flag has no fishing rights in Med.
     # Known imprecision: RUS had bilateral Med fishing agreements pre-2022;

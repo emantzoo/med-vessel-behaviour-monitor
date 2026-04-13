@@ -83,7 +83,26 @@ Check iccat_authorized, iccat_authorizations, iccat_risk_tier. Note if
 authorized as a Carrier (requires Regional Observer Programme coverage).
 
 Risk tree leaves: **iccat_authorized** and **authorization_mismatch** (authorization branch, contextual). Authorization is an opportunity indicator, not exoneration.
-- gfcm_authorized -- future work (needs GFCM Authorized Vessel List)
+
+### Step 3b: GFCM Authorisation Status
+
+Check gfcm_registered, gfcm_vrn, gfcm_licence_indicator,
+gfcm_operational_status. Two leaves fire on positive evidence only:
+
+1. **gfcm_listed_no_licence** (medium severity) -- vessel in GFCM register
+   with licence_indicator = 'No'. Direct regulatory mismatch.
+
+2. **gfcm_listed_inactive** (medium severity) -- vessel in GFCM register
+   marked operational_status = 'No', with GFW observing active events.
+   Register stale or vessel operating when it should not be.
+
+Coverage caveat: the raw GFCM register has only 24% MMSI coverage. Absence
+from the register is treated as unknown, not unauthorised. A vessel may be
+too small for the register's size threshold, or may be in the register
+without its MMSI populated. Leaves fire only on positive evidence.
+
+- gfcm_authorized (absence-based signal) -- future work (needs enrichment of
+  GFCM register MMSI coverage via EU CFR joins or commercial AIS APIs)
 
 ### Step 4: Sanctions Status
 Check ofac_sanctioned, ofac_sanctions_program, ofac_vessel_name. OFAC

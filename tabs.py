@@ -806,6 +806,7 @@ metadata in live mode and from the static profile in demo mode.
             "iuu_matched": bool(g["iuu_matched"].any()) if "iuu_matched" in g.columns else False,
             "iccat_authorized": bool(g["iccat_authorized"].any()) if "iccat_authorized" in g.columns else False,
             "ofac_sanctioned": bool(g["ofac_sanctioned"].any()) if "ofac_sanctioned" in g.columns else False,
+            "gfcm_registered": bool(g["gfcm_registered"].any()) if "gfcm_registered" in g.columns else False,
         })
 
     vessel_df = (pd.DataFrame(rows)
@@ -2117,6 +2118,7 @@ def render_vessel_investigation(df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_l
             "authorization": "Fishing Authorization",
             "behavioural_history": "Behavioural History",
             "spatial_context": "Spatial / Contextual",
+            "fishing_activity": "Fishing Activity",
             "network_exposure": "Network Exposure",
         }
 

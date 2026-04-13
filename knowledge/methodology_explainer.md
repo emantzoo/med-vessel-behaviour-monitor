@@ -108,7 +108,7 @@ This is a deliberate discipline worth calling out in an R&C conversation: the sc
 
 The scoring pipeline answers "how risky is this vessel's behaviour?" The risk tree answers a different question: **"what kind of risk is it, and what should we investigate next?"**
 
-The risk tree is a hierarchical framework with **8 branches** and **32 leaf questions**, defined in `data/risk_tree_framework.yaml`. It drives the per-vessel investigation trace in the Vessel Investigation tab — each branch is evaluated for the selected vessel, coloured by severity, and rendered as expandable cards plus an interactive icicle chart.
+The risk tree is a hierarchical framework with **8 branches** and **34 leaf questions**, defined in `data/risk_tree_framework.yaml`. It drives the per-vessel investigation trace in the Vessel Investigation tab — each branch is evaluated for the selected vessel, coloured by severity, and rendered as expandable cards plus an interactive icicle chart.
 
 ### The three branch types
 
@@ -153,7 +153,7 @@ The final tier is not a simple sum of branch scores. It follows compound rules w
 
 ### What the risk tree does not do (yet)
 
-6 of the 32 leaf questions remain as future-work stubs, each annotated with
+5 of the 34 leaf questions remain as future-work stubs, each annotated with
 `status: future_work` and a `data_requirement` note in both the YAML and
 `investigation.py` documenting exactly what data source would enable it:
 
@@ -162,13 +162,55 @@ The final tier is not a simple sum of branch scores. It follows compound rules w
 - **`name_history`** (Identity Verification) — requires vessel registry change history beyond what a single GFW snapshot provides.
 - **`eu_sanctioned`** (Regulatory Status) — requires EU consolidated sanctions list (only OFAC SDN currently loaded).
 - **`flag_recent_change`** (Flag State Risk) — requires historical flag data.
-- **`gfcm_authorized`** (Authorization) — requires GFCM Authorized Vessel List.
+
+Note: `gfcm_authorized` (absence-based authorisation signal) is partially wired — positive-evidence leaves (`gfcm_listed_no_licence`, `gfcm_listed_inactive`) are active in the `authorization` branch, but the absence-based signal requires enrichment of GFCM register MMSI coverage (currently 24%).
 
 These are flagged as enrichment opportunities, not hidden gaps. The framework is designed to be extended as new data sources become available — the branch structure and compound logic are in place, waiting for the data layer to catch up.
 
 ### Interview answer: "What's the risk tree for?"
 
 *"The scoring pipeline tells you how bad the behaviour looks numerically. The risk tree tells you what kind of risk it is and what to investigate next. A vessel with a high score from encounters plus an IUU listing follows a different investigation path than one with a high score from AIS gaps inside an MPA. The tree gives the analyst a structured triage workflow — identity first, then regulatory status, then behaviour, then spatial context — so they know which questions to ask in which order. It's the fisheries equivalent of Kpler's shadow fleet risk tree, adapted from the oil and gas domain to Mediterranean IUU."*
+
+---
+
+## Data sources -- currently wired
+
+### 1. Global Fishing Watch (GFW)
+
+The behavioural substrate. Three distinct feeds:
+
+- **GFW Events API** -- AIS-derived behavioural events (gap, encounter, loitering) for the Mediterranean polygon. Anchored in Miller et al. 2018. Primary input to the scoring pipeline.
+- **GFW `regions.mpa`** -- WDPA point-in-polygon intersection, computed server-side by GFW on each event. Feeds the MPA tier multiplier in the base score.
+- **GFW `public-global-fishing-events`** -- Kroodsma et al. 2018 CNN-classified fishing activity. Separate feed, display-only (fishing-in-MPA flag).
+- **GFW Vessels API** -- vessel metadata (length, tonnage, shiptypes, flag, IMO). Used for `is_industrial`, `vessel_class`, `vessel_type_mismatch`.
+
+### 2. EU JRC FDI (Fisheries Dependent Information)
+
+83,000 effort rows and 212,000 landing rows, aggregated to 0.5 deg c-square x quarter x gear x species. Contextual baseline -- never multiplies risk, used in Fisheries Context tab.
+
+### 3. TMT Combined IUU Vessel List
+
+369 vessels across 13 RFMOs. Mirrors EU IUU list under Article 30 of Regulation 1005/2008. 168 with IMO, 64 with MMSI. Compound multiplier: GFCM-listed 3.0x, other RFMO 2.0x. Also used in `encounter_iuu_vessel` partner leaf.
+
+### 4. ICCAT Record of Vessels (Med-authorised)
+
+~9,200 vessels. Species tier multipliers: carrier 1.4x, BFT 1.3x, SWO/ALB 1.2x. Authorisation is an opportunity indicator, not exoneration.
+
+### 5. OFAC SDN
+
+~50 vessels. Hard sanctions signal. 2.5x compound multiplier. Also used in `encounter_sanctioned_vessel` partner leaf.
+
+### 6. Poseidon IUU Fishing Risk Index
+
+152 coastal states scored 1-5 across 40 indicators. Drives `flag_multiplier` via `multiplier = 1.0 + (mean_score - 1.0) * 0.3`.
+
+### 7. GFCM Authorised Vessel Register
+
+77,304 vessels, 24 Med countries. 24% MMSI coverage. Two positive-evidence leaves wired: `gfcm_listed_no_licence` (medium), `gfcm_listed_inactive` (medium). Absence-based signal remains future work due to coverage limitation.
+
+### Data sources not wired (future work)
+
+EU IUU carding data, EU Fleet Register (CFR), commercial AIS APIs (MarineTraffic, VesselFinder), Kpler Maritime 2.0 (ownership graph).
 
 ---
 

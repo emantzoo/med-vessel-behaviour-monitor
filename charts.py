@@ -29,6 +29,7 @@ ICICLE_BRANCH_NAMES = {
     "authorization": "Fishing Authorization",
     "behavioural_history": "Behavioural History",
     "spatial_context": "Spatial / Contextual",
+    "fishing_activity": "Fishing Activity",
     "network_exposure": "Network Exposure",
 }
 

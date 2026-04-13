@@ -156,7 +156,7 @@ From *How Deception Detection Works* and the Dec 2025 "Turning Tides" paper:
 
 | Kpler layer | Med Vessel Monitor equivalent | Status |
 |---|---|---|
-| 1. Formal sanctions status | TMT IUU + OFAC SDN screening | **Implemented** |
+| 1. Formal sanctions status | TMT IUU + OFAC SDN screening + ICCAT authorisation + GFCM register (positive-evidence leaves: listed-but-unlicensed, listed-but-inactive) | **Implemented** |
 | 2. Behavioural indicators | GFW gap / encounter / loitering, duration^0.75 weighted | **Implemented** |
 | 3. Associative risk | Five encounter-partner risk tree leaves: partner name vs IUU list (high), partner name vs OFAC SDN (critical), partner flag in weak-cooperation Med coastal set LBY/SYR (medium), partner flag in distant-water/non-Med FoC set (medium), encounter pattern recurrence within 90 days (medium). Plus encounter partner flag analysis charts and ICCAT carrier encounter alerts in display context. | **Partial — first-degree encounter-partner checks wired, fleet-network propagation and ownership graph missing. Maritime 2.0 plugs in here** |
 | 4. Geographic risk | GSA zoning, shore factor, Libya/Tunisia hotspots, **MPA intersection (GFW `regions.mpa`, tiered)** | **Implemented** |
@@ -256,18 +256,24 @@ Five encounter-partner leaves now implemented in the `network_exposure` branch (
 - **`encounter_distant_water_partner`** — partner flag not in EU and not in Med coastal set (medium severity)
 - **`encounter_pattern_recurrence`** — same counterparty 2+ times within 90-day rolling window (medium severity)
 
+Two GFCM positive-evidence leaves now implemented in the `authorization` branch:
+
+- **`gfcm_listed_no_licence`** — vessel in GFCM register with licence_indicator = 'No' (medium severity)
+- **`gfcm_listed_inactive`** — vessel in GFCM register marked inactive but GFW observing events (medium severity)
+
 Plus `authorization_mismatch` hardcoded for obvious cases (IRN/RUS/PRK/SYR have no legitimate fishing rights in EU Med waters).
 
 ### Risk tree branches — need new data
 
-6 of the risk tree's 32 leaf questions remain as future-work stubs:
+5 of the risk tree's 34 leaf questions remain as future-work stubs:
 
 - **`shared_ownership`** — requires vessel beneficial-ownership data (Maritime 2.0 or Equasis)
 - **`mmsi_consistent`** — requires longitudinal MMSI history (GFW Vessels API multi-SSVID, partially available in live mode)
 - **`name_history`** — requires vessel registry change history
 - **`eu_sanctioned`** — requires EU consolidated sanctions list (only OFAC SDN currently loaded)
 - **`flag_recent_change`** — requires historical flag data
-- **`gfcm_authorized`** — requires GFCM Authorized Vessel List
+
+Note: `gfcm_authorized` (absence-based authorisation signal) remains as a partially-wired stub — positive-evidence leaves (`gfcm_listed_no_licence`, `gfcm_listed_inactive`) are active, but the absence-based signal requires enrichment of GFCM register MMSI coverage (currently 24%).
 
 ### Feature-level gaps
 
@@ -275,6 +281,64 @@ Plus `authorization_mismatch` hardcoded for obvious cases (IRN/RUS/PRK/SYR have 
 2. **Identity inconsistency layer** — name/flag/IMO cross-reference for vessels with suspicious naming histories (the PABLO case, seven prior names, is the canonical illustration).
 3. **Associative / adjacency risk (second degree)** — propagate risk across fleet networks and ownership clusters. First-degree encounter-partner checks are now wired; full network graph analysis requires ownership data from Maritime 2.0 or Equasis.
 4. **Spoofing detection** — not yet implemented; fisheries spoofing is rarer than tanker spoofing but increasingly relevant for small-scale fleets.
+
+---
+
+## Primary data sources -- currently wired
+
+### 1. Global Fishing Watch (GFW)
+
+The behavioural substrate. Three distinct feeds from the same organisation.
+
+**GFW Events API** -- AIS-derived behavioural events for the Mediterranean polygon. Produces three event types: gap (AIS disabling), encounter (two vessels meeting at sea), loitering (low-speed stationary behaviour). Anchored in Miller et al. 2018 transshipment detection methodology. Primary input to the scoring pipeline.
+
+**GFW `regions.mpa` field** -- WDPA (World Database on Protected Areas) point-in-polygon intersection, computed server-side by GFW on each event. Returns MPA name and tier classification. No separate WDPA ingestion needed. Feeds the MPA tier multiplier (in the base score).
+
+**GFW `public-global-fishing-events`** -- Kroodsma et al. 2018 CNN-classified fishing activity, separate feed from the behavioural events. Joined to vessels by MMSI. Powers the fishing-in-MPA display flag. Display-only, never multiplied into the score.
+
+**GFW Vessels API** -- vessel metadata for identity enrichment. Provides length, tonnage, shiptypes, flag, IMO when available. Used to populate the `is_industrial` flag, `vessel_class` canonical categorisation, and `vessel_type_mismatch` check.
+
+### 2. EU JRC FDI (Fisheries Dependent Information)
+
+Statistical baseline of legitimate fishing. 83,000 effort rows and 212,000 landing rows, aggregated to 0.5 deg c-square x quarter x gear x species. Provides the "where is legitimate fishing concentrated" context for spatial interpretation -- events in low-effort c-squares are the suspicious ones. Used in the Fisheries Context tab. Never multiplies risk; determines contextual display.
+
+### 3. TMT Combined IUU Vessel List
+
+369 vessels across 13 RFMOs (ICCAT, CCAMLR, IOTC, SPRFMO, and others). Vessels formally designated as engaged in IUU fishing. Mirrors EU IUU list under Article 30 of Regulation 1005/2008. 168 have IMO, 64 have MMSI.
+
+### 4. ICCAT Record of Vessels (Med-authorised)
+
+~9,200 vessels authorised by ICCAT for tuna and tuna-like species in the Mediterranean. Rec. 24-05. Species tier multipliers: carrier 1.4x, BFT 1.3x, SWO/ALB 1.2x. Authorisation amplifies behavioural signal when present; does not exonerate.
+
+### 5. OFAC SDN (US Treasury Specially Designated Nationals)
+
+~50 vessels subject to US sanctions. Hard sanctions signal. 2.5x compound multiplier when matched.
+
+### 6. Poseidon IUU Fishing Risk Index
+
+152 coastal states scored 1-5 across 40 indicators. Flag-responsibility subset (10 indicators per country) aggregated and mapped to flag multiplier via `multiplier = 1.0 + (mean_score - 1.0) * 0.3`. Replaces previous shadow-fleet-tanker flag calibration.
+
+### 7. GFCM Authorised Vessel Register
+
+77,304 vessels, 24 Med countries. Mediterranean broader fisheries beyond ICCAT's tuna scope. Identifier coverage: 24% MMSI, 3% IMO. Two positive-evidence leaves wired (`gfcm_listed_no_licence`, `gfcm_listed_inactive`). Absence-based signal requires enrichment.
+
+## Data sources identified but not wired -- future work
+
+- **EU IUU Regulation carding data** -- Red-carded countries (Cambodia, Comoros). Would complement TMT list.
+- **Equasis / IHS Markit / MarineTraffic / VesselFinder** -- commercial AIS APIs with near-complete MMSI coverage. Would enable enrichment pipeline.
+- **EU Fleet Register (CFR)** -- comprehensive EU fleet database. Would enable VRN-to-MMSI joins for GFCM register.
+- **Kpler Maritime 2.0** -- proprietary ownership and fleet graph. Central to the ownership-opacity layer. Cannot be replicated from open data.
+
+## Source map by Kpler six-layer framework
+
+| Kpler layer | Data source(s) | Status |
+|---|---|---|
+| 1. Formal sanctions status | TMT IUU + OFAC SDN + ICCAT + GFCM (positive-evidence) | Implemented |
+| 2. Behavioural indicators | GFW Events API, Miller 2018 | Implemented |
+| 3. Associative risk | GFW encounter partners (name/flag) + TMT + OFAC + internal flag sets | Partial (first-degree only) |
+| 4. Geographic risk | GFW `regions.mpa`, GSA constants, FDI baseline | Implemented |
+| 5. Cargo risk | ICCAT species multipliers | Implemented (fisheries equivalent) |
+| 6. Ownership opacity | IUU Risk Index (flag proxy only) + vessel_type_mismatch | Partial |
 
 ---
 

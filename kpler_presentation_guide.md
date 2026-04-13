@@ -129,7 +129,7 @@ Explain while it runs: "This is what an analyst would do manually — cross-refe
 
 **What to say about the architecture:**
 
-"The RAG approach means the AI doesn't hallucinate about maritime concepts — it has specific, curated knowledge about IUU indicators, GFCM regulations, ICCAT observer programmes, OFAC sanctions programs, and the investigation workflow itself. The live dataframe schema is injected into the system prompt so the AI knows exactly what columns are available and what's queryable. For vessel-specific queries, it also receives a STRUCTURED EVIDENCE block — the full deterministic risk tree trace from `investigation.py`, showing which of the 32 leaves fired and at what severity. The AI is instructed not to contradict those results."
+"The RAG approach means the AI doesn't hallucinate about maritime concepts — it has specific, curated knowledge about IUU indicators, GFCM regulations, ICCAT observer programmes, OFAC sanctions programs, and the investigation workflow itself. The live dataframe schema is injected into the system prompt so the AI knows exactly what columns are available and what's queryable. For vessel-specific queries, it also receives a STRUCTURED EVIDENCE block — the full deterministic risk tree trace from `investigation.py`, showing which of the 34 leaves fired and at what severity. The AI is instructed not to contradict those results."
 
 "The sandbox is important — generated code can only read the data and produce visualisations. It can't modify the source dataframes, access the filesystem, or make network calls. That matters when you're executing AI-generated code against compliance-sensitive data."
 

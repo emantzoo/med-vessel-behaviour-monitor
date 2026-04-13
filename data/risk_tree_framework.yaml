@@ -123,12 +123,30 @@ framework:
           note: "Authorization is an opportunity indicator, not exoneration. Context-dependent."
         - id: gfcm_authorized
           text: "Is the vessel on the GFCM Authorized Vessel List?"
-          note: "Vessels >15m LOA must be on this list to fish in GFCM area."
+          note: >
+            Vessels >15m LOA must be on this list to fish in GFCM area.
+            Positive-evidence leaves (gfcm_listed_no_licence, gfcm_listed_inactive)
+            are wired. Absence-based signal remains future work due to 24% MMSI
+            coverage in the raw register.
           status: future_work
           data_requirement: >
-            GFCM Record of Authorised Vessels (currently partial public availability).
-            Data prep analogous to ICCAT Rec. 24-05. Complement to ICCAT, captures
-            non-tuna Med fisheries authorisation.
+            Full absence-based authorisation signal requires enrichment of GFCM
+            register MMSI coverage (currently 24%) via EU CFR joins or commercial
+            AIS APIs.
+        - id: gfcm_listed_no_licence
+          text: "Is the vessel in the GFCM register with licence_indicator marked 'No'?"
+          weight: medium
+          escalation: "Direct regulatory mismatch — registered but not licensed."
+          note: >
+            Fires only on positive evidence. Absence from register is not
+            interpretable due to 24% MMSI coverage in the raw GFCM register.
+        - id: gfcm_listed_inactive
+          text: "Is the vessel in the GFCM register marked inactive, with active AIS events?"
+          weight: medium
+          escalation: "Register stale or vessel operating when it should not be."
+          note: >
+            Fires only when registered, inactive, and broadcasting AIS.
+            Coverage caveat same as gfcm_listed_no_licence.
         - id: authorization_mismatch
           text: "Does the vessel's flag have legitimate fishing rights in the area where it was observed?"
           escalation: "Iranian or Russian vessels in EU waters have no legitimate fishing rights."

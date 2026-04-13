@@ -220,6 +220,12 @@ data_source_provenance:
     coverage: "152 coastal states, 2025 edition. Multiplier = 1.0 + (mean_score - 1.0) * 0.3"
     notes: "Replaces earlier hand-curated flag multipliers. Loaded from data/iuu_risk_index_flags.csv at startup. Regenerate via scripts/prepare_iuu_risk_index.py. Index measures state-level governance risk, not vessel-level incidence."
 
+  - source: "GFCM Authorised Vessel Register"
+    content: "77,304 vessels from 24 Med countries — Mediterranean broader fisheries beyond ICCAT's tuna scope"
+    status: "GFCM (FAO) register — positive-evidence leaves wired, absence-based signal future work"
+    coverage: "24% MMSI coverage, 3% IMO coverage. Static demo with 5 curated vessel states"
+    notes: "Two positive-evidence leaves: gfcm_listed_no_licence (medium severity, vessel in register with licence = No) and gfcm_listed_inactive (medium severity, vessel in register marked inactive but AIS active). Absence not interpretable due to coverage limitation."
+
 flag_risk_calibration:
   source: "Poseidon IUU Fishing Risk Index"
   url: "https://iuufishingindex.net/"

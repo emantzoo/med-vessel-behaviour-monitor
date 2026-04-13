@@ -94,6 +94,7 @@ def generate_vessel_case_file(
     iuu = vessel_summary_row.get("iuu_matched", False)
     iccat = vessel_summary_row.get("iccat_authorized", False)
     ofac = vessel_summary_row.get("ofac_sanctioned", False)
+    gfcm = vessel_summary_row.get("gfcm_registered", False)
     lines.append(
         f"- IUU list (TMT Combined, 13 RFMOs): "
         f"{'MATCHED' if iuu else 'Not listed'}"
@@ -101,6 +102,10 @@ def generate_vessel_case_file(
     lines.append(
         f"- ICCAT authorised vessel record: "
         f"{'AUTHORISED' if iccat else 'Not authorised'}"
+    )
+    lines.append(
+        f"- GFCM register: "
+        f"{'REGISTERED' if gfcm else 'Not matched'}"
     )
     lines.append(
         f"- OFAC SDN list: "
@@ -423,12 +428,15 @@ def generate_vessel_case_html(
     iuu = vessel_summary_row.get("iuu_matched", False)
     iccat = vessel_summary_row.get("iccat_authorized", False)
     ofac = vessel_summary_row.get("ofac_sanctioned", False)
+    gfcm = vessel_summary_row.get("gfcm_registered", False)
 
     structural_rows = (
         f"<tr><td>IUU list (TMT Combined, 13 RFMOs)</td>"
         f"<td>{'<strong>MATCHED</strong>' if iuu else 'Not listed'}</td></tr>"
         f"<tr><td>ICCAT authorised vessel record</td>"
         f"<td>{'<strong>AUTHORISED</strong>' if iccat else 'Not authorised'}</td></tr>"
+        f"<tr><td>GFCM register</td>"
+        f"<td>{'<strong>REGISTERED</strong>' if gfcm else 'Not matched'}</td></tr>"
         f"<tr><td>OFAC SDN list</td>"
         f"<td>{'<strong>SANCTIONED</strong>' if ofac else 'Not sanctioned'}</td></tr>"
     )
