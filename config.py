@@ -287,6 +287,10 @@ GFCM_PARTY_FLAGS = {
     "SYR",  # Syria
     "TUN",  # Tunisia
     "TUR",  # Turkey
+    # EU is a collective GFCM contracting party — all EU member states are covered.
+    # Including full EU_FLAGS set to avoid false non-GFCM positives for EU vessels.
+    "PRT", "DEU", "NLD", "BEL", "IRL", "DNK", "SWE", "FIN",
+    "POL", "EST", "LVA", "LTU", "HUN", "CZE", "SVK", "AUT", "LUX",
     # No CNCPs as of April 2026 (Bosnia-Herzegovina, Georgia, Ukraine
     # have been observers but not CNCPs to the GFCM Agreement).
 }
