@@ -242,6 +242,9 @@ def load_snapshot_events():
         return load_static_data()
     df = pd.read_csv(_SNAPSHOT_EVENTS, parse_dates=["date"])
     df["imo"] = df["imo"].astype(str).fillna("") if "imo" in df.columns else ""
+    if "vessel_id" not in df.columns:
+        df["vessel_id"] = ""
+    df["vessel_id"] = df["vessel_id"].fillna("")
     for col, default in [("mpa", ""), ("mpa_tier", ""), ("in_mpa", False)]:
         if col not in df.columns:
             df[col] = default
@@ -257,12 +260,183 @@ def load_snapshot_fishing():
     if not os.path.exists(_SNAPSHOT_FISHING):
         return load_fishing_events_static()
     df = pd.read_csv(_SNAPSHOT_FISHING, parse_dates=["date"])
+    if "vessel_id" not in df.columns:
+        df["vessel_id"] = ""
+    df["vessel_id"] = df["vessel_id"].fillna("")
     for col, default in [("mpa", ""), ("mpa_tier", ""), ("in_mpa", False)]:
         if col not in df.columns:
             df[col] = default
     df["mpa"] = df["mpa"].fillna("")
     df["mpa_tier"] = df["mpa_tier"].fillna("")
     df["in_mpa"] = df["in_mpa"].fillna(False).astype(bool)
+    return df
+
+
+# ========================= GFW INSIGHTS API =========================
+
+_SNAPSHOT_INSIGHTS = os.path.join(_DATA_DIR, "api_insights_snapshot.csv")
+
+
+def _parse_single_insight(vessel_id, mmsi, raw):
+    """Parse a single-vessel Insights API JSON response into a flat dict."""
+    row = {"vessel_id": vessel_id, "mmsi": str(mmsi)}
+
+    cov = raw.get("coverage") or {}
+    row["ais_coverage_pct"] = cov.get("percentage")
+
+    af = raw.get("apparentFishing") or {}
+    counters = af.get("periodSelectedCounters") or {}
+    row["fishing_events"] = counters.get("events", 0)
+    row["fishing_without_rfmo_auth_events"] = counters.get(
+        "eventsInRFMOWithoutKnownAuthorization", 0
+    )
+    row["fishing_in_no_take_mpa_events"] = counters.get("eventsInNoTakeMPAs", 0)
+
+    vi = raw.get("vesselIdentity") or {}
+    iuu = vi.get("iuuVesselList") or {}
+    row["iuu_times_listed"] = iuu.get("totalTimesListed", 0)
+    row["iuu_listed"] = row["iuu_times_listed"] > 0
+
+    gap = raw.get("gap") or {}
+    gap_counters = gap.get("periodSelectedCounters") or {}
+    row["gap_events"] = gap_counters.get("events", 0)
+
+    return row
+
+
+def fetch_vessel_insights(token, vessel_id, start_date, end_date):
+    """Single-vessel Insights API call. Returns dict or None on failure.
+
+    Used on the Investigation tab for on-demand enrichment (~1.5s).
+    """
+    import requests as _requests
+
+    url = "https://gateway.api.globalfishingwatch.org/v3/insights/vessels"
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    body = {
+        "includes": ["FISHING", "COVERAGE", "VESSEL-IDENTITY-IUU-VESSEL-LIST", "GAP"],
+        "startDate": start_date.strftime("%Y-%m-%d") if hasattr(start_date, "strftime") else str(start_date),
+        "endDate": end_date.strftime("%Y-%m-%d") if hasattr(end_date, "strftime") else str(end_date),
+        "vessels": [
+            {"vesselId": vessel_id, "datasetId": "public-global-vessel-identity:latest"}
+        ],
+    }
+    try:
+        resp = _requests.post(url, json=body, headers=headers, timeout=15)
+        resp.raise_for_status()
+        return resp.json()
+    except Exception:
+        return None
+
+
+def download_insights_snapshot(token, start_date, end_date, vessel_records,
+                               concurrency=5, progress=None):
+    """Batch-query GFW Insights API for a list of vessels. Save to CSV.
+
+    vessel_records: list of (vessel_id, mmsi) tuples.
+    Returns DataFrame with one row per vessel.
+    """
+    import asyncio
+    try:
+        import aiohttp
+    except ImportError:
+        # Fall back to sequential if aiohttp not installed
+        return _download_insights_sequential(token, start_date, end_date,
+                                             vessel_records, progress)
+
+    url = "https://gateway.api.globalfishingwatch.org/v3/insights/vessels"
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    sd = start_date.strftime("%Y-%m-%d") if hasattr(start_date, "strftime") else str(start_date)
+    ed = end_date.strftime("%Y-%m-%d") if hasattr(end_date, "strftime") else str(end_date)
+
+    unique = list({vid: mmsi for vid, mmsi in vessel_records if vid}.items())
+    if not unique:
+        return pd.DataFrame()
+
+    all_rows = []
+
+    async def fetch_one(session, sem, vid, mmsi):
+        async with sem:
+            body = {
+                "includes": ["FISHING", "COVERAGE", "VESSEL-IDENTITY-IUU-VESSEL-LIST", "GAP"],
+                "startDate": sd, "endDate": ed,
+                "vessels": [{"vesselId": vid, "datasetId": "public-global-vessel-identity:latest"}],
+            }
+            try:
+                async with session.post(url, json=body, headers=headers) as resp:
+                    if resp.status == 201:
+                        raw = await resp.json()
+                        all_rows.append(_parse_single_insight(vid, mmsi, raw))
+            except Exception:
+                pass
+
+    async def _run():
+        sem = asyncio.Semaphore(concurrency)
+        connector = aiohttp.TCPConnector(limit=concurrency)
+        async with aiohttp.ClientSession(connector=connector) as session:
+            total = len(unique)
+            # Process in chunks for progress reporting
+            chunk_size = max(concurrency * 2, 20)
+            for i in range(0, total, chunk_size):
+                chunk = unique[i:i + chunk_size]
+                await asyncio.gather(*[
+                    fetch_one(session, sem, vid, mmsi) for vid, mmsi in chunk
+                ])
+                if progress:
+                    progress(min(i + chunk_size, total), total)
+
+    try:
+        asyncio.run(_run())
+    except RuntimeError:
+        import nest_asyncio
+        nest_asyncio.apply()
+        asyncio.run(_run())
+
+    df = pd.DataFrame(all_rows)
+    if not df.empty:
+        df.to_csv(_SNAPSHOT_INSIGHTS, index=False)
+    return df
+
+
+def _download_insights_sequential(token, start_date, end_date, vessel_records, progress=None):
+    """Fallback: sequential single-vessel calls when aiohttp unavailable."""
+    unique = list({vid: mmsi for vid, mmsi in vessel_records if vid}.items())
+    rows = []
+    for i, (vid, mmsi) in enumerate(unique):
+        raw = fetch_vessel_insights(token, vid, start_date, end_date)
+        if raw:
+            rows.append(_parse_single_insight(vid, mmsi, raw))
+        if progress:
+            progress(i + 1, len(unique))
+    df = pd.DataFrame(rows)
+    if not df.empty:
+        df.to_csv(_SNAPSHOT_INSIGHTS, index=False)
+    return df
+
+
+def insights_snapshot_exists():
+    """True if a cached Insights API snapshot CSV is present."""
+    return os.path.exists(_SNAPSHOT_INSIGHTS)
+
+
+def insights_snapshot_info():
+    """Return (vessel_count, file_date) or None."""
+    if not insights_snapshot_exists():
+        return None
+    mtime = datetime.fromtimestamp(os.path.getmtime(_SNAPSHOT_INSIGHTS))
+    count = sum(1 for _ in open(_SNAPSHOT_INSIGHTS, encoding="utf-8")) - 1
+    return count, mtime
+
+
+@st.cache_data
+def load_snapshot_insights():
+    """Load cached Insights API snapshot."""
+    if not os.path.exists(_SNAPSHOT_INSIGHTS):
+        return pd.DataFrame()
+    df = pd.read_csv(_SNAPSHOT_INSIGHTS)
+    for col in ["vessel_id", "mmsi"]:
+        if col in df.columns:
+            df[col] = df[col].astype(str).fillna("")
     return df
 
 
@@ -291,6 +465,7 @@ def _parse_events_df(raw_df):
         row_dict["lon"] = pos.get("lon")
 
         vessel = r.get("vessel") if isinstance(r.get("vessel"), dict) else {}
+        row_dict["vessel_id"] = vessel.get("id", "")  # GFW UUID for Insights API
         row_dict["mmsi"] = vessel.get("ssvid", "0")
         row_dict["flag"] = vessel.get("flag", "UNK")
         row_dict["vessel_name"] = vessel.get("name", "")
@@ -373,6 +548,7 @@ def _parse_fishing_df(raw_df):
         row["lon"] = pos.get("lon")
 
         vessel = r.get("vessel") if isinstance(r.get("vessel"), dict) else {}
+        row["vessel_id"] = vessel.get("id", "")  # GFW UUID for Insights API
         row["mmsi"] = vessel.get("ssvid", "0")
         row["flag"] = vessel.get("flag", "UNK")
         row["vessel_name"] = vessel.get("name", "")
@@ -581,7 +757,8 @@ def lookup_vessel_metadata(mmsi_list, token, progress_callback=None):
                         progress_callback(i + 1, total)
                     continue
 
-                meta = {"imo": None, "length_m": None, "tonnage_gt": None, "shiptypes": None}
+                meta = {"imo": None, "length_m": None, "tonnage_gt": None,
+                        "shiptypes": None, "vessel_id": None}
                 # Preferred: registry_info, then fall back to self_reported_info.
                 # Walk both lists for every field independently -- IMO and length
                 # may come from different entries on the same vessel.
@@ -590,8 +767,26 @@ def lookup_vessel_metadata(mmsi_list, token, progress_callback=None):
                 for _, v in vessels.iterrows():
                     _harvest(v.get("self_reported_info") or v.get("selfReportedInfo"), meta)
 
+                # Extract GFW identity vessel_id (for Insights API)
+                if not meta.get("vessel_id"):
+                    for _, v in vessels.iterrows():
+                        for src_key in ("combined_sources_info", "combinedSourcesInfo",
+                                        "self_reported_info", "selfReportedInfo"):
+                            entries = v.get(src_key)
+                            if isinstance(entries, list):
+                                for entry in entries:
+                                    if isinstance(entry, dict):
+                                        vid = entry.get("vessel_id") or entry.get("vesselId") or entry.get("id")
+                                        if vid and str(vid).strip():
+                                            meta["vessel_id"] = str(vid).strip()
+                                            break
+                            if meta.get("vessel_id"):
+                                break
+                        if meta.get("vessel_id"):
+                            break
+
                 # Only retain the row if at least one field resolved
-                if any(meta.get(k) for k in ("imo", "length_m", "tonnage_gt", "shiptypes")):
+                if any(meta.get(k) for k in ("imo", "length_m", "tonnage_gt", "shiptypes", "vessel_id")):
                     result[mmsi] = meta
 
                 await asyncio.sleep(0.2)  # Rate limit courtesy

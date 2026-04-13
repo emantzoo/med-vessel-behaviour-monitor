@@ -136,6 +136,27 @@ intersection), this completes coverage of two of the three FAO IUU
 categories. The third — unreported fishing — requires catch declaration
 data not available in open sources.
 
+### Step 4c: GFW Insights API Cross-References
+
+When vessel insights are available (snapshot downloaded with the "Include
+vessel insights" toggle enabled), two additional leaves fire:
+
+1. **gfw_iuu_crosscheck** (high) — GFW's live RFMO IUU list confirms
+   the vessel is currently listed. Independent of our static TMT CSV —
+   catches additions between CSV updates.
+
+2. **gfw_no_rfmo_authorization** (medium) — GFW detected fishing in
+   RFMO-managed areas where the vessel has no known authorization from
+   any of 40+ public registries. Broader than our ICCAT-only check —
+   covers all RFMOs, not just ICCAT species authorizations.
+
+Both are tree-only (no scoring multiplier). Data source: GFW Insights
+API v3 (`POST /v3/insights/vessels`), queried during snapshot download
+for Elevated+ vessels (concurrency=5, ~1 min for ~200 vessels).
+
+The Insights API also provides AIS coverage percentage (displayed in
+the investigation report but not as a risk tree leaf).
+
 ### Step 5: Fisheries Context
 Look up FDI baseline for the c-square(s) where events occurred. Report
 fishing days, top species, gear types, and whether the activity makes

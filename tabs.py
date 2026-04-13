@@ -1681,6 +1681,58 @@ def render_vessel_investigation(df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_l
     else:
         st.success("Not on OFAC SDN list.")
 
+    # Step 4c: GFW Insights API cross-references (on-demand, ~1.5s)
+    st.markdown("### 4c. GFW Insights Cross-References")
+    _vessel_id = report["identity"].get("vessel_id", "")
+    _gfw_insights = report.get("gfw_insights") or {}
+    if _gfw_insights.get("available"):
+        _ins_cols = st.columns(4)
+        _cov = _gfw_insights.get("ais_coverage_pct")
+        _ins_cols[0].metric(
+            "AIS Coverage",
+            f"{_cov:.1f}%" if _cov is not None else "N/A",
+            help="Percentage of expected AIS position blocks where the vessel actually transmitted.",
+        )
+        _no_auth = _gfw_insights.get("fishing_without_rfmo_auth_events", 0)
+        _ins_cols[1].metric(
+            "Fishing w/o RFMO Auth",
+            _no_auth,
+            help="Fishing events detected in RFMO areas where vessel has no known authorization (from 40+ registries).",
+        )
+        _iuu_listed = _gfw_insights.get("iuu_listed", False)
+        _iuu_times = _gfw_insights.get("iuu_times_listed", 0)
+        _ins_cols[2].metric(
+            "GFW IUU Listed",
+            f"Yes ({_iuu_times}x)" if _iuu_listed else "No",
+            help="GFW live cross-check against RFMO IUU vessel lists.",
+        )
+        _gap_evts = _gfw_insights.get("gap_events", 0)
+        _ins_cols[3].metric(
+            "AIS Off Events (GFW)",
+            _gap_evts,
+            help="GFW-reported AIS-off events for this vessel in the selected period.",
+        )
+        if _no_auth > 0:
+            st.warning(
+                f"**{_no_auth} fishing event(s)** detected in RFMO areas where this vessel "
+                f"has no known authorization. GFW cross-references 40+ public registries."
+            )
+        if _iuu_listed:
+            st.error(
+                f"**GFW Insights confirms vessel on RFMO IUU list** "
+                f"({_iuu_times} listing(s)). Cross-check with our static IUU CSV."
+            )
+    elif _vessel_id:
+        st.caption(
+            "GFW Insights not cached for this vessel. "
+            "Enable 'Include vessel insights' and re-download the snapshot, "
+            "or the vessel may not have scored Elevated+ during download."
+        )
+    else:
+        st.caption(
+            "GFW Insights unavailable (no GFW vessel ID — static demo data or vessel not in GFW registry)."
+        )
+
     # Step 5: Fisheries Context — compact summary table (one row per event)
     st.markdown("### 5. Fisheries Context")
     if report["fisheries"]:

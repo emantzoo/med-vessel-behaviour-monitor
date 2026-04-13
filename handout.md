@@ -276,7 +276,7 @@ sales notes, ERS) — outside the scope of any AIS-based tool.
 
 ### Risk tree branches — need new data
 
-5 of the risk tree's 36 leaf questions remain as future-work stubs:
+5 of the risk tree's 38 leaf questions remain as future-work stubs:
 
 - **`shared_ownership`** — requires vessel beneficial-ownership data (Maritime 2.0 or Equasis)
 - **`mmsi_consistent`** — requires longitudinal MMSI history (GFW Vessels API multi-SSVID, partially available in live mode)

@@ -19,6 +19,8 @@ from data_loading import (
     load_fishing_events_static, load_fishing_events_live, aggregate_fishing_in_mpa,
     snapshot_exists, snapshot_info, download_api_snapshot,
     load_snapshot_events, load_snapshot_fishing,
+    insights_snapshot_exists, insights_snapshot_info,
+    download_insights_snapshot, load_snapshot_insights,
 )
 from risk_model import compute_risk_score, compute_risk_scores_vec, get_fdi_context, match_iuu_vessels, match_iccat_vessels, match_ofac_vessels, compute_vessel_flags
 from tabs import (
@@ -114,26 +116,70 @@ include_fishing = st.sidebar.toggle(
     help="Load GFW fishing events for fishing-in-MPA detection. Slower with large datasets.",
 )
 
+include_insights = st.sidebar.toggle(
+    "Include vessel insights (GFW)", value=False,
+    help="Download GFW Insights API data for Elevated+ vessels: RFMO authorization, "
+         "AIS coverage, IUU list cross-reference. Adds ~1-2 min to snapshot download.",
+)
+
 if token:
     with st.sidebar.expander("Download API snapshot"):
         snap_info = snapshot_info()
         if snap_info:
             ev_n, fish_n, snap_date = snap_info
+            ins_info = insights_snapshot_info()
+            ins_text = f" + {ins_info[0]} insights" if ins_info else ""
             st.caption(
-                f"Existing: {ev_n} events + {fish_n} fishing, "
+                f"Existing: {ev_n} events + {fish_n} fishing{ins_text}, "
                 f"saved {snap_date:%Y-%m-%d %H:%M}"
             )
-        if st.button("Download 30 days from API", key="dl_snapshot"):
+        if st.button("Download 10 days from API", key="dl_snapshot"):
             from datetime import timedelta
             end_dt = datetime.today()
-            start_dt = end_dt - timedelta(days=30)
+            start_dt = end_dt - timedelta(days=10)
             bar = st.progress(0, text="Starting download...")
             try:
-                download_api_snapshot(
+                ev_df, fish_df = download_api_snapshot(
                     token, start_dt, end_dt,
                     include_fishing=include_fishing,
-                    progress=lambda pct, msg: bar.progress(pct, text=msg),
+                    progress=lambda pct, msg: bar.progress(
+                        min(pct, 0.80 if include_insights else 1.0), text=msg),
                 )
+                # Insights: score → filter Elevated+ → resolve identity IDs → batch query
+                if include_insights and ev_df is not None and not ev_df.empty:
+                    bar.progress(0.82, text="Scoring events for insights filter...")
+                    from config import FLAG_RISKS
+                    _tmp_scores = compute_risk_scores_vec(ev_df, event_weights, FLAG_RISKS)
+                    ev_df["_tmp_score"] = _tmp_scores
+                    elevated_mmsis = (
+                        ev_df.loc[ev_df["_tmp_score"] >= 60, "mmsi"]
+                        .dropna().unique().tolist()
+                    )
+                    if elevated_mmsis:
+                        # Resolve MMSI → identity vessel_id via Vessels API
+                        bar.progress(0.84, text=f"Resolving {len(elevated_mmsis)} Elevated+ vessel IDs...")
+                        _meta = lookup_vessel_metadata(
+                            elevated_mmsis, token,
+                            progress_callback=lambda c, t: bar.progress(
+                                0.84 + 0.06 * c / max(t, 1),
+                                text=f"Resolving vessel IDs: {c}/{t}"),
+                        )
+                        # Build (identity_vessel_id, mmsi) pairs
+                        _vid_pairs = [
+                            (v.get("vessel_id"), m)
+                            for m, v in _meta.items()
+                            if v.get("vessel_id")
+                        ]
+                        if _vid_pairs:
+                            bar.progress(0.90, text=f"Fetching insights for {len(_vid_pairs)} vessels...")
+                            download_insights_snapshot(
+                                token, start_dt, end_dt, _vid_pairs,
+                                concurrency=5,
+                                progress=lambda cur, tot: bar.progress(
+                                    0.90 + 0.09 * cur / max(tot, 1),
+                                    text=f"Insights: {cur}/{tot} vessels..."),
+                            )
+                    ev_df.drop(columns=["_tmp_score"], inplace=True)
                 bar.empty()
                 st.success("Snapshot saved. Switch data source to 'API snapshot'.")
                 st.cache_data.clear()
@@ -191,7 +237,7 @@ if not df_filtered.empty:
     df_filtered["csq_lat"] = csq_lat
 
 # Vessel metadata enrichment via GFW Vessels API (live mode only).
-# Returns dict[mmsi] -> {"imo", "length_m", "tonnage_gt", "shiptypes"}.
+# Returns dict[mmsi] -> {"imo", "length_m", "tonnage_gt", "shiptypes", "vessel_id"}.
 # Each field is independently optional. Falls back gracefully on cache miss.
 if use_live and token and resolve_imos and not df_filtered.empty:
     unique_mmsis = df_filtered["mmsi"].dropna().unique().tolist()
@@ -211,11 +257,17 @@ if use_live and token and resolve_imos and not df_filtered.empty:
         df_filtered["length_m"] = mmsi_str.map(lambda m: (meta_map.get(m) or {}).get("length_m"))
         df_filtered["tonnage_gt"] = mmsi_str.map(lambda m: (meta_map.get(m) or {}).get("tonnage_gt"))
         df_filtered["shiptypes"] = mmsi_str.map(lambda m: (meta_map.get(m) or {}).get("shiptypes") or "")
+        # GFW identity vessel_id (for Insights API) — overwrites event vessel.id
+        # with the correct identity-dataset UUID that the Insights API accepts.
+        _vid_map = mmsi_str.map(lambda m: (meta_map.get(m) or {}).get("vessel_id") or "")
+        df_filtered["vessel_id"] = _vid_map.where(_vid_map.astype(bool), df_filtered.get("vessel_id", ""))
 
 # Ensure metadata columns exist (static CSV pre-populates length_m / tonnage_gt /
 # shiptypes; live mode without enrichment skipped or no GFW match leaves them blank).
 if "imo" not in df_filtered.columns:
     df_filtered["imo"] = ""
+if "vessel_id" not in df_filtered.columns:
+    df_filtered["vessel_id"] = ""
 for _meta_col, _meta_default in [("length_m", None), ("tonnage_gt", None), ("shiptypes", "")]:
     if _meta_col not in df_filtered.columns:
         df_filtered[_meta_col] = _meta_default
@@ -269,6 +321,33 @@ for _col, _default in [
 df_filtered["fishing_in_mpa_events"] = df_filtered["fishing_in_mpa_events"].fillna(0).astype(int)
 df_filtered["fishing_in_mpa_hours"] = df_filtered["fishing_in_mpa_hours"].fillna(0.0)
 df_filtered["fishing_in_mpa_top_tier"] = df_filtered["fishing_in_mpa_top_tier"].fillna("")
+
+# GFW Insights join (display-only + risk tree, no scoring multiplier).
+# Keyed on mmsi (reliable in both df_filtered and insights snapshot).
+_insights_df = load_snapshot_insights() if (use_snapshot or use_live) else pd.DataFrame()
+if not df_filtered.empty and not _insights_df.empty and "mmsi" in _insights_df.columns:
+    _ins_cols = ["mmsi", "vessel_id", "ais_coverage_pct", "fishing_events",
+                 "fishing_without_rfmo_auth_events", "fishing_in_no_take_mpa_events",
+                 "iuu_listed", "iuu_times_listed", "gap_events"]
+    _ins_cols = [c for c in _ins_cols if c in _insights_df.columns]
+    df_filtered["mmsi"] = df_filtered["mmsi"].astype(str)
+    _insights_df["mmsi"] = _insights_df["mmsi"].astype(str)
+    # Drop vessel_id from merge cols to avoid collision with event vessel_id
+    _merge_cols = [c for c in _ins_cols if c != "mmsi"]
+    df_filtered = df_filtered.merge(
+        _insights_df[_ins_cols].drop_duplicates("mmsi"),
+        on="mmsi", how="left", suffixes=("", "_gfw"),
+    )
+# Ensure GFW Insights columns exist with safe defaults
+for _col, _default in [
+    ("ais_coverage_pct", None),
+    ("fishing_without_rfmo_auth_events", 0),
+    ("fishing_in_no_take_mpa_events", 0),
+    ("iuu_listed", False),
+    ("iuu_times_listed", 0),
+]:
+    if _col not in df_filtered.columns:
+        df_filtered[_col] = _default
 
 # ========================= MAIN MAP & METRICS =========================
 col1, col2 = st.columns([3, 1])

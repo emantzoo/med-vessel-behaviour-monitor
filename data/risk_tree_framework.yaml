@@ -172,6 +172,27 @@ framework:
             nations (USA, CHN, KOR) or non-cooperating states (IRN, RUS)
             operating in the area without GFCM cooperation status.
 
+        - id: gfw_iuu_crosscheck
+          text: "Does the GFW Insights API confirm the vessel is on an RFMO IUU list?"
+          weight: high
+          escalation: "GFW live IUU cross-reference confirms listing."
+          note: >
+            Cross-checks our static IUU CSV against GFW's live RFMO IUU
+            list data via the Insights API. Fires independently of our
+            local match — catches vessels added to lists after our CSV
+            was last updated. Requires insights snapshot download.
+
+        - id: gfw_no_rfmo_authorization
+          text: "Has the vessel been detected fishing in RFMO areas without known authorization?"
+          weight: medium
+          escalation: "Fishing without RFMO authorization detected by GFW Insights."
+          note: >
+            GFW cross-references vessel registry authorizations from 40+
+            public registries against observed fishing activity. Broader
+            than our ICCAT-only check. Fires when fishing detected in
+            areas where vessel has no known authorization from any RFMO.
+            Requires insights snapshot download.
+
     - id: behavioural_history
       name: "Behavioural History (last 90 days)"
       type: additive

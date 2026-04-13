@@ -9,6 +9,8 @@
 #   authorization_mismatch      — hardcoded flag check (IRN/RUS/PRK/SYR)
 #   stateless_vessel            — flag in RECOGNISED_FLAG_VALUES_INVALID (FAO unregulated)
 #   unregulated_flag_in_gfcm_area — flag not in GFCM_PARTY_FLAGS / EU_FLAGS (FAO unregulated)
+#   gfw_iuu_crosscheck            — GFW Insights API live RFMO IUU list cross-check
+#   gfw_no_rfmo_authorization     — GFW Insights API: fishing without RFMO authorization
 #
 # Future work (data not loaded):
 #   mmsi_consistent       — needs longitudinal MMSI history (GFW Vessels API multi-SSVID)
@@ -67,10 +69,13 @@ def investigate_vessel(vessel_identifier, df, iuu_df, iccat_df, ofac_df, fdi_eff
     flag = primary.get("flag", "")
     vessel_name_val = primary.get("vessel_name", "Unknown")
 
+    vessel_id_val = str(primary.get("vessel_id", "")).strip()
+
     report["identity"] = {
         "vessel_name": vessel_name_val,
         "mmsi": mmsi_val,
         "imo": imo_val,
+        "vessel_id": vessel_id_val,
         "flag": flag,
         "vessel_type": primary.get("vessel_type", ""),
         "shiptypes": primary.get("shiptypes", ""),
@@ -325,6 +330,55 @@ def investigate_vessel(vessel_identifier, df, iuu_df, iccat_df, ofac_df, fdi_eff
                 if not is_stateless
                 else "Stateless (handled by stateless_vessel leaf)"
             )
+        ),
+    })
+
+    # ===== Step 4c: GFW Insights Cross-References =====
+    # Uses cached insights from snapshot download (joined onto df_filtered).
+    _cov = primary.get("ais_coverage_pct")
+    _no_auth = int(primary.get("fishing_without_rfmo_auth_events", 0) or 0)
+    _iuu_listed = bool(primary.get("iuu_listed", False))
+    _iuu_times = int(primary.get("iuu_times_listed", 0) or 0)
+    _gap_evts = int(primary.get("gap_events", 0) or 0)
+    _insights_available = _cov is not None and not (isinstance(_cov, float) and pd.isna(_cov))
+
+    report["gfw_insights"] = {
+        "available": _insights_available,
+        "ais_coverage_pct": float(_cov) if _insights_available else None,
+        "fishing_without_rfmo_auth_events": _no_auth,
+        "iuu_listed": _iuu_listed,
+        "iuu_times_listed": _iuu_times,
+        "gap_events": _gap_evts,
+    }
+
+    # gfw_iuu_crosscheck trace entry
+    trace.append({
+        "branch_id": "authorization",
+        "question_id": "gfw_iuu_crosscheck",
+        "answer": "yes" if _iuu_listed else "no",
+        "severity": "high" if _iuu_listed else "none",
+        "rule_fired": _iuu_listed,
+        "note": (
+            f"GFW Insights API confirms vessel on RFMO IUU list "
+            f"({_iuu_times} listing(s))."
+            if _iuu_listed
+            else "GFW Insights: not on any RFMO IUU list (or insights unavailable)"
+        ),
+    })
+
+    # gfw_no_rfmo_authorization trace entry
+    _has_no_auth = _no_auth > 0
+    trace.append({
+        "branch_id": "authorization",
+        "question_id": "gfw_no_rfmo_authorization",
+        "answer": "yes" if _has_no_auth else "no",
+        "severity": "medium" if _has_no_auth else "none",
+        "rule_fired": _has_no_auth,
+        "note": (
+            f"GFW Insights: {_no_auth} fishing event(s) in RFMO areas "
+            f"where vessel has no known authorization."
+            if _has_no_auth
+            else "GFW Insights: no unauthorized fishing detected (or insights unavailable)"
         ),
     })
 
