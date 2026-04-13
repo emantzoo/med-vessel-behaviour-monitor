@@ -303,17 +303,24 @@ GFCM_PARTY_FLAGS = {
     "PRT", "SVK", "SWE",
     # (Med/Black Sea EU states already listed above: FRA, GRC, HRV, ITA,
     #  MLT, CYP, SVN, BGR, ROU, ESP)
-    # --- ICCAT-authorized distant-water fleets with active Med BFT quota ---
-    # These non-coastal states have legitimate authorized access to Mediterranean
+    # --- ICCAT-authorized distant-water fleets with active BFT quota (2026-2028) ---
+    # These non-coastal states have legitimate authorized access to Mediterranean/Atlantic
     # bluefin tuna under ICCAT CPC status. Their vessels are NOT unregulated.
     # They may still fire encounter_distant_water_partner (transshipment signal)
-    # when encountered, but their own fishing activity is not flagged here.
-    "JPN",  # Japan — ~3,100–3,600 t BFT quota, largest distant-water fleet
-    "KOR",  # Republic of Korea — ~220–370 t BFT quota
-    "CHN",  # China — ~110–290 t BFT quota
+    # when encountered as partners, but their own fishing activity is not flagged here.
+    # Major fleets (meaningful Med presence):
+    "JPN",  # Japan — ~3,559 t BFT quota, largest distant-water fleet in Med
+    "KOR",  # Republic of Korea — ~369 t BFT quota
+    "CHN",  # China — ~286 t BFT quota
     "TWN",  # Chinese Taipei (Taiwan) — ~101 t BFT quota
-    "ISL",  # Iceland — eastern Atlantic / limited Med BFT
-    "NOR",  # Norway — eastern Atlantic / limited Med BFT
+    "ISL",  # Iceland — ~253 t, mostly eastern Atlantic / limited Med
+    "NOR",  # Norway — ~461 t, mostly eastern Atlantic / limited Med
+    # Small-quota CPCs (55–230 t; negligible or no Med presence but ICCAT-authorized):
+    "GBR",  # United Kingdom — 230.56 t, mostly eastern Atlantic longline
+    "MRT",  # Mauritania — 55 t, eastern Atlantic bycatch; negligible Med
+    "NAM",  # Namibia — 55 t, distant-water; historically near-zero catch
+    "PAN",  # Panama — 55 t, flag-state; limited longline outside Med
+    "SEN",  # Senegal — 55 t, eastern Atlantic; no meaningful Med effort
 }
 
 # Flag values treated as stateless / non-recognised registry.
