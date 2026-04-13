@@ -724,7 +724,7 @@ Switch to the **Vessel Investigation** tab for a per-vessel deep dive.
 **Collapsed expanders below:** Risk band distribution -- Base vs structural-amplifier decomposition \
 -- Top vessels segmented.""")
 
-        render_vessel_summary(df_tab)
+        render_vessel_summary(df_tab, fdi_effort=fdi_effort, fdi_landings=fdi_landings)
 
         with st.expander("Risk band distribution", expanded=False):
             render_risk_band_distribution(df_tab)

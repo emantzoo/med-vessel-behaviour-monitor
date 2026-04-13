@@ -42,45 +42,18 @@ def render_daily_trend(df):
     if df.empty:
         st.info("No data.")
         return
-    daily = df.groupby("date")["risk_score"].sum().reset_index()
-    fig = px.line(daily, x="date", y="risk_score", markers=True,
-                  title="Total risk score by day")
+    from charts import build_daily_risk_line_fig, build_daily_risk_area_fig, build_monthly_event_counts_fig
 
-    # Mark IUU event dates
-    if "iuu_matched" in df.columns:
-        iuu_dates = df[df["iuu_matched"] == True]["date"].unique()
-        for d in iuu_dates:
-            d_str = str(d)
-            fig.add_shape(type="line", x0=d_str, x1=d_str, y0=0, y1=1,
-                          yref="paper", line=dict(dash="dash", color="black", width=1))
-            fig.add_annotation(x=d_str, y=1, yref="paper", text="IUU",
-                               showarrow=False, font=dict(color="black", size=10))
+    fig = build_daily_risk_line_fig(df)
+    if fig:
+        st.plotly_chart(fig)
 
-    st.plotly_chart(fig)
+    fig2 = build_daily_risk_area_fig(df)
+    if fig2:
+        st.plotly_chart(fig2)
 
-    # Stacked area by event type
-    daily_by_type = df.groupby(["date", "event_type"])["risk_score"].sum().reset_index()
-    fig2 = px.area(daily_by_type, x="date", y="risk_score", color="event_type",
-                   color_discrete_map=EVENT_COLORS,
-                   title="Daily Risk by Event Type")
-    st.plotly_chart(fig2)
-
-    # Monthly multi-behaviour event counts
-    df_m = df.copy()
-    df_m["date"] = pd.to_datetime(df_m["date"], errors="coerce")
-    df_m = df_m.dropna(subset=["date"])
-    if not df_m.empty:
-        monthly = (df_m.set_index("date")
-                   .groupby("event_type")
-                   .resample("MS")
-                   .size()
-                   .reset_index(name="events"))
-        fig3 = px.line(
-            monthly, x="date", y="events", color="event_type",
-            color_discrete_map=EVENT_COLORS, markers=True,
-            title="Monthly Event Counts by Behaviour Type",
-            labels={"date": "Month", "events": "Event count", "event_type": "Behaviour"},
-        )
+    fig3 = build_monthly_event_counts_fig(df)
+    if fig3:
         st.plotly_chart(fig3)
         st.caption(
             "Monthly deceptive behaviour trends across Mediterranean GFW "
@@ -108,19 +81,15 @@ def render_flag_breakdown(df):
     if df.empty:
         st.info("No data.")
         return
-    flag_risk = (df.groupby("flag")["risk_score"].sum()
-                 .reset_index().sort_values("risk_score", ascending=False))
-    fig = px.bar(flag_risk, x="risk_score", y="flag", orientation="h",
-                 title="Total risk by flag (sorted)")
-    st.plotly_chart(fig)
+    from charts import build_flag_risk_bar_fig, build_flag_event_stacked_fig
 
-    # Stacked bar by event type
-    flag_type = (df.groupby(["flag", "event_type"])["risk_score"].sum()
-                 .reset_index().sort_values("risk_score", ascending=False))
-    fig2 = px.bar(flag_type, x="risk_score", y="flag", color="event_type",
-                  orientation="h", color_discrete_map=EVENT_COLORS,
-                  title="Risk by Flag State and Event Type")
-    st.plotly_chart(fig2)
+    fig = build_flag_risk_bar_fig(df)
+    if fig:
+        st.plotly_chart(fig)
+
+    fig2 = build_flag_event_stacked_fig(df)
+    if fig2:
+        st.plotly_chart(fig2)
 
     # IUU/ICCAT/OFAC summary by flag
     n_summary_cols = 2 + (1 if "ofac_sanctioned" in df.columns else 0)
@@ -170,11 +139,11 @@ def render_event_types(df):
     if df.empty:
         st.info("No data.")
         return
-    type_risk = df.groupby("event_type")["risk_score"].sum().reset_index()
-    fig = px.pie(type_risk, names="event_type", values="risk_score",
-                 color="event_type", color_discrete_map=EVENT_COLORS,
-                 title="Risk contribution by event type")
-    st.plotly_chart(fig)
+    from charts import build_event_type_pie_fig
+
+    fig = build_event_type_pie_fig(df)
+    if fig:
+        st.plotly_chart(fig)
 
     # Summary table
     summary = df.groupby("event_type").agg(
@@ -230,25 +199,17 @@ def render_duration_analysis(df):
     if df.empty:
         st.info("No data.")
         return
-    fig = px.histogram(
-        df, x="duration_h", color="event_type", nbins=25,
-        barmode="overlay", opacity=0.7,
-        color_discrete_map=EVENT_COLORS,
-        labels={"duration_h": "Duration (hours)", "event_type": "Event Type"},
-        title="Event Duration Distribution",
-    )
-    fig.update_layout(bargap=0.05)
-    st.plotly_chart(fig)
+    from charts import build_duration_histogram_fig, build_duration_vs_risk_fig
+
+    fig = build_duration_histogram_fig(df)
+    if fig:
+        st.plotly_chart(fig)
     st.markdown("**Why it matters:** Long gaps (>24h) suggest deliberate AIS disabling. "
                 "Encounters over 8h point to transshipment. Short loitering may be staging.")
 
-    # Duration vs risk scatter by flag
-    hover_cols = ["vessel_name", "event_type", "mmsi"] if "vessel_name" in df.columns else ["event_type", "mmsi"]
-    fig2 = px.scatter(df, x="duration_h", y="risk_score", color="flag",
-                      hover_data=hover_cols,
-                      title="Duration vs Risk Score by Flag",
-                      labels={"duration_h": "Duration (hours)", "risk_score": "Risk Score"})
-    st.plotly_chart(fig2)
+    fig2 = build_duration_vs_risk_fig(df)
+    if fig2:
+        st.plotly_chart(fig2)
 
 
 def render_geographic_risk(df):
@@ -271,43 +232,17 @@ def render_geographic_risk(df):
         st.info("No data.")
         return
 
-    df_geo = df.copy()
-    df_geo["marker"] = "Regular"
-    if "iuu_matched" in df_geo.columns:
-        df_geo.loc[df_geo["iuu_matched"] == True, "marker"] = "IUU-Listed"
-    if "iccat_authorized" in df_geo.columns:
-        df_geo.loc[(df_geo["iccat_authorized"] == True) & (df_geo["marker"] == "Regular"), "marker"] = "ICCAT-Authorized"
+    from charts import build_geographic_scatter_fig, build_med_zone_bar_fig
 
-    hover_cols = ["mmsi", "flag", "duration_h", "risk_score"]
-    if "vessel_name" in df_geo.columns:
-        hover_cols.append("vessel_name")
-
-    fig = px.scatter(
-        df_geo, x="lon", y="lat", size="risk_score", color="event_type",
-        symbol="marker",
-        symbol_map={"Regular": "circle", "IUU-Listed": "diamond", "ICCAT-Authorized": "square"},
-        color_discrete_map=EVENT_COLORS,
-        hover_data=hover_cols,
-        size_max=25,
-        title="Risk-Weighted Event Map (shape: circle=regular, diamond=IUU, square=ICCAT)",
-        labels={"lon": "Longitude", "lat": "Latitude"},
-    )
-    st.plotly_chart(fig)
+    fig = build_geographic_scatter_fig(df)
+    if fig:
+        st.plotly_chart(fig)
 
     if "med_zone" in df.columns:
         st.subheader("Risk by Mediterranean Sub-Region")
-        zone_risk = (
-            df.groupby("med_zone")
-            .agg(total_risk=("risk_score", "sum"), events=("mmsi", "count"))
-            .reset_index().sort_values("total_risk", ascending=True)
-        )
-        fig2 = px.bar(
-            zone_risk, x="total_risk", y="med_zone", orientation="h",
-            color="events", color_continuous_scale="Blues",
-            title="Risk by Mediterranean Sub-Region",
-            labels={"total_risk": "Total Risk Score", "med_zone": "Region", "events": "Events"},
-        )
-        st.plotly_chart(fig2)
+        fig2 = build_med_zone_bar_fig(df)
+        if fig2:
+            st.plotly_chart(fig2)
 
     if "eez" in df.columns and df["eez"].notna().any():
         st.subheader("Risk by Exclusive Economic Zone")
@@ -358,30 +293,19 @@ def render_risk_heatmap(df):
     if df.empty:
         st.info("No data.")
         return
+    from charts import build_risk_heatmap_fig
+
+    fig = build_risk_heatmap_fig(df)
+    if fig:
+        st.plotly_chart(fig)
+
+    # Highest risk combination insight
     pivot = df.pivot_table(
         values="risk_score", index="flag", columns="event_type",
         aggfunc="sum", fill_value=0,
     )
-    pivot["total"] = pivot.sum(axis=1)
-    pivot = pivot.sort_values("total", ascending=True).drop(columns="total")
-
-    fig = go.Figure(data=go.Heatmap(
-        z=pivot.values,
-        x=pivot.columns.tolist(),
-        y=pivot.index.tolist(),
-        colorscale="YlOrRd",
-        text=pivot.values.round(1),
-        texttemplate="%{text}",
-        hovertemplate="Flag: %{y}<br>Event: %{x}<br>Risk: %{z:.1f}<extra></extra>",
-    ))
-    fig.update_layout(
-        title="Risk Heatmap: Flag State vs Event Type",
-        xaxis_title="Event Type", yaxis_title="Flag State", height=500,
-    )
-    st.plotly_chart(fig)
-    # Highest risk combination insight
     if not pivot.empty:
-        max_flag = pivot.max(axis=1).idxmax()
+        max_flag = pivot.sum(axis=1).idxmax()
         max_type = pivot.loc[max_flag].idxmax()
         max_val = pivot.loc[max_flag, max_type]
         st.markdown(f"**Highest risk combination:** {max_flag} + {max_type} = {max_val:.1f} risk score")
@@ -454,15 +378,11 @@ def render_repeat_offenders(df):
 
     repeat_vessels = vessel_counts[vessel_counts["event_count"] >= 2]
     if not repeat_vessels.empty:
-        fig = px.bar(
-            repeat_vessels.head(15), x="mmsi", y="event_count",
-            color="total_risk", color_continuous_scale="YlOrRd",
-            hover_data=["flag", "event_types", "avg_duration", "total_risk"],
-            title="Repeat Offenders -- Vessels with Multiple Events",
-            labels={"event_count": "Number of Events", "mmsi": "MMSI"},
-        )
-        fig.update_xaxes(type="category")
-        st.plotly_chart(fig)
+        from charts import build_repeat_offenders_bar_fig, build_repeat_timeline_fig
+
+        fig = build_repeat_offenders_bar_fig(repeat_vessels)
+        if fig:
+            st.plotly_chart(fig)
         st.dataframe(repeat_vessels.head(15).style.format(
             {"total_risk": "{:.1f}", "avg_duration": "{:.1f}"}))
     else:
@@ -471,20 +391,9 @@ def render_repeat_offenders(df):
     # Event timeline for top 3 repeat offenders
     if not repeat_vessels.empty:
         top3 = repeat_vessels.head(3)["mmsi"].tolist()
-        timeline_df = df[df["mmsi"].isin(top3)].copy()
-        if not timeline_df.empty:
-            st.subheader("Event Timeline for Top Repeat Offenders")
-            hover_cols = ["flag", "duration_h"]
-            if "vessel_name" in timeline_df.columns:
-                hover_cols.append("vessel_name")
-            fig_tl = px.scatter(
-                timeline_df, x="date", y="mmsi", color="event_type",
-                size="risk_score", color_discrete_map=EVENT_COLORS,
-                hover_data=hover_cols,
-                title="When did the top repeat offenders act?",
-                labels={"mmsi": "Vessel MMSI", "date": "Date"},
-            )
-            fig_tl.update_yaxes(type="category")
+        st.subheader("Event Timeline for Top Repeat Offenders")
+        fig_tl = build_repeat_timeline_fig(df, top3)
+        if fig_tl:
             st.plotly_chart(fig_tl)
 
     st.markdown("**Why it matters:** A vessel with 5 events is far more interesting "
@@ -519,35 +428,14 @@ def render_gap_behaviour(df):
                        "highest-priority evasion signals.")
 
     if not gap_df.empty and "speed_before_gap" in gap_df.columns and gap_df["speed_before_gap"].notna().any():
-        # Add IUU status for marker symbols
-        if "iuu_matched" in gap_df.columns:
-            gap_df["status"] = gap_df["iuu_matched"].map({True: "IUU-Listed", False: "Regular"})
-            symbol_col = "status"
-        else:
-            symbol_col = None
+        from charts import build_gap_speed_fig, build_gap_duration_distance_fig
 
-        fig = px.scatter(
-            gap_df, x="speed_before_gap", y="speed_after_gap",
-            size="duration_h", color="flag",
-            symbol=symbol_col,
-            hover_data=["mmsi", "duration_h",
-                        "gap_distance_km"] + (["vessel_name"] if "vessel_name" in gap_df.columns else []),
-            title="Gap Behaviour: Speed Before vs After AIS Disabling",
-            labels={"speed_before_gap": "Speed Before Gap (kn)", "speed_after_gap": "Speed After Gap (kn)"},
-        )
-        fig.add_annotation(x=12, y=1, text="Stopped after gap<br>(possible transfer)",
-                           showarrow=False, font=dict(size=10, color="red"))
-        fig.add_annotation(x=1, y=12, text="Accelerated after gap<br>(possible evasion)",
-                           showarrow=False, font=dict(size=10, color="orange"))
-        st.plotly_chart(fig)
+        fig = build_gap_speed_fig(gap_df)
+        if fig:
+            st.plotly_chart(fig)
 
-        if "gap_distance_km" in gap_df.columns and gap_df["gap_distance_km"].notna().any():
-            fig2 = px.scatter(
-                gap_df, x="duration_h", y="gap_distance_km", color="flag",
-                hover_data=["mmsi"] + (["vessel_name"] if "vessel_name" in gap_df.columns else []),
-                title="Gap Duration vs Distance Traveled During Gap",
-                labels={"duration_h": "Gap Duration (hours)", "gap_distance_km": "Distance During Gap (km)"},
-            )
+        fig2 = build_gap_duration_distance_fig(gap_df)
+        if fig2:
             st.plotly_chart(fig2)
 
         st.markdown("**Interpretation:** A vessel going fast, then going dark, then "
@@ -585,19 +473,11 @@ def render_encounter_analysis(df):
     enc_df = df[df["event_type"] == "ENCOUNTER"].copy()
 
     if not enc_df.empty and "encounter_median_distance_km" in enc_df.columns:
-        fig = px.scatter(
-            enc_df, x="encounter_median_distance_km", y="duration_h",
-            color="flag", size="risk_score",
-            hover_data=["mmsi", "encounter_vessel_name", "encounter_vessel_flag"]
-                        + (["vessel_name"] if "vessel_name" in enc_df.columns else []),
-            title="Encounter Analysis: Proximity vs Duration",
-            labels={"encounter_median_distance_km": "Median Distance Between Vessels (km)",
-                    "duration_h": "Encounter Duration (hours)"},
-        )
-        fig.add_annotation(x=0.1, y=enc_df["duration_h"].max() * 0.8,
-                           text="Close + Long = HIGH RISK",
-                           showarrow=False, font=dict(size=11, color="red"))
-        st.plotly_chart(fig)
+        from charts import build_encounter_proximity_fig, build_encounter_flag_pairing_fig
+
+        fig = build_encounter_proximity_fig(enc_df)
+        if fig:
+            st.plotly_chart(fig)
 
         if "encounter_vessel_flag" in enc_df.columns and enc_df["encounter_vessel_flag"].notna().any():
             st.subheader("Encounter Partner Flag Analysis")
@@ -625,18 +505,9 @@ def render_encounter_analysis(df):
                 st.dataframe(iccat_carriers[carrier_cols].sort_values("risk_score", ascending=False))
 
         # Flag pairing analysis
-        if "encounter_vessel_flag" in enc_df.columns and enc_df["encounter_vessel_flag"].notna().any():
-            pair_df = enc_df.groupby(["flag", "encounter_vessel_flag"]).agg(
-                count=("mmsi", "count"),
-                total_risk=("risk_score", "sum")
-            ).reset_index().sort_values("total_risk", ascending=False).head(10)
-            if not pair_df.empty:
-                pair_df["pairing"] = pair_df["flag"] + " <> " + pair_df["encounter_vessel_flag"]
-                fig_pair = px.bar(pair_df, x="total_risk", y="pairing", orientation="h",
-                                  color="count", color_continuous_scale="Reds",
-                                  title="Top Flag Pairings in Encounters (by risk)",
-                                  labels={"total_risk": "Total Risk", "pairing": "Flag Pairing"})
-                st.plotly_chart(fig_pair)
+        fig_pair = build_encounter_flag_pairing_fig(enc_df)
+        if fig_pair:
+            st.plotly_chart(fig_pair)
 
         st.markdown("**Why it matters:** Two vessels within 100m for 8 hours is almost certainly "
                     "a transshipment. Look for high-risk flag combinations (e.g. RUS + PAN).")
@@ -650,7 +521,7 @@ def render_encounter_analysis(df):
         st.info("No encounter events in filtered data.")
 
 
-def render_vessel_summary(df):
+def render_vessel_summary(df, fdi_effort=None, fdi_landings=None):
     st.subheader("Fleet Risk Ranking")
     st.caption(
         "Vessel-level aggregation reports risk per vessel across multiple "
@@ -869,6 +740,8 @@ metadata in live mode and from the static profile in demo mode.
         vessel_summary_df=vessel_df,
         df_events=df,
         filters_active=filters_active,
+        fdi_effort=fdi_effort,
+        fdi_landings=fdi_landings,
     )
 
     col_e1, col_e2, col_e3 = st.columns(3)
@@ -937,41 +810,11 @@ def render_fisheries_context(df, fdi_effort, fdi_landings):
 
     # Section A: C-Square Effort Comparison Map
     st.subheader("A. Fishing Effort vs GFW Events")
-    latest_year = fdi_effort["year"].max()
-    eff_agg = (fdi_effort[fdi_effort["year"] == latest_year]
-               .groupby(["centre_lon", "centre_lat"])["totfishdays"]
-               .sum().reset_index())
+    from charts import build_fdi_effort_map_fig, build_seasonal_pattern_fig, build_species_landings_fig
 
-    fig_a = go.Figure()
-    fig_a.add_trace(go.Scatter(
-        x=eff_agg["centre_lon"], y=eff_agg["centre_lat"],
-        mode="markers",
-        marker=dict(
-            size=8, symbol="square",
-            color=eff_agg["totfishdays"],
-            colorscale="Blues", showscale=True,
-            colorbar=dict(title="Fishing Days", x=1.02),
-            opacity=0.6,
-        ),
-        name=f"FDI Effort ({latest_year})",
-        hovertemplate="Lon: %{x:.1f}<br>Lat: %{y:.1f}<br>Fishing days: %{marker.color:,.0f}<extra>FDI</extra>",
-    ))
-    for etype, color in EVENT_COLORS.items():
-        sub = df[df["event_type"] == etype]
-        if not sub.empty:
-            fig_a.add_trace(go.Scatter(
-                x=sub["lon"], y=sub["lat"],
-                mode="markers",
-                marker=dict(size=10, color=color, line=dict(width=1, color="white")),
-                name=etype,
-                hovertemplate="Lon: %{x:.2f}<br>Lat: %{y:.2f}<extra>" + etype + "</extra>",
-            ))
-    fig_a.update_layout(
-        title=f"FDI Fishing Effort ({latest_year}) vs GFW Events",
-        xaxis_title="Longitude", yaxis_title="Latitude",
-        height=550, legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
-    )
-    st.plotly_chart(fig_a)
+    fig_a = build_fdi_effort_map_fig(df, fdi_effort)
+    if fig_a:
+        st.plotly_chart(fig_a)
 
     # Section B: Event Context Table
     st.subheader("B. Event Context -- Known Fishing Ground?")
@@ -1022,42 +865,15 @@ def render_fisheries_context(df, fdi_effort, fdi_landings):
 
     # Section C: Seasonal Pattern Analysis
     st.subheader("C. Seasonal Patterns -- FDI Effort vs GFW Events")
-    if "quarter" in fdi_effort.columns:
-        fdi_q = (fdi_effort[fdi_effort["year"] == latest_year]
-                 .groupby(["med_zone", "quarter", "gear_type"])["totfishdays"]
-                 .sum().reset_index())
-        fdi_q_zone = fdi_q.groupby(["med_zone", "quarter"])["totfishdays"].sum().reset_index()
-
-        df_q = df.copy()
-        df_q["quarter"] = pd.to_datetime(df_q["date"]).dt.quarter
-
+    if "quarter" in fdi_effort.columns and "med_zone" in df.columns:
         zone_sel = st.selectbox(
             "Select Mediterranean zone",
             sorted(df["med_zone"].unique()),
             key="fdi_zone_sel",
         )
-
-        fdi_zone = fdi_q_zone[fdi_q_zone["med_zone"] == zone_sel]
-        gfw_zone = df_q[df_q["med_zone"] == zone_sel].groupby("quarter").size().reset_index(name="gfw_events")
-
-        fig_c = go.Figure()
-        fig_c.add_trace(go.Bar(
-            x=fdi_zone["quarter"], y=fdi_zone["totfishdays"],
-            name="FDI Fishing Days", marker_color="steelblue", opacity=0.7,
-        ))
-        fig_c.add_trace(go.Scatter(
-            x=gfw_zone["quarter"], y=gfw_zone["gfw_events"],
-            name="GFW Events", mode="lines+markers",
-            marker=dict(color="red", size=10), yaxis="y2",
-        ))
-        fig_c.update_layout(
-            title=f"Seasonal Pattern: {zone_sel}",
-            xaxis=dict(title="Quarter", dtick=1),
-            yaxis=dict(title="FDI Fishing Days", side="left"),
-            yaxis2=dict(title="GFW Events", side="right", overlaying="y"),
-            height=400,
-        )
-        st.plotly_chart(fig_c)
+        fig_c = build_seasonal_pattern_fig(df, fdi_effort, zone_sel)
+        if fig_c:
+            st.plotly_chart(fig_c)
 
     # Section D: Species Context
     st.subheader("D. Species in Event Locations")
@@ -1065,40 +881,26 @@ def render_fisheries_context(df, fdi_effort, fdi_landings):
         "What species are reported in c-squares where GFW events occur? "
         "High-value species (BFT, SWO, HKE) increase transshipment risk."
     )
-    if not fdi_landings.empty and "csq_lon" in df.columns:
-        event_cells = df[["csq_lon", "csq_lat"]].drop_duplicates()
-        event_land = event_cells.merge(
-            fdi_landings, left_on=["csq_lon", "csq_lat"],
-            right_on=["rectangle_lon", "rectangle_lat"], how="inner",
-        )
-        if not event_land.empty:
-            sp_agg = (event_land.groupby("species")
-                      .agg(total_tonnes=("totwghtlandg", "sum"),
-                           total_value=("totvallandg", "sum"))
-                      .sort_values("total_value", ascending=True).tail(15))
-            sp_agg["species_name"] = sp_agg.index.map(
-                lambda x: f"{x} ({SPECIES_NAMES.get(x, '?')})"
+    fig_d = build_species_landings_fig(df, fdi_landings)
+    if fig_d:
+        st.plotly_chart(fig_d)
+        # ICCAT-managed species note
+        if "csq_lon" in df.columns and not fdi_landings.empty:
+            event_cells = df[["csq_lon", "csq_lat"]].drop_duplicates()
+            event_land = event_cells.merge(
+                fdi_landings, left_on=["csq_lon", "csq_lat"],
+                right_on=["rectangle_lon", "rectangle_lat"], how="inner",
             )
-            fig_d = px.bar(
-                sp_agg.reset_index(), x="total_value", y="species_name",
-                orientation="h",
-                title="Top Species by Landings Value in GFW Event Cells",
-                labels={"total_value": "Total Landings Value (EUR)", "species_name": "Species"},
-                color="total_tonnes", color_continuous_scale="YlOrRd",
-            )
-            fig_d.update_layout(coloraxis_colorbar_title="Tonnes")
-            st.plotly_chart(fig_d)
-
-            # ICCAT-managed species note
-            iccat_species = {"SWO", "BFT", "ALB"}
-            top_species_codes = sp_agg.index.tolist()
-            if any(s in iccat_species for s in top_species_codes):
-                st.markdown("**Note:** ICCAT-managed species detected in these c-squares. "
-                            "Transshipment of BFT/SWO in these areas has elevated regulatory significance.")
-        else:
-            st.info("No FDI landings data matches GFW event c-squares.")
+            if not event_land.empty:
+                sp_agg = (event_land.groupby("species")
+                          .agg(total_value=("totvallandg", "sum"))
+                          .sort_values("total_value", ascending=True).tail(15))
+                iccat_species = {"SWO", "BFT", "ALB"}
+                if any(s in iccat_species for s in sp_agg.index.tolist()):
+                    st.markdown("**Note:** ICCAT-managed species detected in these c-squares. "
+                                "Transshipment of BFT/SWO in these areas has elevated regulatory significance.")
     else:
-        st.info("FDI landings data not available.")
+        st.info("FDI landings data not available or no matches.")
 
 
 def render_base_vs_compound_decomposition(df):
@@ -1141,101 +943,36 @@ def render_base_vs_compound_decomposition(df):
         st.info("Base risk score not available in current dataset.")
         return
 
-    base_total = float(df["base_risk_score"].sum())
-    risk_total = float(df["risk_score"].sum())
-    structural_delta = max(risk_total - base_total, 0.0)
-    if base_total <= 0:
+    from charts import build_base_vs_compound_fig, build_band_decomposition_fig
+
+    fig = build_base_vs_compound_fig(df)
+    if fig is None:
         st.info("No risk scored in current filter window.")
         return
-
-    compound_mult = risk_total / base_total if base_total > 0 else 1.0
-
-    # --- Break down the structural amplifier by source ---
-    # For each event, estimate the contribution of each lookup stage.
-    # The multipliers compound: base -> IUU -> ICCAT -> OFAC, so we
-    # attribute each stage's delta to the lookup that caused it.
-    iuu_delta = 0.0
-    iccat_delta = 0.0
-    ofac_delta = 0.0
-    has_iuu = "iuu_matched" in df.columns and "iuu_multiplier" in df.columns
-    has_iccat = "iccat_authorized" in df.columns and "iccat_multiplier" in df.columns
-    has_ofac = "ofac_sanctioned" in df.columns and "ofac_multiplier" in df.columns
-
-    for _, row in df.iterrows():
-        base_r = float(row.get("base_risk_score", 0))
-        if base_r <= 0:
-            continue
-        # IUU: base * (iuu_mult - 1)
-        iuu_m = float(row.get("iuu_multiplier", 1.0)) if has_iuu and row.get("iuu_matched") else 1.0
-        after_iuu = base_r * iuu_m
-        iuu_delta += after_iuu - base_r
-        # ICCAT: after_iuu * (iccat_mult - 1)
-        iccat_m = float(row.get("iccat_multiplier", 1.0)) if has_iccat and row.get("iccat_authorized") else 1.0
-        after_iccat = after_iuu * iccat_m
-        iccat_delta += after_iccat - after_iuu
-        # OFAC: after_iccat * (ofac_mult - 1)
-        ofac_m = float(row.get("ofac_multiplier", 1.0)) if has_ofac and row.get("ofac_sanctioned") else 1.0
-        after_ofac = after_iccat * ofac_m
-        ofac_delta += after_ofac - after_iccat
-
-    fig = go.Figure()
-    fig.add_trace(go.Bar(
-        y=["Fleet total"], x=[base_total], name="Behavioural base",
-        orientation="h", marker_color="#4C78A8",
-        hovertemplate="Behavioural base: %{x:.1f}<extra></extra>",
-    ))
-    if iuu_delta > 0:
-        fig.add_trace(go.Bar(
-            y=["Fleet total"], x=[iuu_delta], name="IUU listing",
-            orientation="h", marker_color="#2d2d2d",
-            hovertemplate="IUU listing: +%{x:.1f}<extra></extra>",
-        ))
-    if iccat_delta > 0:
-        fig.add_trace(go.Bar(
-            y=["Fleet total"], x=[iccat_delta], name="ICCAT authorization",
-            orientation="h", marker_color="#4169E1",
-            hovertemplate="ICCAT authorization: +%{x:.1f}<extra></extra>",
-        ))
-    if ofac_delta > 0:
-        fig.add_trace(go.Bar(
-            y=["Fleet total"], x=[ofac_delta], name="OFAC sanctions",
-            orientation="h", marker_color="#8B0000",
-            hovertemplate="OFAC sanctions: +%{x:.1f}<extra></extra>",
-        ))
-    # If there's unexplained residual (rounding), lump it
-    explained = iuu_delta + iccat_delta + ofac_delta
-    residual = structural_delta - explained
-    if residual > 0.5:
-        fig.add_trace(go.Bar(
-            y=["Fleet total"], x=[residual], name="Other structural",
-            orientation="h", marker_color="#E45756",
-            hovertemplate="Other structural: +%{x:.1f}<extra></extra>",
-        ))
-
-    fig.update_layout(
-        barmode="stack", height=200,
-        title=f"Total risk = {risk_total:.0f}  ({compound_mult:.2f}x compound multiplier over base {base_total:.0f})",
-        xaxis_title="Risk score",
-        showlegend=True,
-        legend=dict(orientation="h", yanchor="bottom", y=-0.6, xanchor="center", x=0.5),
-        margin=dict(l=20, r=20, t=50, b=20),
-    )
     st.plotly_chart(fig, use_container_width=True)
 
-    # Summary breakdown
-    parts = [f"**{base_total:.0f}** behavioural base"]
-    if iuu_delta > 0:
-        parts.append(f"**+{iuu_delta:.0f}** IUU listing")
-    if iccat_delta > 0:
-        parts.append(f"**+{iccat_delta:.0f}** ICCAT authorization")
-    if ofac_delta > 0:
-        parts.append(f"**+{ofac_delta:.0f}** OFAC sanctions")
+    base_total = float(df["base_risk_score"].sum())
+    risk_total = float(df["risk_score"].sum())
+    compound_mult = risk_total / base_total if base_total > 0 else 1.0
     st.markdown(
-        f"**Read:** {' | '.join(parts)} = **{risk_total:.0f}** total "
+        f"**Read:** **{base_total:.0f}** behavioural base "
+        f"= **{risk_total:.0f}** total "
         f"(**{compound_mult:.2f}x** compound multiplier). "
         "The compound multiplier is the ratio of total to base -- how much "
         "of this fleet's risk is structural vs behavioural."
     )
+
+    # Band-segmented decomposition
+    fig_band = build_band_decomposition_fig(df)
+    if fig_band:
+        st.subheader("Risk composition by band")
+        st.caption(
+            "Does the compound multiplier shift as you move up the bands? "
+            "Critical-band vessels typically have much higher compound ratios "
+            "than Emerging -- band membership is driven by behavioural severity "
+            "AND structural amplification."
+        )
+        st.plotly_chart(fig_band, use_container_width=True)
 
 
 def render_risk_band_distribution(df):
