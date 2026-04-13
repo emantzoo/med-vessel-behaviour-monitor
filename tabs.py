@@ -832,6 +832,58 @@ metadata in live mode and from the static profile in demo mode.
         f"{b}: {int(counts[b])}" for b in band_order
     ))
 
+    # --- Fleet summary export ---
+    st.markdown("---")
+    st.subheader("Export fleet summary")
+    st.caption(
+        "Download a fleet-level risk summary as CSV, with a Markdown cover "
+        "sheet documenting scope and band distribution."
+    )
+
+    from exports import generate_fleet_summary
+    from datetime import datetime as _dt
+
+    # Infer which filters are active from the data that was passed in
+    filters_active = {}
+    if "event_type" in df.columns:
+        et = sorted(df["event_type"].dropna().unique())
+        if et:
+            filters_active["Event types"] = ", ".join(et)
+    if "flag" in df.columns:
+        fl = sorted(df["flag"].dropna().unique())
+        if fl:
+            filters_active["Flag states"] = f"{len(fl)} flags"
+    if "risk_band" in df.columns:
+        rb = sorted(df["risk_band"].dropna().unique())
+        if rb:
+            filters_active["Risk bands"] = ", ".join(rb)
+
+    csv_bytes, cover_md = generate_fleet_summary(
+        vessel_summary_df=vessel_df,
+        filters_active=filters_active,
+    )
+
+    col_e1, col_e2 = st.columns(2)
+    with col_e1:
+        fn_csv = f"fleet_summary_{_dt.utcnow().strftime('%Y%m%d_%H%M')}.csv"
+        st.download_button(
+            label="Download fleet CSV",
+            data=csv_bytes,
+            file_name=fn_csv,
+            mime="text/csv",
+        )
+    with col_e2:
+        fn_md = f"fleet_summary_cover_{_dt.utcnow().strftime('%Y%m%d_%H%M')}.md"
+        st.download_button(
+            label="Download cover sheet (Markdown)",
+            data=cover_md,
+            file_name=fn_md,
+            mime="text/markdown",
+        )
+
+    with st.expander("Preview cover sheet"):
+        st.markdown(cover_md)
+
 
 def render_fisheries_context(df, fdi_effort, fdi_landings):
     st.subheader("Fisheries Context -- EU FDI Baseline")
@@ -2246,6 +2298,66 @@ def render_vessel_investigation(df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_l
                 st.graphviz_chart(dot_vessel)
             except Exception as e:
                 st.warning(f"Per-vessel tree render error: {e}")
+
+    # --- Case file export ---
+    st.markdown("---")
+    st.subheader("Export case file")
+    st.caption(
+        "Download a Markdown case file for this vessel, suitable for "
+        "analyst case archives or forwarding to a client."
+    )
+
+    from exports import generate_vessel_case_file
+    from datetime import datetime as _dt
+
+    identity = report.get("identity", {})
+    risk = report.get("risk", {})
+    base_total = float(
+        vessel_rows_for_flags["base_risk_score"].sum()
+    ) if "base_risk_score" in vessel_rows_for_flags.columns else 0.0
+    risk_total = risk.get("total_risk_score", 0)
+    compound_val = round(risk_total / base_total, 2) if base_total > 0 else 1.0
+
+    case_row = {
+        "vessel_name": identity.get("vessel_name", selected),
+        "flag": identity.get("flag", ""),
+        "imo": identity.get("imo", ""),
+        "vessel_class": identity.get("vessel_class", ""),
+        "risk_band": report.get("assessment", {}).get("threat_level", "Unknown"),
+        "risk_score_total": risk_total,
+        "base_score_total": base_total,
+        "compound_multiplier": compound_val,
+        "iuu_matched": report.get("iuu", {}).get("matched", False),
+        "iccat_authorized": report.get("iccat", {}).get("authorized", False),
+        "ofac_sanctioned": report.get("ofac", {}).get("sanctioned", False),
+        "is_industrial": bool(
+            vessel_rows_for_flags["is_industrial"].any()
+        ) if "is_industrial" in vessel_rows_for_flags.columns else False,
+        "multi_behaviour_flag": multi_behaviour,
+        "dark_port_call_candidate": dark_port_candidates,
+        "repeat_offender_90d": repeat_offender,
+        "vessel_type_mismatch": identity.get("vessel_type_mismatch", False),
+    }
+
+    case_md = generate_vessel_case_file(
+        mmsi=investigated_mmsi,
+        vessel_summary_row=case_row,
+        vessel_events=vessel_rows_for_flags,
+        trace=report.get("trace", []),
+    )
+
+    safe_name = str(case_row["vessel_name"]).replace(" ", "_").replace("/", "_")[:50]
+    fn = f"case_file_{safe_name}_{_dt.utcnow().strftime('%Y%m%d')}.md"
+
+    st.download_button(
+        label="Download case file (Markdown)",
+        data=case_md,
+        file_name=fn,
+        mime="text/markdown",
+    )
+
+    with st.expander("Preview case file"):
+        st.markdown(case_md)
 
 
 # ============================================================================
