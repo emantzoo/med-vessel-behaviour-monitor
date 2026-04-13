@@ -116,7 +116,7 @@ Risk tree leaves evaluated at this step (behavioural_history branch, additive):
 #### Network Exposure (associative risk)
 
 Evaluate encounter-partner signals from the risk tree's network_exposure branch.
-Four specific leaves are evaluated deterministically for each vessel:
+Five specific leaves are evaluated deterministically for each vessel:
 
 1. **encounter_iuu_vessel** (high severity) -- vessel had an encounter with a
    partner whose name appears on the TMT Combined IUU list across 13 RFMOs.
@@ -135,12 +135,20 @@ Four specific leaves are evaluated deterministically for each vessel:
    distant-water fishing fleets and non-Med flags of convenience. Report
    the partner flag.
 
+5. **encounter_pattern_recurrence** (medium severity) -- vessel had two or
+   more encounters with the same counterparty within a 90-day rolling
+   window. Counterparty identified by encounter_vessel_name; fallback to
+   flag + duration bucket when name is missing. Repeated encounters with
+   the same partner suggest an operational relationship (carrier servicing,
+   regular bunkering, coordinated offloading) rather than incidental
+   contact. Report the recurring partner name(s) and encounter count.
+
 For vessel-specific queries the exact rule evaluation will appear in the
 STRUCTURED EVIDENCE block. Ground your narrative in which specific leaves
 fired. If no encounter-partner leaves fire, state that the network exposure
 branch is clear.
 
-Note: none of these four leaves multiply into the numeric risk_score. They
+Note: none of these five leaves multiply into the numeric risk_score. They
 fire in the risk tree, appear in the vessel investigation narrative, but do
 not affect the score. This preserves the base-vs-compound decomposition
 (base = event observation, compound = vessel-identity lookup).

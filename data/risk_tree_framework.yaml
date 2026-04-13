@@ -270,6 +270,21 @@ framework:
             partner flag is neither EU nor Med coastal (cooperative or weak-
             cooperation). Medium severity on its own; escalates when combined
             with offshore position, long duration, or ICCAT authorisation.
+        - id: encounter_pattern_recurrence
+          text: "Did the vessel have two or more encounters with the same counterparty within a 90-day rolling window?"
+          weight: medium
+          note: >
+            A single encounter can be opportunistic; repeated encounters with
+            the same counterparty within 90 days suggest operational relationship
+            -- carrier servicing arrangement, regular bunkering, dedicated
+            offloading, or coordinated voyage patterns. The 90-day window
+            matches the repeat_offender_90d flag convention and mirrors Kpler's
+            exposure drift framing where risk accumulates through repeated
+            behaviours rather than single events. Medium severity on its own;
+            stronger signal when combined with other leaves (e.g. recurring
+            encounters with a distant-water or weak-cooperation partner). Uses
+            encounter_vessel_name as counterparty identifier; fallback to
+            encounter_vessel_flag + duration pattern where name is missing.
         - id: shared_ownership
           text: "Does the vessel share beneficial ownership with known IUU operators?"
           escalation: "Common ownership networks are how IUU operations scale."

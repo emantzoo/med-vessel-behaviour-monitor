@@ -10,7 +10,9 @@ protected demo vessels with special flags (IRN, HND, BHS, UNK).
 This replaces an earlier shadow-fleet-tanker flag distribution which
 was inherited from initial prototyping. The rebalanced distribution
 preserves test cases for all risk tree leaves including weak-cooperation
-(LBY, SYR) and distant-water / FoC partner encounters (PAN, LBR, MHL).
+(LBY, SYR), distant-water / FoC partner encounters (PAN, LBR, MHL), and
+encounter pattern recurrence (FRIO NARUTO has two encounters with SABITI
+within 21 days, exercising the `encounter_pattern_recurrence` leaf).
 
 ## Protected vessels (flags not changed)
 

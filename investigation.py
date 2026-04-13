@@ -619,6 +619,56 @@ def investigate_vessel(vessel_identifier, df, iuu_df, iccat_df, ofac_df, fdi_eff
         ),
     })
 
+    # Leaf 5: Encounter pattern recurrence — same counterparty within 90 days
+    recurring_partners = []
+    recurring_detail = []
+    if not encounter_events.empty and "encounter_vessel_name" in encounter_events.columns:
+        enc_sorted = encounter_events.copy()
+        if "date" in enc_sorted.columns:
+            enc_sorted["_ts"] = pd.to_datetime(enc_sorted["date"], errors="coerce")
+        elif "start_time" in enc_sorted.columns:
+            enc_sorted["_ts"] = pd.to_datetime(enc_sorted["start_time"], errors="coerce")
+        else:
+            enc_sorted["_ts"] = pd.NaT
+        enc_sorted = enc_sorted.dropna(subset=["_ts"]).sort_values("_ts")
+
+        def _partner_key(row):
+            name = row.get("encounter_vessel_name")
+            if isinstance(name, str) and name.strip():
+                return name.strip().upper()
+            flag = row.get("encounter_vessel_flag", "?")
+            dur_bucket = int(row.get("duration_h", 0) // 6) if pd.notna(row.get("duration_h")) else 0
+            return f"UNKNOWN_{flag}_{dur_bucket}h"
+
+        enc_sorted["_pk"] = enc_sorted.apply(_partner_key, axis=1)
+        window = pd.Timedelta(days=90)
+        for pk, grp in enc_sorted.groupby("_pk"):
+            if len(grp) < 2:
+                continue
+            times = grp["_ts"].sort_values().tolist()
+            for i in range(len(times) - 1):
+                if times[i + 1] - times[i] <= window:
+                    recurring_partners.append(pk)
+                    first = times[i].strftime("%Y-%m-%d")
+                    last = times[-1].strftime("%Y-%m-%d")
+                    display = pk if not pk.startswith("UNKNOWN_") else "[unnamed partner]"
+                    recurring_detail.append(f"{display}: {len(grp)} encounters between {first} and {last}")
+                    break
+
+    trace.append({
+        "branch_id": "network_exposure", "question_id": "encounter_pattern_recurrence",
+        "answer": "yes" if recurring_partners else "no",
+        "severity": "medium" if recurring_partners else "none",
+        "rule_fired": bool(recurring_partners),
+        "note": (
+            f"Recurring encounter pattern(s) within 90 days: "
+            f"{'; '.join(recurring_detail[:3])}"
+            + (f" (+{len(recurring_detail) - 3} more)" if len(recurring_detail) > 3 else "")
+            if recurring_detail
+            else "No recurring encounter patterns within 90 days"
+        ),
+    })
+
     # Shared ownership (future work -- requires vessel ownership data)
     trace.append({
         "branch_id": "network_exposure", "question_id": "shared_ownership",
