@@ -13,7 +13,8 @@ risk_formula_explanation: |
   Risk is computed per event, then compounded with vessel-level lookups.
   The base behavioural score uses a non-linear duration term that dampens
   the contribution of very long events, multiplied by event weight, flag
-  risk, shore distance factor, and event-type-specific factors. After base
+  risk, shore distance factor, MPA tier multiplier (spatial rule-zone
+  signal from GFW regions.mpa), and event-type-specific factors. After base
   scoring, three independent lookup multipliers are applied in sequence:
   IUU listing, ICCAT authorisation, and OFAC sanctions. All lookup
   multipliers amplify existing behavioural signal; they never substitute

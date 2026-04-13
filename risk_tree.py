@@ -243,7 +243,7 @@ def render_scoring_pipeline_diagram():
         "B",
         "Base Behavioural Score\\n"
         "duration^0.75 x event_weight\\n"
-        "x flag x shore x event_factors",
+        "x flag x shore x mpa_tier x event_factors",
         fillcolor="#E8F4F8",
     )
     dot.node(

@@ -2546,6 +2546,7 @@ def render_reference():
         "     x event_weight\n"
         "     x flag_multiplier\n"
         "     x shore_factor\n"
+        "     x mpa_tier_multiplier\n"
         "     x event_specific_factors\n"
         "\n"
         "final_score = base\n"
