@@ -1716,6 +1716,141 @@ def render_type_mismatch_by_class(df):
         st.dataframe(detail, use_container_width=True)
 
 
+def render_vessel_trajectory(vessel_events: pd.DataFrame, vessel_summary_row: dict):
+    """Cumulative risk trajectory for a single vessel over the observation window.
+
+    Line chart of cumulative risk_score over time, one point per event.
+    Reference lines at risk band thresholds. Event markers coloured by
+    event type. Shows the behavioural arc -- when the vessel accumulated
+    which risk, and when it crossed band boundaries.
+    """
+    import plotly.graph_objects as go
+
+    st.subheader("Risk trajectory")
+    st.caption(
+        "Cumulative risk score over time. Each marker is an event; the line "
+        "shows running total. Dashed horizontal lines are band thresholds."
+    )
+
+    with st.expander("How to read this chart", expanded=False):
+        st.markdown(
+            "- **Line**: cumulative `risk_score` across all events in chronological "
+            "order. Steep jumps mean high-risk events; flat sections mean quiet "
+            "periods.\n"
+            "- **Markers**: individual events, coloured by event type (gap, "
+            "encounter, loitering). Hover for event detail.\n"
+            "- **Dashed horizontal lines**: risk band thresholds -- "
+            "50 (Emerging), 60 (Elevated), 80 (Severe), 100 (Critical).\n"
+            "- **Read**: where does the vessel's line cross each threshold, and "
+            "which event type dominated that section? That's the behavioural arc."
+        )
+
+    if vessel_events is None or vessel_events.empty:
+        st.info("No events for this vessel in the current filter window.")
+        return
+
+    time_col = "start_time" if "start_time" in vessel_events.columns else "date"
+    if time_col not in vessel_events.columns or "risk_score" not in vessel_events.columns:
+        st.info("Required columns missing for trajectory visualisation.")
+        return
+
+    events = vessel_events.copy()
+    events["_time"] = pd.to_datetime(events[time_col], errors="coerce")
+    events = events.dropna(subset=["_time", "risk_score"]).sort_values("_time")
+
+    if events.empty:
+        st.info("No valid events with timestamps.")
+        return
+
+    events["cumulative_risk"] = events["risk_score"].cumsum()
+
+    color_map = {
+        "GAP": "#4C78A8",
+        "ENCOUNTER": "#E45756",
+        "LOITERING": "#F58518",
+        "FISHING": "#54A24B",
+    }
+
+    fig = go.Figure()
+
+    # Cumulative line
+    fig.add_trace(go.Scatter(
+        x=events["_time"],
+        y=events["cumulative_risk"],
+        mode="lines",
+        name="Cumulative risk",
+        line=dict(color="#2d2d2d", width=2),
+        hoverinfo="skip",
+    ))
+
+    # Event markers by type
+    for event_type, group in events.groupby("event_type"):
+        hover_text = []
+        for _, row in group.iterrows():
+            parts = [
+                f"<b>{row['event_type']}</b>",
+                f"{row['_time'].strftime('%Y-%m-%d')}",
+                f"Risk: {row['risk_score']:.1f}",
+                f"Cumulative: {row['cumulative_risk']:.1f}",
+            ]
+            if "duration_h" in row.index and pd.notna(row.get("duration_h")):
+                parts.append(f"Duration: {row['duration_h']:.1f}h")
+            if "in_mpa" in row.index and row.get("in_mpa"):
+                parts.append("Inside MPA")
+            hover_text.append("<br>".join(parts))
+
+        fig.add_trace(go.Scatter(
+            x=group["_time"],
+            y=group["cumulative_risk"],
+            mode="markers",
+            name=event_type,
+            marker=dict(color=color_map.get(event_type, "#888"), size=10,
+                        line=dict(color="white", width=1)),
+            text=hover_text,
+            hovertemplate="%{text}<extra></extra>",
+        ))
+
+    # Band threshold reference lines
+    band_thresholds = [
+        (50, "Emerging", "#4C78A8"),
+        (60, "Elevated", "#F58518"),
+        (80, "Severe", "#E45756"),
+        (100, "Critical", "#8B0000"),
+    ]
+    y_max = max(events["cumulative_risk"].max(), 100) * 1.05
+    for threshold, label, color in band_thresholds:
+        if threshold <= y_max:
+            fig.add_hline(
+                y=threshold, line_dash="dash", line_color=color,
+                line_width=1, opacity=0.6,
+                annotation_text=label,
+                annotation_position="right",
+                annotation=dict(font_size=10, font_color=color),
+            )
+
+    fig.update_layout(
+        height=400,
+        xaxis_title="Event date",
+        yaxis_title="Cumulative risk score",
+        hovermode="closest",
+        legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5),
+        margin=dict(l=40, r=80, t=40, b=40),
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+    # Summary caption
+    final_cum = events["cumulative_risk"].iloc[-1]
+    event_count = len(events)
+    first_date = events["_time"].iloc[0].strftime("%Y-%m-%d")
+    last_date = events["_time"].iloc[-1].strftime("%Y-%m-%d")
+    st.markdown(
+        f"**Trajectory summary:** {event_count} events between {first_date} and "
+        f"{last_date}, accumulating to total risk {final_cum:.1f}. "
+        "Band crossings readable from where the line intersects the dashed thresholds."
+    )
+
+
 def render_vessel_investigation(df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_landings, fishing_df=None):
     """Deterministic vessel investigation tab."""
     from investigation import investigate_vessel
@@ -2298,6 +2433,10 @@ def render_vessel_investigation(df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_l
                 st.graphviz_chart(dot_vessel)
             except Exception as e:
                 st.warning(f"Per-vessel tree render error: {e}")
+
+    # --- Risk trajectory ---
+    vessel_events_for_traj = df[df["vessel_name"].astype(str).str.upper() == str(selected).upper()]
+    render_vessel_trajectory(vessel_events_for_traj, report.get("identity", {}))
 
     # --- Case file export ---
     st.markdown("---")
