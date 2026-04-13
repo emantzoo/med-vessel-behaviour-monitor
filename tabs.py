@@ -2538,6 +2538,25 @@ def render_reference():
         except Exception as e:
             st.warning(f"Could not render framework diagram: {e}")
 
+    # 2b. Network exposure leaves (associative risk layer)
+    with st.expander("Network exposure leaves (associative risk)", expanded=False):
+        st.markdown(
+            "Five encounter-partner leaves in the `network_exposure` branch evaluate "
+            "associative risk for each vessel. These fire in the risk tree and appear "
+            "in the Vessel Investigation narrative but are **not** multiplied into the "
+            "numeric risk score.\n\n"
+            "| Leaf | Severity | Signal |\n"
+            "|------|----------|--------|\n"
+            "| `encounter_iuu_vessel` | high | Partner name on TMT Combined IUU list (13 RFMOs) |\n"
+            "| `encounter_sanctioned_vessel` | critical | Partner name on OFAC SDN list |\n"
+            "| `encounter_weak_cooperation_partner` | medium | Partner flag LBY or SYR (GFCM non-compliance) |\n"
+            "| `encounter_distant_water_partner` | medium | Partner flag not EU and not Med coastal |\n"
+            "| `encounter_pattern_recurrence` | medium | Same counterparty 2+ times within 90 days |\n\n"
+            "The first four are identity-based (who did the vessel meet); the fifth is "
+            "temporal (how often). Fleet-network propagation and ownership graph remain "
+            "future work (`shared_ownership` stub)."
+        )
+
     # 3. Risk formula
     st.markdown("### Risk Formula")
     st.markdown(content["risk_formula_explanation"])
