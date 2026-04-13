@@ -10,24 +10,33 @@ response) are averaged and mapped linearly to a multiplier:
 `data/iuu_risk_index_flags.csv` at startup; flags not in the Index receive
 1.0x. Regenerate from latest Index via `scripts/prepare_iuu_risk_index.py`.
 
-## High risk flags (sanctions / dark fleet context)
+## Sanctions / conflict flags (context, not hardcoded)
 
-- **RUS**: Russian shadow fleet, sanctions evasion, dark tanker operations.
-- **IRN**: Iranian vessels (NITC, IRISL), oil sanctions, AIS manipulation.
-- **SYR**: Syrian conflict, regime-linked vessels.
-- **PRK**: North Korean vessels, weapons/sanctions.
+These jurisdictions score high on the Index because sanctions, conflict, and
+weak governance drive the underlying indicator scores. No special-case
+multiplier is hardcoded -- the Index captures the risk organically.
 
-## Flags of convenience (weak oversight)
+- **RUS** (1.93x): Shadow fleet operations, sanctions evasion, AIS manipulation.
+- **IRN** (1.63x): NITC/IRISL sanctions, oil smuggling, AIS spoofing.
+- **SYR** (1.24x): Conflict state, limited oversight capacity.
+- **PRK** (1.26x): Weapons/sanctions, flag rarely seen in Med data.
 
-- **PAN**: Panama, largest FOC registry globally.
-- **LBR**: Liberia, second largest FOC.
-- **MHL**: Marshall Islands, growing FOC.
+## Flags of convenience (context, not hardcoded)
+
+FOC registries score higher on the Index due to weak flag-state oversight
+indicators. The multiplier comes from the Index, not a manual FOC list.
+
+- **PAN** (1.81x): Largest FOC registry globally.
+- **LBR** (1.48x): Second largest FOC.
+- **MHL** (1.39x): Growing FOC registry.
 
 ## Mediterranean coastal states (fishing nations)
 
 These are the flags that dominate actual Med fishing catches (GFCM data,
-percentage variation chart, 2024 vs 2023). No risk multiplier (1.0x) --
-their presence in the data is normal operational activity, not a risk signal.
+percentage variation chart, 2024 vs 2023). All carry Index-derived
+multipliers (ranging from GRC 1.21x to LBY 1.66x); their presence in
+the data is normal operational activity, not a risk signal per se -- the
+Index captures governance quality, not suspicion of the flag itself.
 
 **Northern shore (EU + candidate):**
 - **TUR**: Turkey. Largest Med fishing nation by catch volume. -26.8% variation.
