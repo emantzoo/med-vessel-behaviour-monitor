@@ -158,12 +158,12 @@ From *How Deception Detection Works* and the Dec 2025 "Turning Tides" paper:
 |---|---|---|
 | 1. Formal sanctions status | TMT IUU + OFAC SDN screening | **Implemented** |
 | 2. Behavioural indicators | GFW gap / encounter / loitering, duration^0.75 weighted | **Implemented** |
-| 3. Associative risk | — | **Gap — Maritime 2.0 plugs in here** |
+| 3. Associative risk | Four encounter-partner risk tree leaves: partner name vs IUU list (high), partner name vs OFAC SDN (critical), partner flag in weak-cooperation Med coastal set LBY/SYR (medium), partner flag in distant-water/non-Med FoC set (medium). Plus encounter partner flag analysis charts and ICCAT carrier encounter alerts in display context. | **Partial — first-degree encounter-partner checks wired, fleet-network propagation and ownership graph missing. Maritime 2.0 plugs in here** |
 | 4. Geographic risk | GSA zoning, shore factor, Libya/Tunisia hotspots, **MPA intersection (GFW `regions.mpa`, tiered)** | **Implemented** |
 | 5. Cargo risk | ICCAT species tiers (carrier 1.4× / BFT 1.3× / SWO-ALB 1.2×) | **Implemented (fisheries-cargo equivalent)** |
 | 6. Ownership opacity | `flag_multiplier` only (FoC proxy) + `vessel_type_mismatch` (Grey Fleet "irregular vessel information") | **Partial — beneficial ownership missing, identity-misrepresentation in place** |
 
-**Four of six implemented. The two named gaps — associative risk and beneficial ownership — are exactly the layers where Kpler's Maritime 2.0 ownership graph and fleet-association data add value on top of an open-source stack.**
+**Four and a half of six implemented. Associative risk is partially covered (first-degree encounter-partner checks); beneficial ownership remains the clear gap — the layer where Kpler's Maritime 2.0 ownership graph and fleet-association data add value on top of an open-source stack.**
 
 ---
 
@@ -226,11 +226,19 @@ The risk-tree view is the **compound-logic** counterpart to the multiplicative s
 
 ---
 
-## What's also in the app (not scored, shown as context)
+## Not scored, but feeds the risk tree
 
-- **Four display-only Kpler-aligned vessel-level flags**: industrial profile (≥24m or ≥100 GT, the only structural flag of the four — the ICCAT industrial / EU Control Reg 1224/2009 reporting threshold), multi-behaviour, dark-port-call candidate, repeat-offender 90d. Length and tonnage harvested from the GFW Vessels API registry / self-reported metadata during MMSI-to-IMO enrichment — no new data source. Mirrors four of the six inputs in Kpler's Oct 2025 Deceptive Shipping Practices model
-- **Vessel class + identity-misrepresentation flag** (`vessel_class`, `vessel_type_mismatch`). Both derived from the GFW Vessels API `shiptypes` field already harvested during MMSI-to-IMO enrichment (no new data source). `vessel_class` is a descriptive label (industrial_fishing / artisanal_fishing / carrier / tanker / cargo / support / passenger / other) — orthogonal to the size-based `is_industrial` flag. `vessel_type_mismatch` fires when the event-level `vessel_type` (often AIS self-reported) and the registry `shiptypes` map to **different** canonical classes (class-level comparison, so spelling variants like TRAWLER vs FISHING do not trigger). This is the open-data equivalent of Kpler's "irregular vessel information" indicator from the *Grey Fleet* paper (March 2025) — a vessel broadcasting one identity in AIS while its registry record says another. Display-only, never multiplied into the score, fires a medium-severity rule on the risk tree's identity branch (`identity_misrepresentation` leaf).
+These signals are never multiplied into the numeric risk score — the underlying behaviour is already captured at the event level, so folding them back in would double-count. They fire as leaf nodes in the risk tree and surface in the Vessel Summary and Investigation tabs as triage context.
+
+- **Four display-only Kpler-aligned vessel-level flags**: industrial profile (≥24m or ≥100 GT, the only structural flag of the four — the ICCAT industrial / EU Control Reg 1224/2009 reporting threshold), multi-behaviour, dark-port-call candidate, repeat-offender 90d. Length and tonnage harvested from the GFW Vessels API registry / self-reported metadata during MMSI-to-IMO enrichment — no new data source. Mirrors four of the six inputs in Kpler's Oct 2025 Deceptive Shipping Practices model. All four evaluated in the `behavioural_history` branch of the risk tree.
+- **Vessel class + identity-misrepresentation flag** (`vessel_class`, `vessel_type_mismatch`). Both derived from the GFW Vessels API `shiptypes` field already harvested during MMSI-to-IMO enrichment (no new data source). `vessel_class` is a descriptive label (industrial_fishing / artisanal_fishing / carrier / tanker / cargo / support / passenger / other) — orthogonal to the size-based `is_industrial` flag. `vessel_type_mismatch` fires when the event-level `vessel_type` (often AIS self-reported) and the registry `shiptypes` map to **different** canonical classes (class-level comparison, so spelling variants like TRAWLER vs FISHING do not trigger). This is the open-data equivalent of Kpler's "irregular vessel information" indicator from the *Grey Fleet* paper (March 2025) — a vessel broadcasting one identity in AIS while its registry record says another. Fires a medium-severity rule on the risk tree's identity branch (`identity_misrepresentation` leaf).
+
+## Pure display context (not scored, not in the tree)
+
+- **Encounter partner metadata** (`encounter_vessel_name`, `encounter_vessel_flag`) — shown in scatter hovers, partner flag analysis charts, flag-pairing tables, and ICCAT carrier encounter alerts. Not cross-referenced against IUU/OFAC lists (wirable — see next steps).
 - **FDI gear mix per c-square** (27 FAO gear codes, top-5 shown) — spatial context, feeds the planned gear-consistency check (does the vessel's movement match the local fleet profile?)
+- **FDI species landings and fishing effort** (~295K rows) — baseline context in the Fisheries Context tab. Never multiplies risk; determines whether a c-square is a "known fishing ground" for contextual display only.
+- **EEZ, nearest port, med zone** — jurisdictional and geographic context for charts and geographic risk breakdown.
 - **AI Maritime Analyst** (Google Gemini 2.5 Flash) with RAG over 5 methodology/IUU context documents and sandboxed code execution — conceptually similar to Kpler's MCP beta (LLM layered over structured risk data), though mine is embedded in the app rather than exposed as an external server
 - **Per-vessel Investigation tab** with a coloured risk-tree path — structurally similar to the tiered Yellow/Orange/Red flag layout in Kpler's R&C product UI, but rendered as a continuous trace per vessel
 
@@ -238,9 +246,33 @@ The risk-tree view is the **compound-logic** counterpart to the multiplicative s
 
 ## Planned next iterations (honest gaps)
 
+### Recently wired risk tree leaves
+
+Four encounter-partner leaves now implemented in the `network_exposure` branch (previously aspirational stubs):
+
+- **`encounter_iuu_vessel`** — partner name matched against TMT IUU list (high severity)
+- **`encounter_sanctioned_vessel`** — partner name matched against OFAC SDN (critical severity)
+- **`encounter_weak_cooperation_partner`** — partner flag in {LBY, SYR} (medium severity)
+- **`encounter_distant_water_partner`** — partner flag not in EU and not in Med coastal set (medium severity)
+
+Plus `authorization_mismatch` hardcoded for obvious cases (IRN/RUS/PRK/SYR have no legitimate fishing rights in EU Med waters).
+
+### Risk tree branches — need new data
+
+6 of the risk tree's 31 leaf questions remain as future-work stubs:
+
+- **`shared_ownership`** — requires vessel beneficial-ownership data (Maritime 2.0 or Equasis)
+- **`mmsi_consistent`** — requires longitudinal MMSI history (GFW Vessels API multi-SSVID, partially available in live mode)
+- **`name_history`** — requires vessel registry change history
+- **`eu_sanctioned`** — requires EU consolidated sanctions list (only OFAC SDN currently loaded)
+- **`flag_recent_change`** — requires historical flag data
+- **`gfcm_authorized`** — requires GFCM Authorized Vessel List
+
+### Feature-level gaps
+
 1. **Gear-consistency check** — use FDI c-square gear mix plus a vessel-level gear source (MarineTraffic, ICCAT) to flag vessels whose movement pattern is inconsistent with the local fleet profile. Ingredients already on disk.
 2. **Identity inconsistency layer** — name/flag/IMO cross-reference for vessels with suspicious naming histories (the PABLO case, seven prior names, is the canonical illustration).
-3. **Associative / adjacency risk** — propagate risk across encounters, carrier servicing networks, and fleet co-operation.
+3. **Associative / adjacency risk (second degree)** — propagate risk across fleet networks and ownership clusters. First-degree encounter-partner checks are now wired; full network graph analysis requires ownership data from Maritime 2.0 or Equasis.
 4. **Spoofing detection** — not yet implemented; fisheries spoofing is rarer than tanker spoofing but increasingly relevant for small-scale fleets.
 
 ---

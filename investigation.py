@@ -1,7 +1,26 @@
 """Deterministic vessel investigation — rule-based analysis without LLM."""
 
+# ===== Risk tree stub audit (2026-04-13) =====
+# Wired (data on disk):
+#   encounter_iuu_vessel        — partner name matched against iuu_df
+#   encounter_sanctioned_vessel — partner name matched against ofac_df
+#   encounter_weak_cooperation_partner — partner flag in {LBY, SYR}
+#   encounter_distant_water_partner    — partner flag not EU / not Med coastal
+#   authorization_mismatch      — hardcoded flag check (IRN/RUS/PRK/SYR)
+#
+# Future work (data not loaded):
+#   mmsi_consistent       — needs longitudinal MMSI history (GFW Vessels API multi-SSVID)
+#   name_history          — needs vessel registry change history
+#   eu_sanctioned         — needs EU sanctions list (not loaded; only OFAC available)
+#   flag_recent_change    — needs historical flag data
+#   gfcm_authorized       — needs GFCM Authorized Vessel List
+#   shared_ownership      — needs vessel ownership data (Maritime 2.0 / Equasis)
+
 import pandas as pd
-from config import FLAG_RISKS, IUU_MULTIPLIERS, ICCAT_MULTIPLIERS, OFAC_MULTIPLIER
+from config import (
+    FLAG_RISKS, IUU_MULTIPLIERS, ICCAT_MULTIPLIERS, OFAC_MULTIPLIER,
+    EU_FLAGS, MED_COASTAL_COOPERATIVE_FLAGS, MED_COASTAL_WEAK_COOPERATION_FLAGS,
+)
 
 
 def investigate_vessel(vessel_identifier, df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_landings, fishing_df=None):
@@ -66,17 +85,19 @@ def investigate_vessel(vessel_identifier, df, iuu_df, iccat_df, ofac_df, fdi_eff
         "rule_fired": not has_imo,
         "note": f"IMO: {imo_val}" if has_imo else "No valid IMO -- identity unverifiable",
     })
-    # MMSI consistency: we can only check if MMSI exists, not history
+    # MMSI consistency (future_work: needs longitudinal MMSI history)
     trace.append({
         "branch_id": "identity", "question_id": "mmsi_consistent",
         "answer": "unknown", "severity": "none", "rule_fired": False,
-        "note": "MMSI consistency requires historical data (not available in current dataset)",
+        "note": "Needs longitudinal MMSI history (GFW Vessels API multi-SSVID, not available in static mode)",
+        "status": "future_work",
     })
-    # Name history: unknown without historical data
+    # Name history (future_work: needs vessel registry change history)
     trace.append({
         "branch_id": "identity", "question_id": "name_history",
         "answer": "unknown", "severity": "none", "rule_fired": False,
-        "note": "Name change history requires historical data (not available in current dataset)",
+        "note": "Needs vessel registry change history (not available in current dataset)",
+        "status": "future_work",
     })
 
     # Identity misrepresentation: vessel_type (event-level) vs shiptypes
@@ -154,7 +175,8 @@ def investigate_vessel(vessel_identifier, df, iuu_df, iccat_df, ofac_df, fdi_eff
     trace.append({
         "branch_id": "regulatory_status", "question_id": "eu_sanctioned",
         "answer": "unknown", "severity": "none", "rule_fired": False,
-        "note": "EU sanctions data not available in current dataset",
+        "note": "EU sanctions list not loaded (only OFAC SDN available)",
+        "status": "future_work",
     })
 
     # Flag risk trace entries
@@ -178,7 +200,8 @@ def investigate_vessel(vessel_identifier, df, iuu_df, iccat_df, ofac_df, fdi_eff
     trace.append({
         "branch_id": "flag_risk", "question_id": "flag_recent_change",
         "answer": "unknown", "severity": "none", "rule_fired": False,
-        "note": "Flag change history requires historical data",
+        "note": "Needs historical flag data (not available in current dataset)",
+        "status": "future_work",
     })
     psc_blacklist = {"KHM", "COM", "TGO", "TZA", "SLE"}
     is_psc_bl = flag in psc_blacklist
@@ -201,7 +224,8 @@ def investigate_vessel(vessel_identifier, df, iuu_df, iccat_df, ofac_df, fdi_eff
     trace.append({
         "branch_id": "authorization", "question_id": "gfcm_authorized",
         "answer": "unknown", "severity": "none", "rule_fired": False,
-        "note": "GFCM Authorized Vessel List not available in current dataset",
+        "note": "GFCM Authorized Vessel List not loaded",
+        "status": "future_work",
     })
     # Authorization mismatch: check if flag has no fishing rights in Med
     no_fishing_rights = flag in ("IRN", "RUS", "PRK", "SYR")
@@ -509,21 +533,98 @@ def investigate_vessel(vessel_identifier, df, iuu_df, iccat_df, ofac_df, fdi_eff
         "note": fim_note,
     })
 
-    # Network exposure trace entries
+    # ===== Network Exposure (associative risk layer) =====
+    # Four encounter-partner leaves: two name-based (IUU/OFAC list match),
+    # two flag-based (weak-cooperation Med coastal, distant-water/non-Med FoC).
+    encounter_events = vessel_events[vessel_events["event_type"] == "ENCOUNTER"]
+
+    # Leaf 1: Encounter with IUU-listed vessel (name match)
+    iuu_partner_hits = []
+    if not encounter_events.empty and "encounter_vessel_name" in encounter_events.columns:
+        partner_names = encounter_events["encounter_vessel_name"].dropna().str.upper().str.strip()
+        iuu_names = (
+            set(iuu_df["vessel_name"].dropna().str.upper().str.strip())
+            if iuu_df is not None and not iuu_df.empty else set()
+        )
+        iuu_partner_hits = [n for n in partner_names if n in iuu_names]
     trace.append({
         "branch_id": "network_exposure", "question_id": "encounter_iuu_vessel",
-        "answer": "unknown", "severity": "none", "rule_fired": False,
-        "note": "Encounter partner IUU status not checked in current implementation",
+        "answer": "yes" if iuu_partner_hits else "no",
+        "severity": "high" if iuu_partner_hits else "none",
+        "rule_fired": bool(iuu_partner_hits),
+        "note": (
+            f"Encounter with {len(iuu_partner_hits)} IUU-listed vessel(s): "
+            f"{', '.join(sorted(set(iuu_partner_hits))[:3])}"
+            if iuu_partner_hits
+            else "No encounters with IUU-listed vessels"
+        ),
     })
+
+    # Leaf 2: Encounter with OFAC-sanctioned vessel (name match)
+    ofac_partner_hits = []
+    if not encounter_events.empty and "encounter_vessel_name" in encounter_events.columns:
+        partner_names = encounter_events["encounter_vessel_name"].dropna().str.upper().str.strip()
+        ofac_names = (
+            set(ofac_df["vessel_name"].dropna().str.upper().str.strip())
+            if ofac_df is not None and not ofac_df.empty else set()
+        )
+        ofac_partner_hits = [n for n in partner_names if n in ofac_names]
     trace.append({
         "branch_id": "network_exposure", "question_id": "encounter_sanctioned_vessel",
-        "answer": "unknown", "severity": "none", "rule_fired": False,
-        "note": "Encounter partner sanctions status not checked in current implementation",
+        "answer": "yes" if ofac_partner_hits else "no",
+        "severity": "critical" if ofac_partner_hits else "none",
+        "rule_fired": bool(ofac_partner_hits),
+        "note": (
+            f"Encounter with {len(ofac_partner_hits)} OFAC-sanctioned vessel(s): "
+            f"{', '.join(sorted(set(ofac_partner_hits))[:3])}"
+            if ofac_partner_hits
+            else "No encounters with OFAC-sanctioned vessels"
+        ),
     })
+
+    # Leaf 3: Encounter with weak-cooperation Med coastal flag (LBY, SYR)
+    weak_coop_partners = []
+    if not encounter_events.empty and "encounter_vessel_flag" in encounter_events.columns:
+        partner_flags = encounter_events["encounter_vessel_flag"].dropna().str.upper().str.strip()
+        weak_coop_partners = [f for f in partner_flags if f in MED_COASTAL_WEAK_COOPERATION_FLAGS]
+    trace.append({
+        "branch_id": "network_exposure", "question_id": "encounter_weak_cooperation_partner",
+        "answer": "yes" if weak_coop_partners else "no",
+        "severity": "medium" if weak_coop_partners else "none",
+        "rule_fired": bool(weak_coop_partners),
+        "note": (
+            f"Encounter(s) with partner flagged {', '.join(sorted(set(weak_coop_partners)))}: "
+            f"GFCM non-compliance concerns"
+            if weak_coop_partners
+            else "No encounters with weak-cooperation Med coastal flags"
+        ),
+    })
+
+    # Leaf 4: Encounter with distant-water or non-Med FoC flag
+    med_coastal_all = MED_COASTAL_COOPERATIVE_FLAGS | MED_COASTAL_WEAK_COOPERATION_FLAGS
+    dwf_partners = []
+    if not encounter_events.empty and "encounter_vessel_flag" in encounter_events.columns:
+        partner_flags = encounter_events["encounter_vessel_flag"].dropna().str.upper().str.strip()
+        dwf_partners = [f for f in partner_flags if f and f not in EU_FLAGS and f not in med_coastal_all]
+    trace.append({
+        "branch_id": "network_exposure", "question_id": "encounter_distant_water_partner",
+        "answer": "yes" if dwf_partners else "no",
+        "severity": "medium" if dwf_partners else "none",
+        "rule_fired": bool(dwf_partners),
+        "note": (
+            f"Encounter(s) with distant-water / non-Med FoC partner flag(s): "
+            f"{', '.join(sorted(set(dwf_partners))[:5])}. Catch-laundering pattern."
+            if dwf_partners
+            else "No encounters with distant-water or non-Med FoC partners"
+        ),
+    })
+
+    # Shared ownership (future work -- requires vessel ownership data)
     trace.append({
         "branch_id": "network_exposure", "question_id": "shared_ownership",
         "answer": "unknown", "severity": "none", "rule_fired": False,
-        "note": "Ownership data not available",
+        "note": "Ownership data not available (requires Maritime 2.0 or Equasis)",
+        "status": "future_work",
     })
 
     # ===== Step 7: Risk Decomposition =====

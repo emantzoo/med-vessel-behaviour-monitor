@@ -36,6 +36,16 @@ risk_formula_explanation: |
   is a signal of intent, and is therefore the highest-priority behavioural
   indicator in the commercial literature.
 
+  The network_exposure branch of the risk tree implements the associative
+  risk layer of Kpler's six-layer framework using four encounter-partner
+  leaves. Two are name-based (IUU list match at high severity, OFAC list
+  match at critical severity), two are flag-based (weak-cooperation Med
+  coastal flags Libya/Syria at medium severity; distant-water or non-Med
+  FoC flags outside both the EU and cooperative Med coastal set at medium
+  severity). None of these propagate risk across fleet networks or
+  ownership relationships — that layer requires ownership graph data
+  outside the open-data stack and is named as future work.
+
   In addition to the core scoring formula, four behavioural and structural
   flags are computed at the vessel level and displayed in the Vessel
   Summary tab without modifying the risk score itself: an industrial
@@ -233,7 +243,11 @@ methodology_references:
 
   - title: How Deception Detection Works
     citation: Kpler (2025)
-    relevance: Formal six-layer risk framework — formal sanctions, behavioural indicators, associative risk, geographic risk, cargo risk, ownership opacity. Four of the six map directly to the current implementation.
+    relevance: Formal six-layer risk framework — formal sanctions, behavioural indicators, associative risk, geographic risk, cargo risk, ownership opacity. Four and a half of the six map to the current implementation (associative risk partially covered by four encounter-partner risk tree leaves).
+
+  - title: GFCM Compendium of Decisions and non-compliance reports
+    citation: GFCM, ongoing
+    relevance: Regulatory basis for classifying Libya and Syria as weak-cooperation Med coastal flags in the encounter-partner risk tree leaves (network_exposure branch).
 
   - title: "The Grey Fleet: Shadow Operations in Global Oil Trade"
     citation: "Kpler (March 2025). Authors: Ampatzidis, D., Stuart-Grumbar, A., Kinnee, K., Wright, M."

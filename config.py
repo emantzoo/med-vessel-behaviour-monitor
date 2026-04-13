@@ -175,6 +175,40 @@ SPECIES_NAMES = {
     "SQM": "European squid", "VMA": "Violet squid", "RPW": "Red pandora",
 }
 
+# ========================= FLAG TIER CONSTANTS (encounter-partner rules) ====
+# Used by the network_exposure branch of the risk tree to classify encounter
+# partner flags into regulatory tiers. Not used in scoring.
+
+# EU member state flags (ISO 3166-1 alpha-3)
+EU_FLAGS = {
+    "ITA", "ESP", "GRC", "FRA", "HRV", "MLT", "CYP", "SVN",
+    "PRT", "DEU", "NLD", "BEL", "IRL", "DNK", "SWE", "FIN",
+    "POL", "EST", "LVA", "LTU", "BGR", "ROU", "HUN", "CZE",
+    "SVK", "AUT", "LUX",
+}
+
+# Mediterranean coastal non-EU states with active GFCM cooperation
+# and/or bilateral EU fisheries agreements. Encounters with these flags
+# are routine regional interactions, not associative risk signals.
+MED_COASTAL_COOPERATIVE_FLAGS = {
+    "MAR",  # Morocco
+    "TUN",  # Tunisia
+    "TUR",  # Turkey
+    "DZA",  # Algeria
+    "EGY",  # Egypt
+    "LBN",  # Lebanon
+    "ISR",  # Israel
+    "ALB",  # Albania
+    "MNE",  # Montenegro
+}
+
+# Mediterranean coastal states with weak or compromised GFCM cooperation.
+# Cited in GFCM non-compliance reports; encounters warrant medium-severity flag.
+MED_COASTAL_WEAK_COOPERATION_FLAGS = {
+    "LBY",  # Libya -- conflict-affected, weak enforcement capacity
+    "SYR",  # Syria -- conflict-affected, weak enforcement capacity
+}
+
 FORBIDDEN_CODE = [
     "import os", "import sys", "subprocess", "eval(", "open(",
     "__import__", "exec(", "shutil", "pathlib", "requests",

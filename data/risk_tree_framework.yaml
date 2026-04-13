@@ -224,10 +224,33 @@ framework:
         - id: encounter_sanctioned_vessel
           text: "Has the vessel encountered any OFAC/EU sanctioned vessel?"
           escalation: "Direct encounter with sanctioned vessel = Critical tier minimum."
+        - id: encounter_weak_cooperation_partner
+          text: "Did the vessel encounter a partner flagged by a Med coastal state cited in GFCM non-compliance reports (Libya, Syria)?"
+          weight: medium
+          note: >
+            Libya and Syria are Mediterranean coastal states with limited GFCM
+            enforcement capacity due to conflict and state fragility. Encounters
+            with vessels under these flags are a medium-severity associative
+            signal. Distinct from encounters with cooperative Med coastal states
+            (Morocco, Tunisia, Turkey, etc.) which are routine regional
+            interactions and do not fire this rule.
+        - id: encounter_distant_water_partner
+          text: "Did the vessel encounter a partner flagged by a distant-water fishing nation or non-Mediterranean flag of convenience?"
+          weight: medium
+          note: >
+            Catches the classic catch-laundering pattern: EU-flagged or Med-
+            coastal-flagged vessel encountering a distant-water fishing fleet
+            (China, Japan, South Korea, Taiwan) or a flag of convenience with
+            no natural Med coastal business (Panama, Liberia, Marshall Islands,
+            Honduras, Belize, Cambodia, Comoros, and similar). Fires when the
+            partner flag is neither EU nor Med coastal (cooperative or weak-
+            cooperation). Medium severity on its own; escalates when combined
+            with offshore position, long duration, or ICCAT authorisation.
         - id: shared_ownership
           text: "Does the vessel share beneficial ownership with known IUU operators?"
           escalation: "Common ownership networks are how IUU operations scale."
           note: "Requires vessel ownership data -- flagged as enrichment opportunity."
+          status: future_work
 
   tier_assignment_rules:
     description: >

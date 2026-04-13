@@ -189,14 +189,15 @@ From Kpler's "How Deception Detection Works" brief:
 
 The six Kpler risk layers are: formal sanctions status, behavioural indicators, associative risk, geographic risk, cargo risk, ownership opacity.
 
-Med Vessel Monitor implements four of these six layers:
+Med Vessel Monitor implements four and a half of these six layers:
 
 1. **Formal sanctions status** — TMT Combined IUU List, ICCAT IUU list, OFAC SDN screening
 2. **Behavioural indicators** — GFW gap, encounter, loitering events, aligned with Miller et al. 2018 methodology
-3. **Geographic risk** — GSA-based hotspot weighting, shore distance factor
-4. **Cargo risk** — ICCAT species multipliers (BFT 1.3x, SWO/ALB 1.2x, carrier 1.4x) as the fisheries-cargo equivalent
+3. **Associative risk** — four encounter-partner leaves in the risk tree's network_exposure branch: partner name matched against IUU list (high), partner name matched against OFAC SDN (critical), partner flag in weak-cooperation Med coastal set (LBY/SYR, medium), partner flag in distant-water/non-Med FoC set (medium). First-degree only — fleet-network propagation and ownership graph still out of scope.
+4. **Geographic risk** — GSA-based hotspot weighting, shore distance factor
+5. **Cargo risk** — ICCAT species multipliers (BFT 1.3x, SWO/ALB 1.2x, carrier 1.4x) as the fisheries-cargo equivalent
 
-The two gaps are **associative risk** (fleet and network propagation) and **ownership opacity** (beneficial ownership unwinding). These are the layers where Kpler's Maritime 2.0 ownership graph and fleet-association data add value over an open-source stack. Naming the gaps honestly in Kpler's own vocabulary is a pitch strength, not a weakness.
+The remaining gap is **ownership opacity** (beneficial ownership unwinding). This is the layer where Kpler's Maritime 2.0 ownership graph adds value over an open-source stack. Associative risk is partially implemented (first-degree encounter-partner checks) but fleet-network propagation requires the same ownership data. Naming the gap honestly in Kpler's own vocabulary is a pitch strength, not a weakness.
 
 ### Kpler Compliance API Alignment (know this for technical conversations)
 
