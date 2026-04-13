@@ -18,7 +18,7 @@
 
 import pandas as pd
 from config import (
-    FLAG_RISKS, IUU_MULTIPLIERS, ICCAT_MULTIPLIERS, OFAC_MULTIPLIER,
+    FLAG_RISKS, get_flag_risk, IUU_MULTIPLIERS, ICCAT_MULTIPLIERS, OFAC_MULTIPLIER,
     EU_FLAGS, MED_COASTAL_COOPERATIVE_FLAGS, MED_COASTAL_WEAK_COOPERATION_FLAGS,
 )
 
@@ -628,7 +628,7 @@ def investigate_vessel(vessel_identifier, df, iuu_df, iccat_df, ofac_df, fdi_eff
     })
 
     # ===== Step 7: Risk Decomposition =====
-    flag_mult = FLAG_RISKS.get(primary.get("flag", ""), 1.0)
+    flag_mult = get_flag_risk(primary.get("flag", ""))
     report["risk"] = {
         "total_risk_score": float(vessel_events["risk_score"].sum()),
         "max_single_event": float(vessel_events["risk_score"].max()),

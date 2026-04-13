@@ -1,6 +1,8 @@
 """Constants, lookups, and pure utility functions."""
 
 import numpy as np
+import pandas as pd
+from pathlib import Path
 
 # ========================= EVENT & COLOR CONSTANTS =========================
 
@@ -8,10 +10,53 @@ EVENT_COLORS = {"GAP": "#e74c3c", "LOITERING": "#f39c12", "ENCOUNTER": "#8e44ad"
 
 DEFAULT_EVENT_WEIGHTS = {"GAP": 3.2, "LOITERING": 2.0, "ENCOUNTER": 5.0}
 
-FLAG_RISKS = {
-    "RUS": 2.8, "IRN": 2.4, "SYR": 2.0, "PRK": 3.0,
-    "LBR": 1.3, "PAN": 1.2, "MHL": 1.2,
-}
+# ========================= FLAG RISK MULTIPLIERS =========================
+# Derived from the Poseidon IUU Fishing Risk Index (iuufishingindex.net).
+# The Index scores coastal states across 40 indicators; for flag-level
+# calibration, only the 10 Flag-responsibility indicators per country are
+# aggregated (arithmetic mean) and mapped linearly:
+#   multiplier = 1.0 + (mean_score - 1.0) * 0.3
+# Replaces earlier hand-curated multipliers. For updates, re-run
+# scripts/prepare_iuu_risk_index.py.
+
+_FLAG_RISKS_CSV = Path(__file__).parent / "data" / "iuu_risk_index_flags.csv"
+FLAG_RISKS_DEFAULT = 1.0
+FLAG_RISKS_SOURCE_YEAR = None
+
+
+def _load_flag_risks():
+    """Load FLAG_RISKS dict from the Index-derived CSV.
+
+    Returns a dict {iso3: multiplier}. Falls back to an empty dict
+    on any error, with a warning.
+    """
+    global FLAG_RISKS_SOURCE_YEAR
+    try:
+        if not _FLAG_RISKS_CSV.exists():
+            raise FileNotFoundError(f"not found: {_FLAG_RISKS_CSV}")
+        df = pd.read_csv(_FLAG_RISKS_CSV)
+        required = {"iso3", "flag_multiplier", "source_year"}
+        if not required.issubset(df.columns):
+            raise ValueError(f"Missing columns in {_FLAG_RISKS_CSV}: {required}")
+        FLAG_RISKS_SOURCE_YEAR = int(df["source_year"].iloc[0])
+        return dict(zip(df["iso3"], df["flag_multiplier"]))
+    except Exception as e:
+        import warnings
+        warnings.warn(
+            f"Could not load FLAG_RISKS from CSV: {e}. "
+            f"All flags will use neutral 1.0x multiplier."
+        )
+        return {}
+
+
+FLAG_RISKS = _load_flag_risks()
+
+
+def get_flag_risk(iso3: str) -> float:
+    """Return the flag risk multiplier for an ISO-3 code, or the default."""
+    if not iso3 or (isinstance(iso3, float) and np.isnan(iso3)):
+        return FLAG_RISKS_DEFAULT
+    return FLAG_RISKS.get(str(iso3).upper().strip(), FLAG_RISKS_DEFAULT)
 
 TRANSSHIPMENT_VESSEL_TYPES = {"CARRIER", "TANKER"}
 

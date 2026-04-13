@@ -29,7 +29,14 @@ risk = (duration_h ^ 0.75)
 
 ### Base Components
 - **Event weights**: ENCOUNTER=5.0 (transshipment), GAP=3.2 (dark activity), LOITERING=2.0 (staging)
-- **Flag multipliers**: RUS=2.8, IRN=2.4, SYR=2.0, PRK=3.0, LBR=1.3, PAN=1.2, MHL=1.2, others=1.0
+- **Flag multipliers**: Derived from the Poseidon IUU Fishing Risk Index
+  (https://iuufishingindex.net/). The 10 Flag-responsibility indicators per
+  country are averaged (score 1-5) and mapped linearly to a multiplier:
+  `multiplier = 1.0 + (mean_score - 1.0) * 0.3`. Score 1 -> 1.0x, score 3
+  -> 1.6x, score 5 -> 2.2x. 152 countries covered. Flags not in the Index
+  receive 1.0x (neutral). Replaces earlier hand-curated multipliers inherited
+  from shadow-fleet-tanker contexts. Regenerate via
+  `scripts/prepare_iuu_risk_index.py`
 - **Non-linear duration** (exponent 0.75): prevents single extreme events from dominating
 
 ### Shore Distance Factor (all event types)

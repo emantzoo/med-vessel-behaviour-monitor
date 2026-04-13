@@ -211,8 +211,8 @@ OperationalRisks.darkStsEvents           ENCOUNTER events (vessel meetings)
 OperationalRisks.stsEvents               ENCOUNTER + ICCAT carrier matching
 SanctionRisks.sanctionedVessels          OFAC SDN cross-reference (2.5x multiplier)
 SanctionRisks.sanctionedFlag             Flag multipliers + OFAC program data
-FlagRisks.flagOfConvenience              FOC flag multipliers (PAN, LBR, MHL)
-FlagRisks.flagRankings (MoU lists)       FLAG_RISKS dict
+FlagRisks.flagOfConvenience              IUU Risk Index flag multipliers (152 countries)
+FlagRisks.flagRankings (MoU lists)       FLAG_RISKS dict (loaded from IUU Risk Index CSV)
 ManagementRisks.portStateControl         Planned enhancement
 AisSpoof (spoofing detection)            Not in your app
 FleetStatusCounters                      KPI metrics (events, IUU/OFAC counts, risk)
@@ -296,7 +296,8 @@ app.py              → Orchestrator. Loads data, runs filters, applies risk
                       flows through here.
 
 config.py           → Constants and pure functions. Event weights, flag risk
-                      multipliers, IUU multipliers (GFCM=3.0x, other=2.0x),
+                      multipliers (loaded from IUU Risk Index CSV, 152 countries),
+                      IUU multipliers (GFCM=3.0x, other=2.0x),
                       ICCAT multipliers (carrier=1.4x, BFT=1.3x, SWO=1.2x),
                       OFAC multiplier (2.5x), RISK_BANDS definitions
                       (Low / Emerging / Elevated / Severe / Critical),
@@ -418,7 +419,7 @@ base = (duration_h ^ 0.75) x event_weight x flag_multiplier x shore_factor x mpa
 final = base x iuu_multiplier x iccat_multiplier x ofac_multiplier
 
 All multipliers compound. A worst-case event:
-  IRN flag (2.4) x GFCM IUU (3.0) x OFAC sanctions (2.5) x ICCAT carrier (1.4)
+  TWN flag (1.96) x GFCM IUU (3.0) x OFAC sanctions (2.5) x ICCAT carrier (1.4)
   x encounter proximity (1.8) x speed (1.5) x vessel type (1.4)
   x shore >20nm (1.5) x MPA gfcm_fra (2.0) = 190x base score
 

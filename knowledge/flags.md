@@ -1,21 +1,27 @@
 # Flag State Risk Context
 
-## High risk (sanctions / dark fleet)
+## Flag multiplier calibration
 
-These flags receive elevated risk multipliers in `config.py FLAG_RISKS`:
+Flag-level risk multipliers are derived from the Poseidon IUU Fishing Risk
+Index (https://iuufishingindex.net/), covering 152 coastal states. The 10
+Flag-responsibility indicators per country (vulnerability, prevalence,
+response) are averaged and mapped linearly to a multiplier:
+`multiplier = 1.0 + (mean_score - 1.0) * 0.3`. All flags are loaded from
+`data/iuu_risk_index_flags.csv` at startup; flags not in the Index receive
+1.0x. Regenerate from latest Index via `scripts/prepare_iuu_risk_index.py`.
 
-- **RUS** (273): Russian shadow fleet, sanctions evasion, dark tanker operations. Multiplier 2.8x.
-- **IRN** (422): Iranian vessels (NITC, IRISL), oil sanctions, AIS manipulation. Multiplier 2.4x.
-- **SYR** (468): Syrian conflict, regime-linked vessels. Multiplier 2.0x.
-- **PRK** (371): North Korean vessels, weapons/sanctions. Multiplier 3.0x.
+## High risk flags (sanctions / dark fleet context)
+
+- **RUS**: Russian shadow fleet, sanctions evasion, dark tanker operations.
+- **IRN**: Iranian vessels (NITC, IRISL), oil sanctions, AIS manipulation.
+- **SYR**: Syrian conflict, regime-linked vessels.
+- **PRK**: North Korean vessels, weapons/sanctions.
 
 ## Flags of convenience (weak oversight)
 
-These flags receive modest risk multipliers:
-
-- **PAN** (351-354): Panama, largest FOC registry globally. Multiplier 1.2x.
-- **LBR** (636-637): Liberia, second largest FOC. Multiplier 1.3x.
-- **MHL** (538): Marshall Islands, growing FOC. Multiplier 1.2x.
+- **PAN**: Panama, largest FOC registry globally.
+- **LBR**: Liberia, second largest FOC.
+- **MHL**: Marshall Islands, growing FOC.
 
 ## Mediterranean coastal states (fishing nations)
 

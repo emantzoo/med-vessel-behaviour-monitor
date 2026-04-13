@@ -9,7 +9,7 @@ from pathlib import Path
 
 from config import (
     EVENT_COLORS,
-    FLAG_RISKS,
+    FLAG_RISKS, FLAG_RISKS_SOURCE_YEAR,
     ICCAT_MULTIPLIERS,
     IUU_MULTIPLIERS,
     OFAC_MULTIPLIER,
@@ -2336,16 +2336,17 @@ def render_reference():
 
     # 4. Multiplier tables (collapsed)
     with st.expander("Multiplier tables (from config.py)", expanded=False):
-        st.markdown("**Flag risk multipliers** — applied to every event on the flag")
+        src_yr = f" (source: IUU Fishing Index {FLAG_RISKS_SOURCE_YEAR})" if FLAG_RISKS_SOURCE_YEAR else ""
+        st.markdown(f"**Flag risk multipliers** — applied to every event on the flag{src_yr}")
         flag_df = (
             pd.DataFrame(
-                [{"Flag (ISO3)": k, "Multiplier": v} for k, v in FLAG_RISKS.items()]
+                [{"Flag (ISO3)": k, "Multiplier": round(v, 3)} for k, v in FLAG_RISKS.items()]
             )
             .sort_values("Multiplier", ascending=False)
             .reset_index(drop=True)
         )
-        st.dataframe(flag_df, use_container_width=True, hide_index=True)
-        st.caption("Flags not listed carry a 1.0x multiplier (neutral).")
+        st.dataframe(flag_df, use_container_width=True, hide_index=True, height=300)
+        st.caption("Derived from the Poseidon IUU Fishing Risk Index — 10 Flag-responsibility indicators per country. Flags not in the Index carry a 1.0x multiplier (neutral).")
 
         st.markdown("**IUU listing multipliers** — applied on IUU vessel match")
         iuu_df = pd.DataFrame(

@@ -211,6 +211,27 @@ data_source_provenance:
     coverage: "Global, but less directly relevant for Med fisheries than EU sanctions"
     notes: "No fuzzy matching — false positives have legal consequences. EU consolidated sanctions list is named as the next integration priority."
 
+  - source: "Poseidon IUU Fishing Risk Index"
+    content: "Flag-level risk multipliers derived from 10 Flag-responsibility indicators per country"
+    status: "Independent fisheries governance benchmark (iuufishingindex.net)"
+    coverage: "152 coastal states, 2025 edition. Multiplier = 1.0 + (mean_score - 1.0) * 0.3"
+    notes: "Replaces earlier hand-curated flag multipliers. Loaded from data/iuu_risk_index_flags.csv at startup. Regenerate via scripts/prepare_iuu_risk_index.py. Index measures state-level governance risk, not vessel-level incidence."
+
+flag_risk_calibration:
+  source: "Poseidon IUU Fishing Risk Index"
+  url: "https://iuufishingindex.net/"
+  methodology: >
+    Flag multipliers derived from the 10 Flag-responsibility indicators
+    per country. Arithmetic mean score mapped linearly to multiplier via
+    multiplier = 1.0 + (mean_score - 1.0) * 0.3.
+  replaces: >
+    Earlier shadow-fleet-tanker calibration — inherited values that were
+    not fisheries-specific.
+  caveats:
+    - "Index measures state-level risk, not vessel-level incidence"
+    - "Coastal states only; landlocked FoCs get default 1.0x"
+    - "Annual update cycle; source year embedded in loaded CSV"
+
 epistemological_separation: |
   Each data source answers a different question and is kept separate at
   the data layer. GFW provides AIS-inferred behavioural events; FDI
