@@ -162,6 +162,32 @@ Look up FDI baseline for the c-square(s) where events occurred. Report
 fishing days, top species, gear types, and whether the activity makes
 sense in this fisheries context.
 
+### Step 5b: Fishing Activity Analysis (GFW classification)
+
+Two fishing_activity branch leaves use the GFW fishing-events dataset
+(separate from behavioural events) cross-referenced against curated
+regulatory data:
+
+1. **fishing_in_closed_area** (high severity) — vessel had a GFW-classified
+   fishing event inside an MPA listed as totally closed or no-take in
+   `data/closed_area_mpas.csv`. Distinct from the existing `fishing_in_mpa`
+   signal which counts all MPA intersections — this leaf fires only for the
+   strictly-closed subset where any fishing is by definition illegal
+   regardless of gear, species, or vessel type. The curated CSV includes
+   12 Mediterranean entries covering GFCM FRAs and national no-take zones,
+   each with explicit closure_type and source_reference.
+
+2. **gap_then_fishing_sequence** (high severity) — vessel went AIS-dark
+   for 4+ hours and then resumed fishing within 72 hours. Classic IUU
+   evasion signature: going dark before fishing suggests deliberate
+   concealment of fishing location. For each GAP event of 4+ hours,
+   checks whether any GFW fishing event occurs within 72 hours after the
+   gap ends. Caveats: gaps can have legitimate causes (equipment failure,
+   coverage gaps); the leaf is a behavioural pattern indicator, not
+   direct evidence.
+
+Both are tree-only (no scoring multiplier).
+
 ### Step 6: Behavioural Pattern Analysis and Network Exposure
 
 Analyse event patterns: event type mix, duration patterns, speed analysis,

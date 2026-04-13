@@ -108,7 +108,7 @@ This is a deliberate discipline worth calling out in an R&C conversation: the sc
 
 The scoring pipeline answers "how risky is this vessel's behaviour?" The risk tree answers a different question: **"what kind of risk is it, and what should we investigate next?"**
 
-The risk tree is a hierarchical framework with **8 branches** and **38 leaf questions**, defined in `data/risk_tree_framework.yaml`. It drives the per-vessel investigation trace in the Vessel Investigation tab — each branch is evaluated for the selected vessel, coloured by severity, and rendered as expandable cards plus an interactive icicle chart.
+The risk tree is a hierarchical framework with **8 branches** and **40 leaf questions**, defined in `data/risk_tree_framework.yaml`. It drives the per-vessel investigation trace in the Vessel Investigation tab — each branch is evaluated for the selected vessel, coloured by severity, and rendered as expandable cards plus an interactive icicle chart.
 
 ### The three branch types
 

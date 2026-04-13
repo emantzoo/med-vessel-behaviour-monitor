@@ -297,6 +297,30 @@ framework:
             joined to GFW's regions.mpa field. The branch fires at high
             severity when at least one fishing event for the vessel
             intersects an MPA.
+        - id: fishing_in_closed_area
+          text: "Did the vessel have any fishing event inside a totally closed area or no-take zone?"
+          weight: high
+          escalation: "Fishing inside a closed area -- direct regulatory violation regardless of gear or species."
+          note: >
+            Fires when a vessel's fishing event (from GFW public-global-fishing-events)
+            intersects an MPA listed as totally closed or no-take in
+            data/closed_area_mpas.csv. Distinct from the existing
+            fishing_in_mpa signal which counts all MPA intersections -- this
+            leaf only fires for the strictly-closed subset where any fishing is
+            by definition illegal. References the curated closed-area list with
+            explicit source citations per entry.
+        - id: gap_then_fishing_sequence
+          text: "Did the vessel go AIS-dark for 4+ hours and then resume fishing within 72 hours?"
+          weight: high
+          escalation: "Classic IUU evasion pattern -- going dark before fishing suggests deliberate concealment."
+          note: >
+            Detects a recognised IUU evasion signature: AIS gap of meaningful
+            duration immediately preceding a fishing event. Going dark and then
+            fishing is a much stronger signal than either behaviour in isolation.
+            Methodology: for each GAP event of 4+ hours, check whether any
+            FISHING event occurs within 72 hours after the gap ends. Caveats:
+            gaps can have legitimate causes (equipment, coverage); the leaf is
+            a behavioural pattern indicator, not direct evidence.
 
     - id: network_exposure
       name: "Network Exposure"

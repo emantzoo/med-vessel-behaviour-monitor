@@ -888,3 +888,21 @@ def load_ofac_vessels():
         except Exception as e:
             st.warning(f"Error loading OFAC vessel list: {e}")
     return pd.DataFrame()
+
+
+@st.cache_data
+def load_closed_area_mpas():
+    """Load curated reference of Mediterranean MPAs prohibiting all fishing.
+
+    Returns a DataFrame with columns: mpa_name, mpa_tier, closure_type,
+    prohibits, source_reference, notes. Used by the fishing_in_closed_area
+    leaf to refine the existing MPA intersection signal.
+    """
+    csv_path = os.path.join(os.path.dirname(__file__), "data", "closed_area_mpas.csv")
+    if os.path.exists(csv_path):
+        df = pd.read_csv(csv_path)
+        return df
+    return pd.DataFrame(columns=[
+        "mpa_name", "mpa_tier", "closure_type",
+        "prohibits", "source_reference", "notes",
+    ])

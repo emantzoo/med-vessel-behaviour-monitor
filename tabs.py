@@ -1472,7 +1472,7 @@ def render_vessel_trajectory(vessel_events: pd.DataFrame, vessel_summary_row: di
         )
 
 
-def render_vessel_investigation(df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_landings, fishing_df=None):
+def render_vessel_investigation(df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_landings, fishing_df=None, closed_area_mpas=None):
     """Deterministic vessel investigation tab."""
     from investigation import investigate_vessel
     from risk_tree import render_framework_tree
@@ -1583,7 +1583,7 @@ def render_vessel_investigation(df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_l
                 st.session_state["map_clicked_vessel"] = _picked
                 st.rerun()
 
-    report = investigate_vessel(selected, df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_landings, fishing_df=fishing_df)
+    report = investigate_vessel(selected, df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_landings, fishing_df=fishing_df, closed_area_mpas=closed_area_mpas)
 
     if "error" in report:
         st.error(report["error"])

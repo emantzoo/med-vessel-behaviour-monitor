@@ -1,0 +1,13 @@
+mpa_name,mpa_tier,closure_type,prohibits,source_reference,notes
+"Jabuka/Pomo Pit FRA","gfcm_fra","gear_specific","bottom_contact_gears","GFCM Rec. GFCM/41/2017/3","Closed to bottom trawls and dredges; passive gears allowed"
+"Eastern Ionian Sea FRA","gfcm_fra","gear_specific","bottom_trawls","GFCM Rec. GFCM/30/2006/3","Closed to bottom trawling year-round"
+"Gulf of Lion FRA","gfcm_fra","gear_specific","bottom_trawls","GFCM Rec. GFCM/33/2009/1","Deep-sea fisheries restricted area; bottom trawling prohibited below 1000m"
+"Eratosthenes Seamount FRA","gfcm_fra","gear_specific","bottom_contact_gears","GFCM Rec. GFCM/2006/3","Deep-water FRA south of Cyprus; bottom contact gears prohibited"
+"Nile Delta Cold Seeps FRA","gfcm_fra","gear_specific","bottom_contact_gears","GFCM Rec. GFCM/2006/3","Deep-water VME protection off Egypt"
+"Cabrera Archipelago Maritime-Terrestrial National Park","general","total_no_take","all_fishing","Spanish Royal Decree 277/2019","Strictly protected core zone — all extractive activity prohibited"
+"Calanques National Park (No-Take Zone)","general","total_no_take","all_fishing","French Decree 2012-507","Core marine no-take zones within Calanques NP near Marseille"
+"Medes Islands Marine Reserve","general","total_no_take","all_fishing","Catalan Law 19/1990","Integral reserve — no fishing or anchoring permitted"
+"Cerbere-Banyuls Marine Nature Reserve","general","total_no_take","all_fishing","French ministerial decree 1974","Integral protection zone — all fishing prohibited"
+"Egadi Islands Marine Protected Area (Zone A)","general","total_no_take","all_fishing","Italian Ministerial Decree 2010","Zone A integral reserve — no extractive activities"
+"Portofino Marine Protected Area (Zone A)","general","total_no_take","all_fishing","Italian Ministerial Decree 1999","Zone A integral reserve — no fishing permitted"
+"Brijuni National Park","general","total_no_take","all_fishing","Croatian Nature Protection Act","Marine zone — all fishing prohibited"

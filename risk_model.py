@@ -661,3 +661,73 @@ def compute_vessel_flags(df):
     df["vessel_type_mismatch"] = both_present & (shiptypes_class != vessel_type_class)
 
     return df
+
+
+def detect_gap_then_fishing_sequence(
+    vessel_events,
+    vessel_fishing,
+    window_hours=72,
+    min_gap_duration_h=4,
+):
+    """Detect cases where a vessel went AIS-dark then resumed fishing.
+
+    For each GAP event ending at time T_end, check whether any FISHING event
+    occurs within `window_hours` after T_end for the same MMSI.
+
+    Args:
+        vessel_events: DataFrame of behavioural events for one vessel
+            (must contain event_type, start_time, end_time)
+        vessel_fishing: DataFrame of fishing events for the same vessel
+            (must contain date, lat, lon, fishing_hours)
+        window_hours: max hours between gap end and fishing event start
+        min_gap_duration_h: minimum gap duration to consider
+
+    Returns:
+        List of dicts: {gap_end, fishing_start, gap_duration_h, hours_between}
+    """
+    matches = []
+    if vessel_events is None or vessel_events.empty:
+        return matches
+    if vessel_fishing is None or vessel_fishing.empty:
+        return matches
+
+    gaps = vessel_events[vessel_events["event_type"] == "GAP"].copy()
+    if gaps.empty:
+        return matches
+
+    # Events use "date" as start timestamp; end = date + duration_h
+    gaps["_start"] = pd.to_datetime(gaps["date"], errors="coerce")
+    dur_h = pd.to_numeric(gaps.get("duration_h", pd.Series(dtype=float)), errors="coerce").fillna(0)
+    gaps["_end"] = gaps["_start"] + pd.to_timedelta(dur_h, unit="h")
+    gaps["_dur_h"] = dur_h
+    gaps = gaps.dropna(subset=["_start", "_end"])
+    gaps = gaps[gaps["_dur_h"] >= min_gap_duration_h]
+    if gaps.empty:
+        return matches
+
+    fishing = vessel_fishing.copy()
+    fishing["_fdate"] = pd.to_datetime(fishing["date"], errors="coerce")
+    fishing = fishing.dropna(subset=["_fdate"])
+    if fishing.empty:
+        return matches
+
+    window = pd.Timedelta(hours=window_hours)
+
+    for _, gap in gaps.iterrows():
+        gap_end = gap["_end"]
+        candidate_fishing = fishing[
+            (fishing["_fdate"] > gap_end) & (fishing["_fdate"] <= gap_end + window)
+        ]
+        if not candidate_fishing.empty:
+            first_fishing = candidate_fishing.iloc[0]
+            hours_between = (
+                (first_fishing["_fdate"] - gap_end).total_seconds() / 3600.0
+            )
+            matches.append({
+                "gap_end": gap_end,
+                "gap_duration_h": gap["_dur_h"],
+                "fishing_start": first_fishing["_fdate"],
+                "hours_between": hours_between,
+            })
+
+    return matches

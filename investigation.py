@@ -11,6 +11,8 @@
 #   unregulated_flag_in_gfcm_area — flag not in GFCM_PARTY_FLAGS / EU_FLAGS (FAO unregulated)
 #   gfw_iuu_crosscheck            — GFW Insights API live RFMO IUU list cross-check
 #   gfw_no_rfmo_authorization     — GFW Insights API: fishing without RFMO authorization
+#   fishing_in_closed_area        — fishing inside curated no-take / closed-area MPAs
+#   gap_then_fishing_sequence     — AIS gap 4h+ followed by fishing within 72h
 #
 # Future work (data not loaded):
 #   mmsi_consistent       — needs longitudinal MMSI history (GFW Vessels API multi-SSVID)
@@ -26,9 +28,10 @@ from config import (
     EU_FLAGS, MED_COASTAL_COOPERATIVE_FLAGS, MED_COASTAL_WEAK_COOPERATION_FLAGS,
     GFCM_PARTY_FLAGS, RECOGNISED_FLAG_VALUES_INVALID,
 )
+from risk_model import detect_gap_then_fishing_sequence
 
 
-def investigate_vessel(vessel_identifier, df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_landings, fishing_df=None):
+def investigate_vessel(vessel_identifier, df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_landings, fishing_df=None, closed_area_mpas=None):
     """
     Run a structured 10-step investigation on a vessel.
 
@@ -38,6 +41,9 @@ def investigate_vessel(vessel_identifier, df, iuu_df, iccat_df, ofac_df, fdi_eff
         include a fishing_in_mpa section and the risk tree will fire a
         fishing_activity branch when the vessel has GFW-classified
         fishing events inside any MPA.
+    closed_area_mpas: optional DataFrame of curated no-take / closed-area
+        MPAs (from data/closed_area_mpas.csv). Fires fishing_in_closed_area
+        leaf when a vessel's fishing events intersect a closed area.
     Returns: dict with all investigation steps as structured data.
     """
     # Find vessel in df (by name or mmsi). Use EXACT match -- fuzzy matching
@@ -676,6 +682,73 @@ def investigate_vessel(vessel_identifier, df, iuu_df, iccat_df, ofac_df, fdi_eff
         "severity": "high" if fishing_in_mpa_fired else "none",
         "rule_fired": fishing_in_mpa_fired,
         "note": fim_note,
+    })
+
+    # fishing_in_closed_area — refines fishing_in_mpa to no-take / totally closed areas
+    closed_area_intersections = []
+    if (
+        closed_area_mpas is not None and not closed_area_mpas.empty
+        and fishing_df is not None and not fishing_df.empty
+    ):
+        _vessel_fishing = fishing_df[fishing_df["mmsi"].astype(str) == str(mmsi_val)]
+        if not _vessel_fishing.empty and "mpa" in _vessel_fishing.columns:
+            mpas_fished_in = (
+                _vessel_fishing[_vessel_fishing["in_mpa"].fillna(False).astype(bool)]
+                ["mpa"].dropna().str.strip().tolist()
+            )
+            closed_area_names = set(
+                closed_area_mpas["mpa_name"].dropna().str.strip()
+            )
+            closed_area_intersections = [
+                m for m in mpas_fished_in
+                if any(c in m for c in closed_area_names)
+            ]
+
+    trace.append({
+        "branch_id": "fishing_activity",
+        "question_id": "fishing_in_closed_area",
+        "answer": "yes" if closed_area_intersections else (
+            "no" if fishing_section["available"] else "unknown"
+        ),
+        "severity": "high" if closed_area_intersections else "none",
+        "rule_fired": bool(closed_area_intersections),
+        "note": (
+            f"Vessel observed fishing inside closed area(s): "
+            f"{', '.join(list(set(closed_area_intersections))[:3])}. "
+            f"Direct violation regardless of gear or species."
+            if closed_area_intersections
+            else "No fishing events inside curated closed areas"
+        ),
+    })
+
+    # gap_then_fishing_sequence — AIS dark then fishing within 72h
+    _vessel_fishing_for_gap = (
+        fishing_df[fishing_df["mmsi"].astype(str) == str(mmsi_val)]
+        if fishing_df is not None and not fishing_df.empty
+        else pd.DataFrame()
+    )
+    gap_fishing_matches = detect_gap_then_fishing_sequence(
+        vessel_events, _vessel_fishing_for_gap,
+        window_hours=72, min_gap_duration_h=4,
+    )
+
+    trace.append({
+        "branch_id": "fishing_activity",
+        "question_id": "gap_then_fishing_sequence",
+        "answer": "yes" if gap_fishing_matches else (
+            "no" if fishing_section["available"] else "unknown"
+        ),
+        "severity": "high" if gap_fishing_matches else "none",
+        "rule_fired": bool(gap_fishing_matches),
+        "note": (
+            f"Detected {len(gap_fishing_matches)} gap-then-fishing sequence(s). "
+            f"First match: {gap_fishing_matches[0]['gap_duration_h']:.1f}h gap "
+            f"ending {gap_fishing_matches[0]['gap_end'].strftime('%Y-%m-%d')}, "
+            f"followed by fishing {gap_fishing_matches[0]['hours_between']:.1f}h later. "
+            f"Classic evasion pattern."
+            if gap_fishing_matches
+            else "No gap-then-fishing sequences detected (4h+ gap followed by fishing within 72h)"
+        ),
     })
 
     # ===== Network Exposure (associative risk layer) =====

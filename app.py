@@ -15,7 +15,7 @@ from config import (
 from data_loading import (
     load_knowledge_base, load_static_data, load_live_data,
     load_fdi_effort, load_fdi_landings, load_iuu_vessels, load_iccat_vessels,
-    load_ofac_vessels, lookup_vessel_metadata,
+    load_ofac_vessels, load_closed_area_mpas, lookup_vessel_metadata,
     load_fishing_events_static, load_fishing_events_live, aggregate_fishing_in_mpa,
     snapshot_exists, snapshot_info, download_api_snapshot,
     load_snapshot_events, load_snapshot_fishing,
@@ -211,6 +211,7 @@ fdi_landings = load_fdi_landings()
 iuu_vessels = load_iuu_vessels()
 iccat_vessels = load_iccat_vessels()
 ofac_vessels = load_ofac_vessels()
+closed_area_mpas = load_closed_area_mpas()
 knowledge_base = load_knowledge_base()
 
 # Per-vessel fishing-in-MPA aggregation (display-only, no risk multiplier)
@@ -1054,6 +1055,7 @@ click a marker on the map. The dropdown defaults to the highest-risk vessel.""")
     render_vessel_investigation(
         df_filtered, iuu_vessels, iccat_vessels, ofac_vessels,
         fdi_effort, fdi_landings, fishing_df=fishing_df,
+        closed_area_mpas=closed_area_mpas,
     )
     st.caption("See **Reference & Methodology** tab for the generic framework and multiplier tables.")
 
