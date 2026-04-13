@@ -1157,44 +1157,49 @@ def render_fishing_in_mpa_map(df, fishing_df):
 
     st.subheader("Fishing events with risk signals")
     st.caption(
-        "Three-layer interactive map. FDI heatmap (coloured rectangles): declared "
-        "fishing effort by c-square. Clustered circles (blue clusters): all "
-        "fishing-in-MPA events — click to expand. Foreground (coloured shapes): "
-        "events that fired high-signal risk tree leaves. White border = vessel-level "
-        "concerns. Use the layer control (top-right) to toggle layers."
+        "Three-layer Folium map. Layer 1 — FDI rectangles: EU-declared fishing effort by c-square. "
+        "Layer 2 — grey dot cluster: fishing events inside GFCM-FRA or EU-designated sites (>=0.5h). "
+        "Layer 3 — coloured shapes: events that fired high-signal risk tree leaves. "
+        "Hover for vessel tooltip. Click foreground marker for full event detail. "
+        "Use the layer toggle (top-right) to show/hide layers."
     )
     with st.expander("How to read this chart", expanded=False):
         st.markdown(
             """
-**FDI effort layer** (coloured rectangles):
-- EU-declared fishing effort (days) by 0.5x0.5 degree c-square from JRC
-  FDI spatial data (latest year). Colour scale: pale yellow (<50 days)
-  to dark red (>2000 days). Toggle off via layer control.
+**Layer 1 — FDI effort** (coloured rectangles):
+EU-declared fishing effort (days) by 0.5x0.5 degree c-square, JRC FDI spatial data (latest year).
+Colour scale: pale yellow (<50d) → orange (50–500d) → orange-red (500–2000d) → dark red (>2000d).
+Toggle off via the layer control (top-right of map).
 
-**Clustered background** (blue cluster circles):
-- All GFW fishing-in-MPA events. FastMarkerCluster groups nearby events
-  at low zoom; click a cluster to expand it, or zoom in to individual
-  markers. Shows total event density without overplotting.
+**Layer 2 — Background cluster** (grey dots / numbered circles):
+Fishing events inside GFCM Fisheries Restricted Areas or EU Natura 2000 / Barcelona Convention sites
+(mpa_tier = `gfcm_fra` or `eu_site`). Filtered to >=0.5 fishing hours; capped at 2,000 events by hours.
+The "general" WDPA tier (nominal designations with no active fishing restriction) is excluded to avoid
+inflating the count. Hover a dot for vessel name, flag, fishing hours, and MPA name. Click a cluster
+circle to expand it; zoom in to see individual dots.
 
-**Foreground layer** (shaped markers — not clustered):
-- **Triangle-up (red)**: `fishing_in_closed_area` -- fishing in a no-take
-  MPA (GFW mpaNoTake field) or curated Mediterranean closed area
-- **Square (orange)**: `fishing_in_low_effort_cell` -- EU vessel fishing
-  in a c-square in the bottom 5% of FDI declared effort
-- **Diamond (orange)**: `gfw_no_rfmo_authorization` -- fishing in RFMO
-  area without authorization (GFW Insights cross-check)
-- **White border**: vessel has at least one vessel-level concern --
-  `gfw_iuu_crosscheck`, `stateless_vessel`, or
-  `unregulated_flag_in_gfcm_area`
+**Layer 3 — Foreground** (coloured shapes, clustered):
+Events that fired one or more high-signal risk tree leaves. Both layers cluster at low zoom
+(maxClusterRadius 60 px) and uncluster at zoom 11.
 
-**Sizing**: foreground markers sized by fishing hours.
+| Shape | Colour | Leaf | Meaning |
+|---|---|---|---|
+| Triangle-up | Red (high) | `fishing_in_closed_area` | Fishing in a no-take MPA (GFW `mpaNoTake`) or curated Med closed area |
+| Square | Orange (medium) | `fishing_in_low_effort_cell` | EU vessel fishing in bottom 5% FDI effort c-square |
+| Diamond | Orange (medium) | `gfw_no_rfmo_authorization` / `unregulated_flag` | No RFMO authorisation (GFW Insights) or non-GFCM contracting party flag |
+| Circle | Blue (low) | `fishing_in_mpa` (general) | Fishing in any other WDPA MPA — lower confidence |
+| White border | — | Vessel-level concern | Vessel flagged by `gfw_iuu_crosscheck`, `stateless_vessel`, or `unregulated_flag_in_gfcm_area` |
 
-These events are **never** added to `risk_score`. They fire risk tree
-leaves but are shown as display-only context.
+Hover any foreground marker for a tooltip; click for a full popup with vessel name, flag, date,
+fishing hours, leaf fired, MPA name, and vessel-level signals.
 
-**AIS-based lower bound.** McDonald et al. 2024 (*Nature*) found ~90%
-of fishing vessels detected by satellite radar inside MPAs do not
-broadcast AIS. This chart captures the tip of the iceberg.
+**Sizing**: foreground markers are fixed size (20px). Fishing hours appear in the popup.
+
+**These events are never scored.** They fire risk tree leaves and appear here as display-only context.
+The `risk_score` column is not affected.
+
+**AIS lower bound.** McDonald et al. 2024 (*Nature*) found ~90% of fishing vessels detected by
+satellite radar inside MPAs do not broadcast AIS. This map captures the tip of the iceberg.
             """
         )
     if fishing_df is None or fishing_df.empty:
@@ -1243,7 +1248,11 @@ broadcast AIS. This chart captures the tip of the iceberg.
     )
 
     # Split into background (general MPA) and foreground (high-signal)
-    bg_mask = enriched["leaf_fishing_in_mpa"]  # all fishing inside any MPA
+    # Restrict background to meaningful tiers only (gfcm_fra / eu_site).
+    # The "general" tier covers every nominal WDPA polygon in the Med —
+    # including candidate sites and buffer zones — which inflates the count.
+    _bg_tier_mask = enriched["mpa_tier"].isin(["gfcm_fra", "eu_site"])
+    bg_mask = enriched["leaf_fishing_in_mpa"] & _bg_tier_mask
     # Include non-GFCM flag vessels as foreground (unregulated fishing signal)
     _unreg_direct = (
         enriched["vessel_unregulated_flag_direct"].fillna(False).astype(bool)
@@ -1359,18 +1368,52 @@ broadcast AIS. This chart captures the tip of the iceberg.
             show=True,
         ).add_to(fmap)
 
-    # --- Layer 2: Background clustering — all fishing-in-MPA events ---
+    # --- Layer 2: Background clustering — fishing-in-MPA events (>=0.5h, cap 2000) ---
+    # Filter to meaningful detections (>=0.5 fishing hours) to avoid cluttering
+    # the cluster with low-confidence GFW detections.
+    n_bg_shown = 0
     if n_bg > 0:
-        bg_coords = list(zip(bg_df["lat"].tolist(), bg_df["lon"].tolist()))
-        FastMarkerCluster(
-            data=bg_coords,
-            name=f"MPA fishing events ({n_bg:,})",
-            options={
-                "maxClusterRadius": 40,
-                "disableClusteringAtZoom": 9,
-                "spiderfyOnMaxZoom": True,
-            },
-        ).add_to(fmap)
+        if hours_col and hours_col in bg_df.columns:
+            _bg_h = pd.to_numeric(bg_df[hours_col], errors="coerce").fillna(0)
+            bg_plot = bg_df[_bg_h >= 0.5].copy()
+            if len(bg_plot) > 2000:
+                bg_plot = bg_plot.nlargest(2000, hours_col)
+        else:
+            bg_plot = bg_df.head(2000)
+        n_bg_shown = len(bg_plot)
+        if n_bg_shown > 0:
+            # Build rows: [lat, lon, tooltip_text]
+            _bg_rows = []
+            for _, _r in bg_plot.iterrows():
+                _vn = _r.get("vessel_name", "") or "Unknown"
+                _fl = _r.get("flag", "N/A")
+                _hr = _r.get(hours_col, 0) if hours_col else 0
+                _mp = _r.get("mpa", "") or ""
+                _tip = f"{_vn} | {_fl} | {float(_hr):.1f}h"
+                if _mp:
+                    _tip += f" | {_mp[:40]}"
+                _bg_rows.append([float(_r["lat"]), float(_r["lon"]), _tip])
+            _bg_callback = """
+            function(row, context) {
+                var svg = '<svg width="10" height="10" xmlns="http://www.w3.org/2000/svg">'
+                        + '<circle cx="5" cy="5" r="4" fill="#888" fill-opacity="0.6" '
+                        + 'stroke="#555" stroke-width="0.5"/></svg>';
+                var icon = L.divIcon({html: svg, iconSize: [10,10], iconAnchor: [5,5], className: ''});
+                var marker = L.marker([row[0], row[1]], {icon: icon});
+                marker.bindTooltip(row[2]);
+                return marker;
+            }
+            """
+            FastMarkerCluster(
+                data=_bg_rows,
+                callback=_bg_callback,
+                name=f"GFCM-FRA / EU-site fishing events ({n_bg_shown:,} shown, {n_bg:,} total)",
+                options={
+                    "maxClusterRadius": 40,
+                    "disableClusteringAtZoom": 9,
+                    "spiderfyOnMaxZoom": True,
+                },
+            ).add_to(fmap)
 
     # --- Layer 3: Foreground — high-signal events with SVG DivIcon shapes ---
     if n_fg > 0:
@@ -1382,7 +1425,7 @@ broadcast AIS. This chart captures the tip of the iceberg.
             if row.get("leaf_fishing_in_low_effort_cell"):
                 return "fishing_in_low_effort_cell", "medium"
             if row.get("vessel_unregulated_flag_direct") or row.get("vessel_unregulated_flag"):
-                return "unregulated_flag", "low"
+                return "unregulated_flag", "medium"
             return "fishing_in_mpa", "low"
 
         pairs = fg_df.apply(_fg_primary, axis=1)
@@ -1468,14 +1511,78 @@ broadcast AIS. This chart captures the tip of the iceberg.
             callback=_fg_callback,
             name=f"High-signal events ({n_fg:,})",
             options={
-                "maxClusterRadius": 30,
-                "disableClusteringAtZoom": 8,
+                "maxClusterRadius": 60,
+                "disableClusteringAtZoom": 11,
                 "spiderfyOnMaxZoom": True,
             },
         ).add_to(fmap)
 
-    folium.LayerControl(collapsed=False).add_to(fmap)
+    folium.LayerControl(collapsed=True).add_to(fmap)
     st_folium(fmap, use_container_width=True, height=520, returned_objects=[])
+
+    # Inline legend (mirrors main Behavioural Risk Map style)
+    def _fsv(shape, fill="#888", size=14, border="#333", bw=1, dashed_border=False):
+        """Tiny inline SVG for legend swatches."""
+        s = size
+        half = s / 2
+        stroke = "#ff9900" if dashed_border else border
+        dash = 'stroke-dasharray="3,2"' if dashed_border else ""
+        if shape == "triangle":
+            pts = f"10,2 {s-1},{s-1} 1,{s-1}"
+            return (f'<svg width="{s}" height="{s}" xmlns="http://www.w3.org/2000/svg" '
+                    f'style="vertical-align:middle;margin-right:3px">'
+                    f'<polygon points="{pts}" fill="{fill}" stroke="{stroke}" '
+                    f'stroke-width="{bw}" {dash}/></svg>')
+        elif shape == "square":
+            return (f'<svg width="{s}" height="{s}" xmlns="http://www.w3.org/2000/svg" '
+                    f'style="vertical-align:middle;margin-right:3px">'
+                    f'<rect x="1" y="1" width="{s-2}" height="{s-2}" fill="{fill}" '
+                    f'stroke="{stroke}" stroke-width="{bw}" {dash}/></svg>')
+        elif shape == "diamond":
+            pts = f"{half},1 {s-1},{half} {half},{s-1} 1,{half}"
+            return (f'<svg width="{s}" height="{s}" xmlns="http://www.w3.org/2000/svg" '
+                    f'style="vertical-align:middle;margin-right:3px">'
+                    f'<polygon points="{pts}" fill="{fill}" stroke="{stroke}" '
+                    f'stroke-width="{bw}" {dash}/></svg>')
+        else:  # circle
+            return (f'<svg width="{s}" height="{s}" xmlns="http://www.w3.org/2000/svg" '
+                    f'style="vertical-align:middle;margin-right:3px">'
+                    f'<circle cx="{half}" cy="{half}" r="{half-1}" fill="{fill}" '
+                    f'stroke="{stroke}" stroke-width="{bw}" {dash}/></svg>')
+
+    _HIGH = "#E45756"
+    _MED  = "#F58518"
+    _LOW  = "#4C78A8"
+    legend_md = (
+        '<b>Foreground shape</b> (leaf type):&ensp;'
+        f'{_fsv("triangle", fill=_HIGH)} Closed area (no-take)&ensp;'
+        f'{_fsv("square",   fill=_MED)}  Low-effort c-square&ensp;'
+        f'{_fsv("diamond",  fill=_MED)}  No RFMO auth / non-GFCM flag&ensp;'
+        f'{_fsv("circle",   fill=_LOW)}  General MPA (other)<br/>'
+        '<b>Fill colour</b> (severity):&ensp;'
+        f'{_fsv("circle", fill=_HIGH)} High&ensp;'
+        f'{_fsv("circle", fill=_MED)}  Medium&ensp;'
+        f'{_fsv("circle", fill=_LOW)}  Low&emsp;'
+        '<b>White border</b>:&ensp;'
+        f'{_fsv("circle", fill=_HIGH, border="white", bw=3)} Vessel-level concern '
+        f'(IUU crosscheck / stateless / unregulated flag)<br/>'
+        '<b>Background cluster</b>:&ensp;'
+        f'{_fsv("circle", fill="#888", size=10)} '
+        'Fishing in GFCM-FRA or EU-designated sites (meaningful regulatory tiers only)&emsp;'
+        '<b>FDI rectangles</b>:&ensp;'
+        '<span style="display:inline-block;width:11px;height:11px;background:#ffffb2;'
+        'border:1px solid #ccc;margin-right:3px;vertical-align:middle"></span><small>&lt;50d</small>&ensp;'
+        '<span style="display:inline-block;width:11px;height:11px;background:#fecc5c;'
+        'border:1px solid #ccc;margin-right:3px;vertical-align:middle"></span><small>50-500d</small>&ensp;'
+        '<span style="display:inline-block;width:11px;height:11px;background:#fd8d3c;'
+        'border:1px solid #ccc;margin-right:3px;vertical-align:middle"></span><small>500-2kd</small>&ensp;'
+        '<span style="display:inline-block;width:11px;height:11px;background:#e31a1c;'
+        'border:1px solid #ccc;margin-right:3px;vertical-align:middle"></span><small>&gt;2kd</small>'
+    )
+    st.markdown(
+        f'<div style="font-size:13px;line-height:2.2">{legend_md}</div>',
+        unsafe_allow_html=True,
+    )
 
     # Summary panel
     n_fg_vessels = fg_df["mmsi"].nunique() if n_fg > 0 and "mmsi" in fg_df.columns else 0
@@ -1486,8 +1593,8 @@ broadcast AIS. This chart captures the tip of the iceberg.
     )
 
     st.markdown(
-        f"**Clustered background:** {n_bg:,} fishing-in-MPA events across "
-        f"{n_bg_vessels:,} vessels (click clusters to expand). "
+        f"**Clustered background:** {n_bg_shown:,} / {n_bg:,} fishing events in GFCM-FRA or EU-designated sites "
+        f"(>=0.5h, top by hours) across {n_bg_vessels:,} vessels. "
         f"**Foreground:** {n_fg:,} high-signal events across "
         f"{n_fg_vessels:,} vessels."
         + (f" {n_overlay} vessel(s) with vessel-level concerns "

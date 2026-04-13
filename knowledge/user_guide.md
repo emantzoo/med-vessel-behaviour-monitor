@@ -126,12 +126,33 @@ GFW-classified fishing events (CNN model, `public-global-fishing-events` feed) w
 
 **Toggle filters:** In MPA only / Non-GFCM flag / With behavioural events / Fishing-only (no behavioural). Filters cascade to both the scatter map and vessel table.
 
-### Views in the Fishing Activity subtab
+### Map layers
+
+Three-layer Folium map with collapsible layer control (top-right of map):
+
+**Layer 1 — FDI effort rectangles:** EU-declared fishing effort by 0.5° c-square (pale yellow <50d → dark red >2000d). Provides spatial context for where legitimate fishing occurs.
+
+**Layer 2 — Background cluster (grey dots):** Fishing events inside GFCM Fisheries Restricted Areas or EU Natura 2000 / Barcelona Convention sites (`mpa_tier = gfcm_fra` or `eu_site`), filtered to >=0.5 fishing hours. The noisy "general" WDPA tier is excluded. Hover for vessel name, flag, hours, MPA name. Click a cluster to expand; zoom in to individual dots.
+
+**Layer 3 — Foreground shapes (clustered):** Events that fired high-signal risk tree leaves. Both layers use FastMarkerCluster — they group at low zoom and uncluster at zoom 11.
+
+| Shape | Colour | Leaf |
+|---|---|---|
+| Triangle-up | Red (high) | `fishing_in_closed_area` — no-take MPA or curated closed area |
+| Square | Orange (medium) | `fishing_in_low_effort_cell` — bottom 5% FDI effort c-square |
+| Diamond | Orange (medium) | `gfw_no_rfmo_authorization` / `unregulated_flag` — non-GFCM flag or no RFMO auth |
+| Circle | Blue (low) | `fishing_in_mpa` (general) — any other WDPA MPA |
+| White border | — | Vessel-level concern: IUU crosscheck / stateless / unregulated flag |
+
+Hover any marker for a tooltip; click a foreground marker for a full popup (vessel name, flag, date, hours, leaf, MPA name, vessel signals).
+
+### Other views
 
 | View | What it shows |
 |---|---|
-| Scatter map | Background grey dots = all fishing inside MPAs; foreground coloured shapes = events that fired risk tree leaves (closed area, low-effort cell, non-GFCM flag). Shape encodes leaf type; colour encodes severity. |
-| Fishing vessel table | One row per fishing vessel: event counts, total hours, in-MPA events, non-GFCM flag, whether the vessel also appears in the behavioural ranking. Includes fishing-only vessels not visible in the Ranking subtab. |
+| Fishing vessel table (expander) | One row per fishing vessel: event counts, total hours, in-MPA events, non-GFCM flag, whether the vessel also appears in the behavioural ranking. Includes fishing-only vessels not visible in the Ranking subtab. |
+
+**These events are never scored.** They fire risk tree leaves and are shown as display-only context.
 
 **Static-demo caveat:** the bundled fishing dataset has only ~5 fishing-in-MPA events. Switch to live GFW mode for the full picture.
 
