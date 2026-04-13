@@ -317,12 +317,18 @@ def investigate_vessel(vessel_identifier, df, iuu_df, iccat_df, ofac_df, fdi_eff
     })
 
     # unregulated_flag_in_gfcm_area (FAO unregulated fishing category)
-    # Only fires when flag is recognised AND outside GFCM membership.
-    # EU collective party status covers all EU member states.
+    # Only fires when flag is recognised AND outside GFCM membership AND
+    # the vessel is classified as a fishing vessel. Non-fishing vessels
+    # (cargo, tanker, carrier, etc.) with non-GFCM flags are not subject
+    # to GFCM fishing regulations and should not fire this leaf.
+    _vc = str(primary.get("vessel_class", "")).lower()
+    _vt = str(primary.get("vessel_type", "")).lower()
+    _is_fishing_vessel = any(kw in _vc or kw in _vt for kw in ("fishing", "trawl", "seiner", "longliner", "dredge"))
     is_unregulated_flag = (
         not is_stateless
         and flag not in GFCM_PARTY_FLAGS
         and flag not in EU_FLAGS
+        and _is_fishing_vessel
     )
     trace.append({
         "branch_id": "authorization", "question_id": "unregulated_flag_in_gfcm_area",

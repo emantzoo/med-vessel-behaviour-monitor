@@ -260,13 +260,23 @@ MED_COASTAL_WEAK_COOPERATION_FLAGS = {
 # Source: https://www.fao.org/gfcm/about/members/en/
 # Vessels flagged to states NOT in this set (and not EU members), fishing
 # in the GFCM area, are engaged in unregulated fishing under the FAO IUU
-# framework. The EU is a collective contracting party — individual EU
-# member states are covered via EU_FLAGS.
+# framework.
+#
+# GFCM full members (contracting parties) as of April 2026 — 24 total:
+#   21 Mediterranean/Black Sea coastal states + EU collective party.
+#   The EU acts on behalf of all its member states; individual EU flags
+#   are therefore covered and must NOT fire the unregulated_flag leaf.
+#
+# Cooperating non-contracting parties (BIH, GEO, JOR, MDA, SAU) have
+# limited/observer status only and are NOT included here — their vessels
+# fishing in the GFCM area without authorisation remain a risk signal.
+#
 # Last verified: April 2026. Update if GFCM membership changes.
 GFCM_PARTY_FLAGS = {
+    # --- GFCM coastal contracting parties ---
     "ALB",  # Albania
     "DZA",  # Algeria
-    "BGR",  # Bulgaria
+    "BGR",  # Bulgaria (Black Sea)
     "HRV",  # Croatia
     "CYP",  # Cyprus
     "EGY",  # Egypt
@@ -274,25 +284,36 @@ GFCM_PARTY_FLAGS = {
     "GRC",  # Greece
     "ISR",  # Israel
     "ITA",  # Italy
-    "JPN",  # Japan
     "LBN",  # Lebanon
     "LBY",  # Libya
     "MLT",  # Malta
     "MCO",  # Monaco
     "MNE",  # Montenegro
     "MAR",  # Morocco
-    "ROU",  # Romania
+    "ROU",  # Romania (Black Sea)
     "SVN",  # Slovenia
     "ESP",  # Spain
     "SYR",  # Syria
     "TUN",  # Tunisia
     "TUR",  # Turkey
-    # EU is a collective GFCM contracting party — all EU member states are covered.
-    # Including full EU_FLAGS set to avoid false non-GFCM positives for EU vessels.
-    "PRT", "DEU", "NLD", "BEL", "IRL", "DNK", "SWE", "FIN",
-    "POL", "EST", "LVA", "LTU", "HUN", "CZE", "SVK", "AUT", "LUX",
-    # No CNCPs as of April 2026 (Bosnia-Herzegovina, Georgia, Ukraine
-    # have been observers but not CNCPs to the GFCM Agreement).
+    "UKR",  # Ukraine (Black Sea — full GFCM member)
+    # --- EU collective contracting party — all EU member states covered ---
+    "AUT", "BEL", "CZE", "DEU", "DNK", "EST", "FIN",
+    "HUN", "IRL", "LTU", "LUX", "LVA", "NLD", "POL",
+    "PRT", "SVK", "SWE",
+    # (Med/Black Sea EU states already listed above: FRA, GRC, HRV, ITA,
+    #  MLT, CYP, SVN, BGR, ROU, ESP)
+    # --- ICCAT-authorized distant-water fleets with active Med BFT quota ---
+    # These non-coastal states have legitimate authorized access to Mediterranean
+    # bluefin tuna under ICCAT CPC status. Their vessels are NOT unregulated.
+    # They may still fire encounter_distant_water_partner (transshipment signal)
+    # when encountered, but their own fishing activity is not flagged here.
+    "JPN",  # Japan — ~3,100–3,600 t BFT quota, largest distant-water fleet
+    "KOR",  # Republic of Korea — ~220–370 t BFT quota
+    "CHN",  # China — ~110–290 t BFT quota
+    "TWN",  # Chinese Taipei (Taiwan) — ~101 t BFT quota
+    "ISL",  # Iceland — eastern Atlantic / limited Med BFT
+    "NOR",  # Norway — eastern Atlantic / limited Med BFT
 }
 
 # Flag values treated as stateless / non-recognised registry.
