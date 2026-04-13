@@ -158,7 +158,7 @@ From *How Deception Detection Works* and the Dec 2025 "Turning Tides" paper:
 |---|---|---|
 | 1. Formal sanctions status | TMT IUU + OFAC SDN screening | **Implemented** |
 | 2. Behavioural indicators | GFW gap / encounter / loitering, duration^0.75 weighted | **Implemented** |
-| 3. Associative risk | Four encounter-partner risk tree leaves: partner name vs IUU list (high), partner name vs OFAC SDN (critical), partner flag in weak-cooperation Med coastal set LBY/SYR (medium), partner flag in distant-water/non-Med FoC set (medium). Plus encounter partner flag analysis charts and ICCAT carrier encounter alerts in display context. | **Partial — first-degree encounter-partner checks wired, fleet-network propagation and ownership graph missing. Maritime 2.0 plugs in here** |
+| 3. Associative risk | Five encounter-partner risk tree leaves: partner name vs IUU list (high), partner name vs OFAC SDN (critical), partner flag in weak-cooperation Med coastal set LBY/SYR (medium), partner flag in distant-water/non-Med FoC set (medium), encounter pattern recurrence within 90 days (medium). Plus encounter partner flag analysis charts and ICCAT carrier encounter alerts in display context. | **Partial — first-degree encounter-partner checks wired, fleet-network propagation and ownership graph missing. Maritime 2.0 plugs in here** |
 | 4. Geographic risk | GSA zoning, shore factor, Libya/Tunisia hotspots, **MPA intersection (GFW `regions.mpa`, tiered)** | **Implemented** |
 | 5. Cargo risk | ICCAT species tiers (carrier 1.4× / BFT 1.3× / SWO-ALB 1.2×) | **Implemented (fisheries-cargo equivalent)** |
 | 6. Ownership opacity | `flag_multiplier` only (FoC proxy) + `vessel_type_mismatch` (Grey Fleet "irregular vessel information") | **Partial — beneficial ownership missing, identity-misrepresentation in place** |
@@ -248,12 +248,13 @@ These signals are never multiplied into the numeric risk score — the underlyin
 
 ### Recently wired risk tree leaves
 
-Four encounter-partner leaves now implemented in the `network_exposure` branch (previously aspirational stubs):
+Five encounter-partner leaves now implemented in the `network_exposure` branch (previously aspirational stubs):
 
 - **`encounter_iuu_vessel`** — partner name matched against TMT IUU list (high severity)
 - **`encounter_sanctioned_vessel`** — partner name matched against OFAC SDN (critical severity)
 - **`encounter_weak_cooperation_partner`** — partner flag in {LBY, SYR} (medium severity)
 - **`encounter_distant_water_partner`** — partner flag not in EU and not in Med coastal set (medium severity)
+- **`encounter_pattern_recurrence`** — same counterparty 2+ times within 90-day rolling window (medium severity)
 
 Plus `authorization_mismatch` hardcoded for obvious cases (IRN/RUS/PRK/SYR have no legitimate fishing rights in EU Med waters).
 

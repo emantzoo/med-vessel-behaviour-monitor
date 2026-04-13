@@ -147,7 +147,7 @@ Two descriptive columns derived from `shiptypes` (registry-level, GFW Vessels AP
 
 **Why this is the Kpler Grey Fleet equivalent:**
 
-The Kpler *Grey Fleet* paper (March 2025) lists "irregular vessel information" as one of the indicators that distinguishes deceptive vessels — a vessel broadcasting one identity in AIS while its registry record says something different. `vessel_type_mismatch` operationalises that exact indicator on open data: AIS-self-reported type (event-level) vs the GFW Vessels API registry record. Like the four Kpler-aligned behavioural flags, it is **never multiplied into the risk score** — it is a parallel indicator that fires a rule in the risk tree (`identity_misrepresentation` leaf, medium severity) and shows up in the Trends & Patterns subtab.
+The Kpler *Grey Fleet* paper (March 2025) lists "irregular vessel information" as one of the indicators that distinguishes deceptive vessels — a vessel broadcasting one identity in AIS while its registry record says something different. `vessel_type_mismatch` operationalises that exact indicator on open data: AIS-self-reported type (event-level) vs the GFW Vessels API registry record. Like the Kpler-aligned behavioural flags, it is **never multiplied into the risk score** — it is a parallel indicator that fires a rule in the risk tree (`identity_misrepresentation` leaf, medium severity) and shows up in the Trends & Patterns subtab.
 
 **`vessel_class` is orthogonal to `is_industrial`:**
 

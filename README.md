@@ -82,17 +82,18 @@ Methodology aligned with GFW transshipment detection (Miller et al. 2018): encou
 
 ## Architecture
 
-Eight-module Streamlit application:
+Nine-module Streamlit application:
 
 | Module | Responsibility |
 |---|---|
-| `app.py` | Orchestrator. Loads data, applies filters, runs scoring pipeline, renders Folium map, dispatches to six tabs. |
+| `app.py` | Orchestrator. Loads data, applies filters, runs scoring pipeline, renders Folium map, dispatches to four top-level tabs (with subtabs). |
 | `config.py` | Constants (event weights, flag risks, IUU/ICCAT/OFAC multipliers, risk bands, species names, sandbox forbidden code list) and pure utility functions (`classify_med_zone`, `assign_csquare`, `classify_risk_band`). |
 | `data_loading.py` | All data loaders with `@st.cache_data`: static CSV, GFW Events API (async), FDI effort/landings, IUU vessels, ICCAT vessels, OFAC SDN, GFW Vessels API (IMO lookup). |
 | `risk_model.py` | `compute_risk_score()`, `get_fdi_context()`, IUU matching, ICCAT matching, OFAC matching, `compute_vessel_flags()` (Kpler-aligned display-only flags). |
 | `tabs.py` | Render functions for each top-level tab and expander section, including `render_vessel_summary` (Kpler-vocabulary aggregation) and `render_daily_trend` (daily + monthly multi-behaviour trend). |
 | `ai_analyst.py` | Google Gemini 2.5 Flash integration with RAG knowledge base, sandboxed pandas/plotly code execution, system prompt builder. |
 | `investigation.py` | Deterministic rule-based vessel investigation (no LLM) -- structured multi-section report used by the Vessel Investigation tab. |
+| `exports.py` | Per-vessel Markdown case file (`generate_vessel_case_file()`) and fleet-level CSV + Markdown cover sheet (`generate_fleet_summary()`). Download buttons in Investigation and Ranking tabs. |
 | `risk_tree.py` | Two Graphviz diagram builders: `render_framework_tree()` for the Med IUU Risk Tree framework loaded from `data/risk_tree_framework.yaml`, and `render_scoring_pipeline_diagram()` for the end-to-end scoring pipeline shown in the Reference tab. |
 
 ## Data pipeline
@@ -158,7 +159,7 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-Static demo mode (94 pre-generated events across 88 vessels, including 2 IUU-listed, 6 ICCAT-authorised and 2 OFAC-sanctioned demo vessels, enriched with realistic length / tonnage profiles so all four Kpler-aligned flags -- including industrial profile -- fire visibly across both sides of the 24m / 100 GT threshold) runs without any API credentials. Live mode requires a GFW API JWT token, which can be placed in `.streamlit/secrets.toml` or entered via the sidebar.
+Static demo mode (95 pre-generated events across 88 vessels, including 2 IUU-listed, 6 ICCAT-authorised and 2 OFAC-sanctioned demo vessels, enriched with realistic length / tonnage profiles so all four Kpler-aligned flags -- including industrial profile -- fire visibly across both sides of the 24m / 100 GT threshold) runs without any API credentials. Live mode requires a GFW API JWT token, which can be placed in `.streamlit/secrets.toml` or entered via the sidebar.
 
 ### Optional credentials
 
@@ -177,10 +178,10 @@ Both have sidebar text-input fallbacks if the secrets file is missing.
 - 7 multiplicative factors in the base risk formula
 - 4 lookup-based amplifiers applied post-scoring (IUU, ICCAT, OFAC, flag)
 - 5 risk bands (Low, Emerging, Elevated, Severe, Critical)
-- 6 top-level tabs
+- 4 top-level tabs (Fleet Analytics has 4 subtabs)
 - 369 IUU vessels, 9,203 ICCAT Med-authorised vessels, 1,008 FDI c-squares
-- 94 static demo events across 88 unique MMSI, including 2 IUU-listed, 6 ICCAT-authorised and 2 OFAC-sanctioned demo vessels
-- 3 Kpler-aligned display-only behavioural flags (multi-behaviour, dark port call candidate, repeat offender 90d)
+- 95 static demo events across 88 unique MMSI, including 2 IUU-listed, 6 ICCAT-authorised and 2 OFAC-sanctioned demo vessels
+- 4 Kpler-aligned display-only behavioural flags (industrial profile, multi-behaviour, dark port call candidate, repeat offender 90d) plus vessel_type_mismatch identity signal
 - Med polygon: `[[-6, 30], [36.5, 30], [36.5, 46], [-6, 46]]`
 - FDI c-square grid: 0.5 deg x 0.5 deg
 

@@ -193,7 +193,7 @@ Med Vessel Monitor implements four and a half of these six layers:
 
 1. **Formal sanctions status** — TMT Combined IUU List, ICCAT IUU list, OFAC SDN screening
 2. **Behavioural indicators** — GFW gap, encounter, loitering events, aligned with Miller et al. 2018 methodology
-3. **Associative risk** — four encounter-partner leaves in the risk tree's network_exposure branch: partner name matched against IUU list (high), partner name matched against OFAC SDN (critical), partner flag in weak-cooperation Med coastal set (LBY/SYR, medium), partner flag in distant-water/non-Med FoC set (medium). First-degree only — fleet-network propagation and ownership graph still out of scope.
+3. **Associative risk** — five encounter-partner leaves in the risk tree's network_exposure branch: partner name matched against IUU list (high), partner name matched against OFAC SDN (critical), partner flag in weak-cooperation Med coastal set (LBY/SYR, medium), partner flag in distant-water/non-Med FoC set (medium), encounter pattern recurrence (same counterparty 2+ times within 90 days, medium). First-degree only — fleet-network propagation and ownership graph still out of scope.
 4. **Geographic risk** — GSA-based hotspot weighting, shore distance factor
 5. **Cargo risk** — ICCAT species multipliers (BFT 1.3x, SWO/ALB 1.2x, carrier 1.4x) as the fisheries-cargo equivalent
 
@@ -291,9 +291,8 @@ Know this cold. If they ask "walk me through the code" or "how is it structured,
 
 ```
 app.py              → Orchestrator. Loads data, runs filters, applies risk
-                      scoring, renders Folium map, dispatches to the 6
-                      top-level tabs. This is the entry point — everything
-                      flows through here.
+                      scoring, renders Folium map, dispatches to the 4
+                      top-level tabs (with subtabs). Entry point.
 
 config.py           → Constants and pure functions. Event weights, flag risk
                       multipliers (loaded from IUU Risk Index CSV, 152 countries),
@@ -379,6 +378,13 @@ ai_analyst.py       → Gemini 2.5 Flash integration:
                       - exec namespace: df, fdi_effort, fdi_landings,
                         iuu_vessels, iccat_vessels, ofac_vessels, pd, np,
                         px, go
+
+exports.py          → Export helpers for analyst workflow:
+                      - generate_vessel_case_file() → Markdown per vessel
+                        (identity, risk summary, events, risk tree, narrative)
+                      - generate_fleet_summary() → CSV + Markdown cover
+                        (scope, band distribution, top vessels, methodology)
+                      - Wired to download buttons in Investigation + Ranking
 ```
 
 ### Data Pipeline (execution order in app.py)
@@ -396,7 +402,7 @@ ai_analyst.py       → Gemini 2.5 Flash integration:
 10. OFAC match        match_ofac_vessels() → ofac_* columns, risk *= ofac_multiplier
 11. Classify band     classify_risk_band() → risk_band column (Low..Critical)
 12. Render map        Folium markers (priority: OFAC > IUU > ICCAT > event type)
-13. Render tabs       6 top-level tabs dispatched with df_filtered + reference data
+13. Render tabs       4 top-level tabs (with subtabs) dispatched with df_filtered + reference data
 14. AI analyst        Gemini with RAG + sandboxed code execution + risk tree trace (per vessel)
 ```
 
@@ -457,7 +463,7 @@ Purple   = ENCOUNTER event
 ## Key Numbers to Know
 
 - 5 data sources cross-referenced (GFW, FDI, IUU, ICCAT, OFAC), with GFW providing three distinct feeds (Events API, `regions.mpa` WDPA intersection, `public-global-fishing-events` CNN classifier)
-- 94 demo events across 6 top-level tabs (secondary charts in expanders)
+- 95 demo events across 4 top-level tabs (Fleet Analytics has 4 subtabs; secondary charts in expanders)
 - 369 IUU vessels (213 currently listed, 150 GFCM-listed)
 - 9,203 ICCAT Med-authorized vessels
 - ~1,000 FDI c-squares covering EU Med waters

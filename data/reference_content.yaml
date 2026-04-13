@@ -37,11 +37,13 @@ risk_formula_explanation: |
   indicator in the commercial literature.
 
   The network_exposure branch of the risk tree implements the associative
-  risk layer of Kpler's six-layer framework using four encounter-partner
+  risk layer of Kpler's six-layer framework using five encounter-partner
   leaves. Two are name-based (IUU list match at high severity, OFAC list
   match at critical severity), two are flag-based (weak-cooperation Med
   coastal flags Libya/Syria at medium severity; distant-water or non-Med
   FoC flags outside both the EU and cooperative Med coastal set at medium
+  severity), and one is temporal (encounter pattern recurrence -- same
+  counterparty 2+ times within a 90-day rolling window at medium
   severity). None of these propagate risk across fleet networks or
   ownership relationships — that layer requires ownership graph data
   outside the open-data stack and is named as future work.
@@ -264,7 +266,7 @@ methodology_references:
 
   - title: How Deception Detection Works
     citation: Kpler (2025)
-    relevance: Formal six-layer risk framework — formal sanctions, behavioural indicators, associative risk, geographic risk, cargo risk, ownership opacity. Four and a half of the six map to the current implementation (associative risk partially covered by four encounter-partner risk tree leaves).
+    relevance: Formal six-layer risk framework — formal sanctions, behavioural indicators, associative risk, geographic risk, cargo risk, ownership opacity. Four and a half of the six map to the current implementation (associative risk partially covered by five encounter-partner risk tree leaves).
 
   - title: GFCM Compendium of Decisions and non-compliance reports
     citation: GFCM, ongoing
@@ -304,7 +306,7 @@ scope_and_limitations: |
   North Africa.
 
   Temporal. FDI reliable from 2017 onwards. Live mode pulls current GFW
-  events subject to API rate limits; static mode uses a fixed 94-event
+  events subject to API rate limits; static mode uses a fixed 95-event
   demo dataset.
 
   Spatial resolution. GFW events are point-level; FDI is aggregated to

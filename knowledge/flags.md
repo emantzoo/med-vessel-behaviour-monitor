@@ -65,7 +65,7 @@ their presence in the data is normal operational activity, not a risk signal.
 
 ## Demo data flag distribution
 
-The static demo dataset (`data/med_events_static.csv`, 94 events) uses a
+The static demo dataset (`data/med_events_static.csv`, 95 events) uses a
 flag distribution roughly proportional to actual Med fishing activity:
 GRC 13, ITA 13, TUR 12, TUN 9, DZA 7, MLT 6, ESP 5, IRN 5, EGY 5,
 MAR 3, LBY 3, HRV 3, FRA 2, CYP 2, BHS 2, HND 2, ALB 1, UNK 1.

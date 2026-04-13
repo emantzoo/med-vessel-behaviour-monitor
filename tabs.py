@@ -2423,9 +2423,10 @@ def render_reference():
         st.caption(
             "How one AIS event becomes a per-vessel risk band. The main "
             "column is the multiplicative chain that produces the risk "
-            "score; the dashed side-chain shows the three vessel-level "
-            "behavioural flags, which are displayed alongside the score "
-            "but are **not** multiplied into it."
+            "score; the dashed side-chain shows the four vessel-level "
+            "behavioural flags (industrial profile, multi-behaviour, dark "
+            "port call candidate, repeat offender), which are displayed "
+            "alongside the score but are **not** multiplied into it."
         )
         try:
             st.graphviz_chart(render_scoring_pipeline_diagram())

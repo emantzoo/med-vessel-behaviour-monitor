@@ -534,8 +534,9 @@ def investigate_vessel(vessel_identifier, df, iuu_df, iccat_df, ofac_df, fdi_eff
     })
 
     # ===== Network Exposure (associative risk layer) =====
-    # Four encounter-partner leaves: two name-based (IUU/OFAC list match),
-    # two flag-based (weak-cooperation Med coastal, distant-water/non-Med FoC).
+    # Five encounter-partner leaves: two name-based (IUU/OFAC list match),
+    # two flag-based (weak-cooperation Med coastal, distant-water/non-Med FoC),
+    # one temporal (encounter pattern recurrence within 90 days).
     encounter_events = vessel_events[vessel_events["event_type"] == "ENCOUNTER"]
 
     # Leaf 1: Encounter with IUU-listed vessel (name match)
