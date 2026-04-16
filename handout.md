@@ -77,7 +77,7 @@ Replicates and extends the GFW transshipment methodology (Miller et al. 2018, *T
 
 **Non-linear duration** — `duration_h^0.75` prevents a single extreme event from dominating.
 
-**Flag multipliers** — RUS 2.8, IRN 2.4, PRK 3.0, SYR 2.0, LBR 1.3, PAN 1.2, MHL 1.2, others 1.0. (Libya is in the "others" bucket — no explicit multiplier, the risk comes via behaviour, not passport.)
+**Flag multipliers** — from Poseidon IUU Fishing Risk Index (152 countries, 10 flag-responsibility indicators per country). Formula: `multiplier = 1.0 + (mean_score - 1.0) * 0.3`, range 1.0–2.0×. Representative values: TWN 1.96×, RUS 1.93×, CHN 1.87×, PAN 1.81×, LBY 1.66×, IRN 1.63×, ESP 1.51×, TUR 1.51×, FRA 1.54×, ITA 1.42×, GRC 1.21×. No country is zero-risk — the multiplier encodes flag-state governance quality, not passport.
 
 **Shore distance factor** (all event types)
 - `>20 nm` (37 km): 1.5× — high-suspicion zone, GFW "likely transshipment" threshold
@@ -112,20 +112,20 @@ Replicates and extends the GFW transshipment methodology (Miller et al. 2018, *T
 
 ---
 
-## Worked example — a Libyan-flagged gap event
+## Worked example — a Tunisian-flagged gap event
 
 | Step | Factor | Value | Running score |
 |---|---:|---:|---:|
 | 18 h GAP event | duration^0.75 × 3.2 | 8.8 × 3.2 | **28.2** |
-| Flag (Libya, no explicit multiplier — risk comes via behaviour, not passport) | × 1.0 | — | 28.2 |
-| 12 km offshore | × 1.2 shore | — | 33.8 |
-| Inside a GFCM FRA | × 2.0 mpa | — | 67.6 |
-| Base score snapshotted | | | **67.6 → Elevated** |
-| IUU-listed (GFCM) | × 3.0 | | 202.8 |
-| ICCAT BFT-catching | × 1.3 | | 263.6 |
+| Flag (Tunisia, IUU Risk Index 1.48×) | × 1.48 | — | 41.7 |
+| 12 km offshore | × 1.2 shore | — | 50.1 |
+| Inside an EU-designated marine site | × 1.5 mpa | — | 75.1 |
+| Base score snapshotted | | | **75.1 → Elevated** |
+| IUU-listed (GFCM) | × 3.0 | | 225.2 |
+| ICCAT BFT-catching | × 1.3 | | 292.8 |
 | **Final band** | | | **Critical** |
 
-Same event. Behavioural base (including the MPA factor, which is a spatial rule-zone signal) says "Elevated". Structural amplifiers from list lookups compound it to "Critical". The analyst sees both numbers, so the compounding is auditable rather than opaque.
+Same event. Behavioural base (including the MPA factor, which is a spatial rule-zone signal, and the data-driven flag multiplier from the Poseidon IUU Risk Index) says "Elevated". Structural amplifiers from list lookups compound it to "Critical" — nearly 4× the base. The analyst sees both numbers (base 75.1 vs final 292.8, compound multiplier 3.9×), so the compounding is auditable rather than opaque.
 
 **Calibration of the MPA multiplier.** The MPA factor is anchored by regulatory tier rather than empirical outcomes, the same way every other factor in the formula is methodology-driven rather than enforcement-calibrated. GFCM FRAs (legally binding under Reg 1967/2006) sit at 2.0× for parity with "other RFMO IUU listing"; EU-designated marine sites at 1.5×; general WDPA entries at 1.2× (below flag-of-convenience). Sensitivity sweep on the static demo across `gfcm ∈ {1.5, 2.0, 2.5, 3.0}` preserves the top-6 *set* across all four values, holds the top-6 *order* stable across `[2.0, 3.0]` (a single rank swap inside the set occurs only at the lowest value), and keeps every top-10 vessel in the Critical band at every setting — calibration sits in a stable plateau. Empirical calibration would require a labelled Mediterranean enforcement-outcome dataset which does not currently exist at scale; this is the same gap named for `duration^0.75` and every other weight.
 
@@ -135,19 +135,21 @@ The **Fishing Activity subtab** renders a three-layer Folium map: (1) FDI effort
 
 ---
 
-## Data sources and epistemologies (GFW provides four distinct feeds)
+## Data sources and epistemologies (GFW provides five distinct feeds)
 
 | # | Source | Scale | Epistemic role |
 |---|---|---|---|
 | 1 | **GFW Events API** — gap / encounter / loitering | Live, Med polygon | Observed behaviour |
 | 1b | **GFW `regions.mpa`** — WDPA point-in-polygon, pre-computed server-side | Global, tiered into GFCM-FRA / EU-site / general | Spatial rule-zone violation (composes into base score) |
 | 1c | **GFW `public-global-fishing-events`** — Kroodsma et al. 2018 CNN-classified fishing activity | Same Med polygon, joined onto MMSI of the behavioural feed | Ground-truth fishing classification (display-only fishing-in-MPA flag, kept out of multiplier chain) |
+| 1d | **GFW Vessels API** — vessel metadata (IMO, length, tonnage, shiptypes) | Per-MMSI lookup | Identity enrichment (vessel class, industrial flag, type mismatch) |
+| 1e | **GFW Insights API** (optional) — RFMO auth cross-checks, IUU list confirmation, AIS coverage | Per-vessel batch query | Regulatory cross-reference (two risk tree leaves) |
 | 2 | **EU JRC FDI** — effort & landings by c-square × quarter × gear × species | 83k effort rows, 212k landing rows, 27 gear types | Statistical estimate of legitimate activity |
 | 3 | **TMT Combined IUU List** — 13 RFMOs | 369 vessels (168 with IMO, 64 with MMSI) | Confirmed enforcement |
 | 4 | **ICCAT Record of Vessels** — Med-authorised | 9,203 vessels, species-weighted multipliers | Authorisation as *opportunity*, not exoneration |
 | 5 | **OFAC SDN** — US Treasury sanctioned vessels | ~50 vessels | Hard sanctions flag |
 
-MPA intersection is listed as 1b because it is part of the GFW Events API response itself — no additional ingestion, no polygon encoding, WDPA point-in-polygon computed server-side.
+MPA intersection is listed as 1b because it is part of the GFW Events API response itself — no additional ingestion, no polygon encoding, WDPA point-in-polygon computed server-side. The Vessels API (1d) is a separate endpoint used for MMSI-to-IMO resolution and vessel metadata enrichment. The Insights API (1e) is optional and requires a sidebar toggle.
 
 Base behavioural score is snapshotted between step 1 and steps 3–5 so the final report can decompose any vessel into **base × compound multiplier**.
 
@@ -316,7 +318,7 @@ Note: `gfcm_authorized` (absence-based authorisation signal) remains as a partia
 
 ### 1. Global Fishing Watch (GFW)
 
-The behavioural substrate. Three distinct feeds from the same organisation.
+The behavioural substrate. Five distinct feeds from the same organisation.
 
 **GFW Events API** -- AIS-derived behavioural events for the Mediterranean polygon. Produces three event types: gap (AIS disabling), encounter (two vessels meeting at sea), loitering (low-speed stationary behaviour). Anchored in Miller et al. 2018 transshipment detection methodology. Primary input to the scoring pipeline.
 
@@ -325,6 +327,8 @@ The behavioural substrate. Three distinct feeds from the same organisation.
 **GFW `public-global-fishing-events`** -- Kroodsma et al. 2018 CNN-classified fishing activity, separate feed from the behavioural events. Joined to vessels by MMSI. Powers the fishing-in-MPA display flag. Display-only, never multiplied into the score.
 
 **GFW Vessels API** -- vessel metadata for identity enrichment. Provides length, tonnage, shiptypes, flag, IMO when available. Used to populate the `is_industrial` flag, `vessel_class` canonical categorisation, and `vessel_type_mismatch` check.
+
+**GFW Insights API** (optional, requires sidebar toggle) -- per-vessel intelligence from GFW's RFMO authorization cross-checks and IUU list confirmation. Provides AIS coverage %, fishing-without-RFMO-auth events, fishing-in-no-take-MPA events, IUU listing status (independent of static TMT CSV), and AIS-off event counts. Feeds two risk tree leaves: `gfw_iuu_crosscheck` and `gfw_no_rfmo_authorization`. Concurrent batch queries (up to 10 vessels simultaneously).
 
 ### 2. EU JRC FDI (Fisheries Dependent Information)
 

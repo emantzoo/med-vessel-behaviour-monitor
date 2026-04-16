@@ -16,8 +16,8 @@ These elements sit above the four tabs because they carry the highest-priority s
 
 **Visual encoding (triple):**
 - **Shape** = behaviour type: circle (AIS gap), square (loitering), triangle (encounter)
-- **Fill colour** = listing status, priority order: OFAC dark red > IUU black > clean (coloured by event type). Low-band events excluded from map.
-- **Size** = risk band: Low (14 px) → Emerging (17 px) → Elevated (20 px) → Severe (24 px) → Critical (28 px)
+- **Fill colour** = listing status, priority order: OFAC dark red (#8B0000) > IUU black > ICCAT blue > clean (coloured by risk band). Low-band events excluded from map.
+- **Size** = risk band: Low (5 px) → Emerging (6 px) → Elevated (7 px) → Severe (9 px) → Critical (11 px)
 - **Dashed amber outline** = dark port call candidate (loitering within 10 km of shore)
 
 **FDI choropleth layer (toggleable):** All Mediterranean 0.5-degree c-squares coloured by fishing days with opacity tiers — pale yellow (<50d, 0.15 opacity), orange (50–500d, 0.25), orange-red (500–2000d, 0.30), dark red (>2000d, 0.35). Coverage is fleet-wide, not limited to event proximity.
@@ -25,23 +25,29 @@ These elements sit above the four tabs because they carry the highest-priority s
 **Interactions:**
 - Click a marker to see the event detail card (vessel, event type, risk score, flag, duration, date, listing status, FDI context, external lookup links).
 - Clicking a marker also pre-selects that vessel for the Vessel Investigation tab and filters the map to that vessel's events.
-- Use the layer control (top-right) to toggle Clean / IUU / OFAC / FDI layers.
+- Use the layer control (top-right) to toggle IUU-Listed / OFAC Sanctioned / FDI Fishing Effort layers.
 - When a vessel is focused (via row click, marker click, or Investigation dropdown), the map auto-zooms to fit that vessel's events. Use the "Clear map filter" button to return to the full fleet view.
+
+**Scope note:** The map responds to both pill filters (event type, risk band, flag, vessel class) and vessel-level focus (marker click, quick-select row click, investigation dropdown). Pill filter state is read from session state before the map renders, so changing a pill in Fleet Analytics updates the map, the metrics column, and the subtabs on the next rerun. When pills are active, fleet metrics show the pill-filtered count as primary with "of N total" context (e.g., "12 of 38"). Alert boxes always show the full sidebar-filtered dataset.
+
+**Performance note:** FDI choropleth rectangles and FDI context lookups are cached across reruns (`@st.cache_data`), so only event markers are rebuilt when pills or vessel focus change. The `st_folium` component uses a stable `key` to avoid full unmount/remount cycles.
 
 ### Fleet Metrics (right column)
 
-**What it shows:** Summary metrics for the filtered fleet.
+**What it shows:** Summary metrics for the filtered fleet. When pill filters are active, metrics show the pill-filtered count as primary with "of N total" context (e.g., "12 of 38" events). When no pills are active, metrics show the full sidebar-filtered dataset.
 
 **Metrics displayed:**
-- Mediterranean Behavioral Risk Index (total risk score)
-- Events (count)
-- Unique Vessels (MMSI count)
-- Flags (unique flag count)
-- IUU-Listed Vessels (count, if any matched)
-- OFAC Sanctioned (count, if any matched)
-- Multi-behaviour Vessels (count, if column present)
-- Dark Port Call Candidates (count, if events present)
-- Repeat Offenders 90d (count, if column present)
+- Avg Risk Score (mean risk score per event)
+- Peak Risk Score (highest single-event risk score)
+- Total Events (count, or "X of Y" when pills active)
+- Map coverage caption (Emerging+ on map, Low-band hidden, Elevated/Severe/Critical count)
+- Unique Vessels (MMSI count, or "X of Y" when pills active)
+- Flags (unique flag count, or "X of Y" when pills active)
+- IUU-Listed Vessels (event count where iuu_matched=True, if any)
+- OFAC Sanctioned (event count where ofac_sanctioned=True, if any)
+- Multi-behaviour Vessels (unique vessel count, if column present)
+- Dark Port Call Candidates (event count, if events present)
+- Repeat Offenders 90d (unique vessel count, if column present)
 
 ### OFAC Sanctions Alert (full width)
 
@@ -59,28 +65,33 @@ Red alert banner if any event involves an IUU-listed vessel. Expandable table wi
 
 **Data:** Scored GFW events for the selected vessel + IUU vessel list + ICCAT authorized vessels + OFAC SDN list + FDI fishing effort and landings (spatial join by c-square) + fishing-in-MPA events.
 
-**Report sections (10 steps):**
+**Report sections (15 steps):**
 
-1. **Identity confirmation** — vessel name, MMSI, IMO, flag, event count, profile (length/tonnage).
-2. **IUU listing status** — colour-coded alert (red if matched, green if clean).
-3. **ICCAT authorization status** — colour-coded alert (amber if authorized, blue if not).
-4. **OFAC sanctions status** — colour-coded alert (red if sanctioned, green if clean).
+1. **Identity confirmation** — vessel name, MMSI, IMO, flag, event count, profile (length/tonnage), industrial badge.
+2. **IUU listing status** — colour-coded alert (red if matched, green if clean), tier (GFCM/Other), match type/confidence.
+3. **ICCAT authorization status** — colour-coded alert (amber if authorized, blue if not), authorization types, risk tier.
+4. **OFAC sanctions status** — colour-coded alert (red if sanctioned, green if clean), sanctions program, multiplier.
+4c. **GFW Insights cross-references** (optional, live/snapshot mode only) — AIS coverage %, fishing without RFMO auth, GFW IUU listed, AIS-off events.
 5. **Fisheries context** — event-level table with FDI overlay (fishing days, top species, landings value per c-square).
-5b. **Fishing activity inside MPAs** — metrics + MPA name list + event table (display-only).
-6. **Behavioural pattern** — event types, counts, average duration, gap speed analysis.
-6b. **Behavioural flags** — multi-behaviour, dark port call candidates, repeat offender (display-only).
+5b. **Fishing activity inside MPAs** — event count, total hours, highest tier, MPA name list + event detail table (display-only).
+6. **Behavioural pattern** — event types, counts, average duration, gap speed analysis (intentional disabling, implied speed).
+6b. **Behavioural flags** — multi-behaviour, dark port call candidates, repeat offender (display-only metrics).
 7. **Risk score decomposition** — total risk, flag multiplier, compounded multiplier, max single event.
-8. **Hypotheses** — colour-coded hypothesis cards generated by the investigation engine.
+8. **Hypotheses** — prioritised findings (critical/high/info level) generated by the investigation engine.
 9. **External lookups** — links to MarineTraffic, VesselFinder, Equasis.
 10. **Threat assessment** — key evidence summary + recommended action.
+11. **Risk tree trace** — per-vessel evaluation of all branches and leaves (expandable by branch).
+12. **Cumulative risk trajectory** — line chart with band threshold lines showing behavioural arc over time.
 
 **Quick-select table:** Expandable compact table with vessel name, flag, events, risk score, risk band, IUU, OFAC. Click a row to switch investigation and filter the map.
 
-**Risk-tree trace (bottom):**
-- Expandable by branch (Identity, Flag Risk, Regulatory Status, Authorization, Behavioural History, Spatial/Contextual, Network Exposure).
+**Risk-tree trace** (rendered as steps 11-12 of the investigation report):
+- Expandable by branch (Identity, Flag Risk, Regulatory Status, Authorization, Behavioural History, Spatial/Contextual, Network Exposure, Fishing Activity).
 - Each branch shows fired/total questions, coloured severity tags, and notes.
 - Interactive icicle chart (Plotly) showing the full tree hierarchy.
 - Full Graphviz diagram of the tree for this vessel.
+
+**Cumulative risk trajectory** (step 12): line chart of cumulative risk score over time with horizontal band-threshold lines (Low/Emerging/Elevated/Severe/Critical).
 
 **Interactions:** Select a vessel from the dropdown, the quick-select table, or click a marker on the map. The dropdown is pre-populated with the highest-risk vessel.
 
@@ -96,13 +107,13 @@ Red alert banner if any event involves an IUU-listed vessel. Expandable table wi
 
 **Key columns:**
 - `risk_band` — Kpler Turning Tides classification: Low (<50), Emerging (50-60), Elevated (60-80), Severe (80-100), Critical (>=100). Cell background coloured.
-- `avg_risk` / `peak_risk` — per-event average and maximum risk score. More stable than sum for cross-vessel comparison.
+- `base_score_total` / `risk_score_total` / `max_event_risk` — sum of base scores, sum of compounded scores, and highest single-event score.
 - `compound_multiplier` — `risk_score_total / base_score_total`. 1.0x = purely behavioural; >2x = structural lookups (IUU, ICCAT, OFAC) dominate.
 - `vessel_class` — descriptive category from GFW Vessels API shiptypes (industrial_fishing / artisanal_fishing / carrier / tanker / cargo / support / passenger / other).
 - `type_mismatch` — fires when event-level vessel_type and registry shiptypes map to different canonical classes (Kpler Grey Fleet "irregular vessel information" equivalent).
 - Four behavioural flags: `is_industrial`, `multi_behaviour`, `dark_port_candidates`, `repeat_offender` (display-only, never scored).
 - MPA intersection: `in_mpa`, `mpa_tier`, `fishing_in_mpa_events`, `fishing_in_mpa_hours`.
-- Listing booleans: `iuu_matched`, `iccat_authorized`, `ofac_sanctioned`.
+- Listing booleans: `iuu_matched`, `iccat_authorized`, `ofac_sanctioned`, `gfcm_registered`.
 
 **Pill filters:** Event type, risk band, flag state, vessel class. Sit above the subtabs and cascade to all five Fleet Analytics subtabs.
 

@@ -36,6 +36,45 @@ from tabs import (
 )
 from ai_analyst import render_ai_analyst
 
+
+# ========================= CACHED HELPERS =========================
+
+@st.cache_data(show_spinner=False)
+def _build_fdi_rectangles(fdi_effort_df):
+    """Pre-compute FDI rectangle specs (built once, reused across reruns)."""
+    latest_year = fdi_effort_df["year"].max()
+    fdi_agg = (
+        fdi_effort_df[fdi_effort_df["year"] == latest_year]
+        .groupby(["rectangle_lon", "rectangle_lat"])["totfishdays"]
+        .sum()
+        .reset_index()
+    )
+    rects = []
+    for _, cell in fdi_agg.iterrows():
+        days = cell["totfishdays"]
+        if days >= 2000:
+            color, opacity = "#e31a1c", 0.35
+        elif days >= 500:
+            color, opacity = "#fd8d3c", 0.30
+        elif days >= 50:
+            color, opacity = "#fecc5c", 0.25
+        else:
+            color, opacity = "#ffffb2", 0.15
+        rects.append((cell["rectangle_lat"], cell["rectangle_lon"], days, color, opacity))
+    return rects
+
+
+@st.cache_data(show_spinner=False)
+def _build_fdi_cache(csquares_tuples, fdi_effort_df, fdi_landings_df):
+    """Pre-compute FDI context for each unique c-square (cached across reruns)."""
+    cache = {}
+    for csq_lon_v, csq_lat_v in csquares_tuples:
+        cache[(csq_lon_v, csq_lat_v)] = get_fdi_context(
+            csq_lon_v, csq_lat_v, fdi_effort_df, fdi_landings_df
+        )
+    return cache
+
+
 # ========================= PAGE CONFIG =========================
 st.set_page_config(
     page_title="Med Vessel Behaviour Monitor",
@@ -345,6 +384,27 @@ for _col, _default in [
         df_filtered[_col] = _default
 
 # ========================= MAIN MAP & METRICS =========================
+
+# Read pill filter state early (widgets rendered later in Fleet Analytics,
+# but their session-state keys persist across reruns).  This lets the map
+# respond to the same pills that drive the Fleet Analytics subtabs.
+_pill_events = st.session_state.get("pill_event_type", [])
+_pill_bands = st.session_state.get("pill_risk_band", [])
+_pill_flags = st.session_state.get("pill_flag", [])
+_pill_class = st.session_state.get("pill_vessel_class", [])
+
+df_map_base = df_filtered
+if _pill_events:
+    df_map_base = df_map_base[df_map_base["event_type"].isin(_pill_events)]
+if _pill_bands:
+    df_map_base = df_map_base[df_map_base["risk_band"].isin(_pill_bands)]
+if _pill_flags:
+    df_map_base = df_map_base[df_map_base["flag"].isin(_pill_flags)]
+if _pill_class and "vessel_class" in df_map_base.columns:
+    df_map_base = df_map_base[df_map_base["vessel_class"].isin(_pill_class)]
+
+_pills_active = bool(_pill_events or _pill_bands or _pill_flags or _pill_class)
+
 col1, col2 = st.columns([3, 1])
 
 with col1:
@@ -357,8 +417,8 @@ with col1:
         # the viewport to its events. df_filtered itself is left alone
         # so the fleet-level tabs still show the full picture.
         focus_vessel = st.session_state.get("map_clicked_vessel")
-        if focus_vessel and focus_vessel in df_filtered["vessel_name"].values:
-            df_map = df_filtered[df_filtered["vessel_name"] == focus_vessel]
+        if focus_vessel and focus_vessel in df_map_base["vessel_name"].values:
+            df_map = df_map_base[df_map_base["vessel_name"] == focus_vessel]
             n_focus = len(df_map)
             fc1, fc2 = st.columns([5, 1])
             fc1.info(
@@ -370,7 +430,12 @@ with col1:
                 st.session_state.pop("map_clicked_vessel", None)
                 st.rerun()
         else:
-            df_map = df_filtered
+            df_map = df_map_base
+        if _pills_active:
+            st.caption(
+                f"Map showing {len(df_map)} of {len(df_filtered)} events "
+                f"(pill filters active). Clear pills in Fleet Analytics to reset."
+            )
 
         # Centre + zoom: fit to the focused vessel's events when filtered,
         # otherwise default to the whole Med basin.
@@ -397,27 +462,9 @@ with col1:
         fg_ofac = MarkerCluster(name="OFAC Sanctioned", show=True)
         fg_fdi = folium.FeatureGroup(name="FDI Fishing Effort", show=show_fdi_layer)
 
-        # FDI fishing effort choropleth layer — all Med c-squares
+        # FDI fishing effort choropleth layer — all Med c-squares (cached)
         if not fdi_effort.empty:
-            latest_year = fdi_effort["year"].max()
-            fdi_agg = (
-                fdi_effort[fdi_effort["year"] == latest_year]
-                .groupby(["rectangle_lon", "rectangle_lat"])["totfishdays"]
-                .sum()
-                .reset_index()
-            )
-            for _, cell in fdi_agg.iterrows():
-                sw_lon = cell["rectangle_lon"]
-                sw_lat = cell["rectangle_lat"]
-                days = cell["totfishdays"]
-                if days >= 2000:
-                    color, opacity = "#e31a1c", 0.35
-                elif days >= 500:
-                    color, opacity = "#fd8d3c", 0.30
-                elif days >= 50:
-                    color, opacity = "#fecc5c", 0.25
-                else:
-                    color, opacity = "#ffffb2", 0.15
+            for sw_lat, sw_lon, days, color, opacity in _build_fdi_rectangles(fdi_effort):
                 folium.Rectangle(
                     bounds=[[sw_lat, sw_lon], [sw_lat + 0.5, sw_lon + 0.5]],
                     color=color,
@@ -425,14 +472,16 @@ with col1:
                     fill_color=color,
                     fill_opacity=opacity,
                     weight=0,
-                    popup=f"Fishing days ({latest_year}): {days:,.0f}",
+                    popup=f"Fishing days: {days:,.0f}",
                 ).add_to(fg_fdi)
 
-        # Pre-compute FDI context per unique c-square (avoid repeated 83K-row scans)
+        # Pre-compute FDI context per unique c-square (cached across reruns)
         fdi_cache = {}
         if not fdi_effort.empty and "csq_lon" in df_filtered.columns:
-            for csq_lon_v, csq_lat_v in df_filtered[["csq_lon", "csq_lat"]].drop_duplicates().values:
-                fdi_cache[(csq_lon_v, csq_lat_v)] = get_fdi_context(csq_lon_v, csq_lat_v, fdi_effort, fdi_landings)
+            csq_pairs = tuple(
+                map(tuple, df_filtered[["csq_lon", "csq_lat"]].drop_duplicates().values)
+            )
+            fdi_cache = _build_fdi_cache(csq_pairs, fdi_effort, fdi_landings)
 
         # Separate flagged (IUU/OFAC) from clean events.
         # Flagged vessels get full DivIcon markers with SVG shapes.
@@ -548,6 +597,7 @@ with col1:
         map_data = st_folium(
             m, height=500, use_container_width=True,
             returned_objects=["last_object_clicked"],
+            key="main_map",
         )
 
         # Dual-encoding legend: shape = behaviour, fill = listing, size = risk band
@@ -696,34 +746,44 @@ with col1:
 
 with col2:
     if not df_filtered.empty:
-        _band_counts = df_filtered["risk_band"].value_counts() if "risk_band" in df_filtered.columns else pd.Series(dtype=int)
+        # When pills are active, show pill-filtered counts with "of N total" context.
+        _df_metrics = df_map_base if _pills_active else df_filtered
+        _total_label = f" of {len(df_filtered)}" if _pills_active else ""
+        _band_counts = _df_metrics["risk_band"].value_counts() if "risk_band" in _df_metrics.columns else pd.Series(dtype=int)
         _n_low = int(_band_counts.get("Low", 0))
         _n_elevated_plus = int(_band_counts.get("Elevated", 0)) + int(_band_counts.get("Severe", 0)) + int(_band_counts.get("Critical", 0))
-        _n_map = len(df_filtered) - _n_low
-        _avg_risk = df_filtered["risk_score"].mean()
-        _max_risk = df_filtered["risk_score"].max()
-        st.metric("Avg Risk Score", f"{_avg_risk:.1f}", help="Mean risk score per event across the fleet")
+        _n_map = len(_df_metrics) - _n_low
+        _avg_risk = _df_metrics["risk_score"].mean() if not _df_metrics.empty else 0
+        _max_risk = _df_metrics["risk_score"].max() if not _df_metrics.empty else 0
+        st.metric("Avg Risk Score", f"{_avg_risk:.1f}", help="Mean risk score per event")
         st.metric("Peak Risk Score", f"{_max_risk:.1f}", help="Highest single-event risk score")
-        st.metric("Total Events", len(df_filtered))
+        _evt_label = f"{len(_df_metrics)}{_total_label}"
+        st.metric("Total Events", _evt_label)
         st.caption(
             f"On map: **{_n_map}** (Emerging+)  \n"
             f"Hidden: {_n_low} Low-band  \n"
             f"Elevated/Severe/Critical: **{_n_elevated_plus}**"
         )
-        st.metric("Unique Vessels", df_filtered["mmsi"].nunique())
-        st.metric("Flags", df_filtered["flag"].nunique())
-        if "iuu_matched" in df_filtered.columns:
-            iuu_count = int(df_filtered["iuu_matched"].sum())
+        _n_vessels = _df_metrics["mmsi"].nunique()
+        _n_vessels_total = df_filtered["mmsi"].nunique()
+        _v_label = f"{_n_vessels} of {_n_vessels_total}" if _pills_active else str(_n_vessels)
+        st.metric("Unique Vessels", _v_label)
+        _n_flags = _df_metrics["flag"].nunique()
+        _n_flags_total = df_filtered["flag"].nunique()
+        _f_label = f"{_n_flags} of {_n_flags_total}" if _pills_active else str(_n_flags)
+        st.metric("Flags", _f_label)
+        if "iuu_matched" in _df_metrics.columns:
+            iuu_count = int(_df_metrics["iuu_matched"].sum())
             if iuu_count > 0:
                 st.metric("IUU-Listed Vessels", iuu_count)
-        if "ofac_sanctioned" in df_filtered.columns:
-            ofac_count = int(df_filtered["ofac_sanctioned"].sum())
+        if "ofac_sanctioned" in _df_metrics.columns:
+            ofac_count = int(_df_metrics["ofac_sanctioned"].sum())
             if ofac_count > 0:
                 st.metric("OFAC Sanctioned", ofac_count)
         # Kpler-aligned behavioural flags (display-only, do not affect risk_score)
-        if "multi_behaviour_flag" in df_filtered.columns:
+        if "multi_behaviour_flag" in _df_metrics.columns:
             multi_vessels = int(
-                df_filtered[df_filtered["multi_behaviour_flag"]]["mmsi"].nunique()
+                _df_metrics[_df_metrics["multi_behaviour_flag"]]["mmsi"].nunique()
             )
             if multi_vessels > 0:
                 st.metric(
@@ -731,17 +791,17 @@ with col2:
                     help="Vessels showing two or more distinct GFW event types "
                          "(gap, encounter, loitering). Compound behavioural indicator.",
                 )
-        if "dark_port_call_candidate" in df_filtered.columns:
-            dpc_events = int(df_filtered["dark_port_call_candidate"].sum())
+        if "dark_port_call_candidate" in _df_metrics.columns:
+            dpc_events = int(_df_metrics["dark_port_call_candidate"].sum())
             if dpc_events > 0:
                 st.metric(
                     "Dark Port Call Candidates", dpc_events,
                     help="Loitering events within 10 km of shore. AIS-inferred, "
                          "not satellite-verified (hence 'candidate').",
                 )
-        if "repeat_offender_90d" in df_filtered.columns:
+        if "repeat_offender_90d" in _df_metrics.columns:
             repeat_vessels = int(
-                df_filtered[df_filtered["repeat_offender_90d"]]["mmsi"].nunique()
+                _df_metrics[_df_metrics["repeat_offender_90d"]]["mmsi"].nunique()
             )
             if repeat_vessels > 0:
                 st.metric(
