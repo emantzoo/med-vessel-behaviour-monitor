@@ -155,6 +155,12 @@ include_fishing = st.sidebar.toggle(
     help="Load GFW fishing events for fishing-in-MPA detection. Slower with large datasets.",
 )
 
+fisheries_only = st.sidebar.toggle(
+    "Fisheries context only", value=False,
+    help="Show only vessels connected to fisheries: fishing/carrier class, "
+         "IUU-listed, ICCAT-authorized, GFCM-registered, or GFW-classified fishing activity.",
+)
+
 include_insights = st.sidebar.toggle(
     "Include vessel insights (GFW)", value=False,
     help="Optional: queries GFW Insights API per vessel for AIS coverage % and "
@@ -249,6 +255,9 @@ knowledge_base = load_knowledge_base()
 
 # Per-vessel fishing-in-MPA aggregation (display-only, no risk multiplier)
 fishing_mpa_agg = aggregate_fishing_in_mpa(fishing_df)
+
+# Set of MMSIs that appear in fishing_df (used by "Fisheries context only" toggle)
+_fishing_mmsis = set(fishing_df["mmsi"].astype(str).unique()) if not fishing_df.empty else set()
 
 # ========================= FILTER & SCORE =========================
 # Clip events to selected date range (± 3 day buffer for long-running events)
@@ -382,6 +391,16 @@ for _col, _default in [
 ]:
     if _col not in df_filtered.columns:
         df_filtered[_col] = _default
+
+# "Fisheries context only" — keep vessels with any fisheries nexus
+if fisheries_only and not df_filtered.empty:
+    _fisheries_classes = {"industrial_fishing", "artisanal_fishing", "carrier"}
+    _is_fisheries_class = df_filtered["vessel_class"].isin(_fisheries_classes) if "vessel_class" in df_filtered.columns else False
+    _is_iuu = df_filtered["iuu_matched"].fillna(False).astype(bool) if "iuu_matched" in df_filtered.columns else False
+    _is_iccat = df_filtered["iccat_authorized"].fillna(False).astype(bool) if "iccat_authorized" in df_filtered.columns else False
+    _is_gfcm = df_filtered["gfcm_registered"].fillna(False).astype(bool) if "gfcm_registered" in df_filtered.columns else False
+    _in_fishing = df_filtered["mmsi"].astype(str).isin(_fishing_mmsis)
+    df_filtered = df_filtered[_is_fisheries_class | _is_iuu | _is_iccat | _is_gfcm | _in_fishing]
 
 # ========================= MAIN MAP & METRICS =========================
 
