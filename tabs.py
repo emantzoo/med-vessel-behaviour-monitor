@@ -1793,6 +1793,10 @@ def render_vessel_trajectory(vessel_events: pd.DataFrame, vessel_summary_row: di
     """
     import plotly.graph_objects as go
 
+    # Skip trajectory for single-event vessels — no arc to show
+    if len(vessel_events) < 2:
+        return
+
     st.subheader("Risk trajectory")
     st.caption(
         "Cumulative risk score over time. Each marker is an event; the line "

@@ -1035,11 +1035,25 @@ def investigate_vessel(vessel_identifier, df, iuu_df, iccat_df, ofac_df, fdi_eff
             "text": "GFCM-listed vessel operating in Mediterranean — confirmed IUU history in this exact area. Likely repeat offender.",
         })
 
+    # IUU-listed but not GFCM and not ICCAT (covered above as elif chains)
+    if iuu_matched and not report["iuu"]["is_gfcm"] and not iccat_authorized:
+        hypotheses.append({
+            "level": "high",
+            "text": f"IUU-listed vessel (listed by: {report['iuu'].get('listing_rfmos', 'unknown RFMO')}) — confirmed IUU history in another region, now operating in Mediterranean waters.",
+        })
+
     # Behavioural hypotheses (has_encounter, has_gap, has_loitering set above)
     if iccat_authorized and report["iccat"]["risk_tier"] == "carrier" and has_encounter:
         hypotheses.append({
             "level": "high",
             "text": "ICCAT-authorized carrier in encounter event — core transshipment scenario. Verify Regional Observer Programme coverage under Rec. 24-05.",
+        })
+
+    # ICCAT-authorized non-carrier (BFT/SWO/ALB catching vessel)
+    if iccat_authorized and report["iccat"]["risk_tier"] != "carrier":
+        hypotheses.append({
+            "level": "medium",
+            "text": f"ICCAT-authorized vessel ({report['iccat']['authorizations']}). Authorization provides quota access and infrastructure — behavioural events from authorized vessels warrant scrutiny for quota evasion.",
         })
 
     ga = report["behaviour"].get("gap_analysis", {})
@@ -1055,10 +1069,93 @@ def investigate_vessel(vessel_identifier, df, iuu_df, iccat_df, ofac_df, fdi_eff
             "text": "Carrier/tanker vessel loitering — consistent with staging for ship-to-ship transfer. Look for nearby fishing vessel encounters in the same timeframe.",
         })
 
+    # Fishing inside MPA
+    if fishing_in_mpa_fired:
+        tier_label = fishing_section.get("top_tier", "general") or "general"
+        hypotheses.append({
+            "level": "high" if tier_label == "gfcm_fra" else "medium",
+            "text": f"GFW-classified fishing activity inside an MPA (tier: {tier_label}, {fishing_section['event_count']} events, {fishing_section['hours']:.1f} h). Direct regulatory violation if confirmed.",
+        })
+
+    # MPA intersection on behavioural events
+    if in_mpa_any and not fishing_in_mpa_fired:
+        hypotheses.append({
+            "level": "medium",
+            "text": f"Behavioural event(s) inside a Marine Protected Area (tier: {top_tier or 'general'}). AIS behaviour in protected waters raises enforcement concern.",
+        })
+
+    # Contested EEZ
+    if in_contested:
+        hypotheses.append({
+            "level": "medium",
+            "text": "Activity in contested or weakly enforced EEZ (Libyan/Syrian/Lebanese waters). Limited coastal-state enforcement capacity increases IUU risk.",
+        })
+
+    # Repeat offender
+    if repeat_offender:
+        hypotheses.append({
+            "level": "medium",
+            "text": "Repeat offender — two or more events within a 90-day window. Temporal clustering suggests systematic rather than opportunistic behaviour.",
+        })
+
+    # Multi-behaviour compound indicator
+    if multi_behaviour:
+        hypotheses.append({
+            "level": "medium",
+            "text": "Multiple distinct event types (gap + encounter + loitering). Combined behavioural signatures are a stronger indicator than any single event type.",
+        })
+
+    # Dark port call candidate
+    if dark_port_candidates > 0:
+        hypotheses.append({
+            "level": "medium",
+            "text": f"{dark_port_candidates} loitering event(s) within 10 km of shore — dark port call candidate. May indicate unreported landing or crew/gear exchange.",
+        })
+
+    # High flag multiplier
+    if flag_mult >= 1.5:
+        hypotheses.append({
+            "level": "medium",
+            "text": f"Flag state ({flag}) carries a {flag_mult:.2f}x risk multiplier from the Poseidon IUU Risk Index, indicating weak flag-state governance.",
+        })
+
+    # Type mismatch (identity misrepresentation)
+    if type_mismatch:
+        hypotheses.append({
+            "level": "medium",
+            "text": f"Vessel type mismatch — AIS-reported type disagrees with registry shiptypes. Irregular vessel information (Kpler Grey Fleet equivalent).",
+        })
+
+    # Industrial vessel profile
+    if is_industrial:
+        hypotheses.append({
+            "level": "medium",
+            "text": f"Industrial-class vessel ({size_str}) — above 24m / 100 GT threshold. Industrial-scale capacity increases the operational significance of behavioural signals.",
+        })
+
+    # Unregulated flag in GFCM area
+    if is_unregulated_flag:
+        hypotheses.append({
+            "level": "medium",
+            "text": f"Flag {flag} is not a GFCM contracting party or EU member state. Fishing vessel operating under no applicable GFCM conservation measures.",
+        })
+
+    # GFCM register anomalies
+    if gfcm_no_licence_fires:
+        hypotheses.append({
+            "level": "medium",
+            "text": f"Vessel in GFCM register but licence indicator is 'No'. Registered vessel operating without valid fishing licence.",
+        })
+    if gfcm_inactive_fires:
+        hypotheses.append({
+            "level": "medium",
+            "text": f"Vessel in GFCM register marked as operationally inactive, but GFW observed {len(vessel_events)} events. Register may be stale or vessel operating when it should not be.",
+        })
+
     if not hypotheses:
         hypotheses.append({
             "level": "low",
-            "text": "No high-confidence hypothesis generated. Vessel shows behavioural signals but no compounding regulatory flags.",
+            "text": "No specific hypothesis generated. Vessel shows behavioural signals; review the risk tree trace for detailed signal breakdown.",
         })
 
     report["hypotheses"] = hypotheses

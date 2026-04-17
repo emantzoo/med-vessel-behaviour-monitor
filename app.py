@@ -279,10 +279,10 @@ if not df_filtered.empty:
     df_filtered["csq_lon"] = csq_lon
     df_filtered["csq_lat"] = csq_lat
 
-# Vessel metadata enrichment via GFW Vessels API (live mode only).
+# Vessel metadata enrichment via GFW Vessels API (live + snapshot mode).
 # Returns dict[mmsi] -> {"imo", "length_m", "tonnage_gt", "shiptypes", "vessel_id"}.
 # Each field is independently optional. Falls back gracefully on cache miss.
-if use_live and token and resolve_imos and not df_filtered.empty:
+if (use_live or use_snapshot) and token and resolve_imos and not df_filtered.empty:
     unique_mmsis = df_filtered["mmsi"].dropna().unique().tolist()
     cache_key = f"vessel_meta_{hash(tuple(sorted(str(m) for m in unique_mmsis)))}"
     if cache_key in st.session_state:
