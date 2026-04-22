@@ -15,7 +15,7 @@ from config import (
 from data_loading import (
     load_knowledge_base, load_static_data, load_live_data,
     load_fdi_effort, load_fdi_landings, load_iuu_vessels, load_iccat_vessels,
-    load_ofac_vessels, load_closed_area_mpas, lookup_vessel_metadata,
+    load_ofac_vessels, load_closed_area_mpas, lookup_vessel_metadata, load_vessel_metadata_cache,
     load_fishing_events_static, load_fishing_events_live, aggregate_fishing_in_mpa,
     snapshot_exists, snapshot_info, download_api_snapshot,
     load_snapshot_events, load_snapshot_fishing,
@@ -282,17 +282,18 @@ if not df_filtered.empty:
 # Vessel metadata enrichment via GFW Vessels API (live + snapshot mode).
 # Returns dict[mmsi] -> {"imo", "length_m", "tonnage_gt", "shiptypes", "vessel_id"}.
 # Each field is independently optional. Falls back gracefully on cache miss.
-if (use_live or use_snapshot) and token and resolve_imos and not df_filtered.empty:
+if (use_live or use_snapshot) and resolve_imos and not df_filtered.empty:
     unique_mmsis = df_filtered["mmsi"].dropna().unique().tolist()
-    cache_key = f"vessel_meta_{hash(tuple(sorted(str(m) for m in unique_mmsis)))}"
-    if cache_key in st.session_state:
-        meta_map = st.session_state[cache_key]
-    else:
+    # Three-layer cache: session_state → disk JSON → API
+    meta_map = load_vessel_metadata_cache()
+    _cached_mmsis = set(meta_map.keys())
+    _needed = [m for m in unique_mmsis if str(m) not in _cached_mmsis]
+    if _needed and token:
         progress_bar = st.progress(0, text="Resolving vessel metadata via GFW API...")
         def _update_progress(current, total):
             progress_bar.progress(current / total, text=f"Resolving vessel metadata... {current}/{total}")
-        meta_map = lookup_vessel_metadata(unique_mmsis, token, progress_callback=_update_progress)
-        st.session_state[cache_key] = meta_map
+        fresh = lookup_vessel_metadata(_needed, token, progress_callback=_update_progress)
+        meta_map.update(fresh)
         progress_bar.empty()
     if meta_map:
         mmsi_str = df_filtered["mmsi"].astype(str)

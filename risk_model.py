@@ -304,13 +304,27 @@ def check_iuu_match(mmsi, vessel_name, iuu_df, include_delisted=False, imo=None)
         if not exact_matches.empty:
             return _build_match_result(exact_matches.iloc[0], "name_exact", "medium")
 
-        # Fuzzy match: name appears as substring in all_names
-        fuzzy = working[
-            working["all_names"].str.upper().str.contains(name_upper, na=False, regex=False)
-        ]
-        if not fuzzy.empty:
-            confidence = "medium" if len(name_upper) >= 5 else "low"
-            return _build_match_result(fuzzy.iloc[0], "name_fuzzy", confidence)
+        # Fuzzy match: token-overlap + similarity ratio
+        # Requires ≥80% character similarity AND all query tokens present
+        # in at least one of the pipe-delimited known names.
+        if len(name_upper) >= 4:
+            from difflib import SequenceMatcher
+            query_tokens = set(name_upper.split())
+            best_row = None
+            best_ratio = 0.0
+            for idx, row in working.iterrows():
+                known_names = [n.strip().upper() for n in str(row["all_names"]).split("|")]
+                for kn in known_names:
+                    kn_tokens = set(kn.split())
+                    if not query_tokens.issubset(kn_tokens):
+                        continue
+                    ratio = SequenceMatcher(None, name_upper, kn).ratio()
+                    if ratio > best_ratio:
+                        best_ratio = ratio
+                        best_row = row
+            if best_row is not None and best_ratio >= 0.80:
+                confidence = "medium" if best_ratio >= 0.90 else "low"
+                return _build_match_result(best_row, "name_fuzzy", confidence)
 
     return dict(_NO_MATCH)
 

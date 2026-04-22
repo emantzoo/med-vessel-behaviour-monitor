@@ -142,6 +142,7 @@ def load_static_data():
 _DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 _SNAPSHOT_EVENTS = os.path.join(_DATA_DIR, "api_events_snapshot.csv")
 _SNAPSHOT_FISHING = os.path.join(_DATA_DIR, "api_fishing_snapshot.csv")
+_SNAPSHOT_VESSEL_META = os.path.join(_DATA_DIR, "api_vessel_meta.json")
 
 
 def snapshot_exists():
@@ -913,7 +914,28 @@ def lookup_vessel_metadata(mmsi_list, token, progress_callback=None):
     except Exception:
         pass  # Fall back silently -- name matching still works
 
+    # Persist to disk so page reloads don't re-fetch
+    if result:
+        try:
+            import json as _json
+            with open(_SNAPSHOT_VESSEL_META, "w", encoding="utf-8") as f:
+                _json.dump(result, f)
+        except Exception:
+            pass
+
     return result
+
+
+def load_vessel_metadata_cache():
+    """Load cached vessel metadata from disk (saved by lookup_vessel_metadata)."""
+    import json as _json
+    if not os.path.exists(_SNAPSHOT_VESSEL_META):
+        return {}
+    try:
+        with open(_SNAPSHOT_VESSEL_META, "r", encoding="utf-8") as f:
+            return _json.load(f)
+    except Exception:
+        return {}
 
 
 def lookup_vessel_imos(mmsi_list, token, progress_callback=None):

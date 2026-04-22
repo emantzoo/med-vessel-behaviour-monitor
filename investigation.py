@@ -1227,6 +1227,13 @@ def format_trace_for_llm(trace: list, vessel_name: str = "") -> str:
     else:
         lines.append("Risk tree trace:")
     lines.append("")
+    lines.append(
+        "FORMAT INSTRUCTION: Your ANALYSIS must use the branch headings below "
+        "as its section structure. For each branch that fired, create a section "
+        "headed '## <branch_name>' and list the rules that fired with their "
+        "severity and metrics. Do NOT invent your own section headings."
+    )
+    lines.append("")
 
     for bid, entries in branches.items():
         fired = [e for e in entries if e.get("rule_fired")]
@@ -1240,6 +1247,13 @@ def format_trace_for_llm(trace: list, vessel_name: str = "") -> str:
             suffix = f" [future_work]" if status == "future_work" else ""
             lines.append(f"  - {qid}: {mark} | severity={sev} | {note}{suffix}")
         lines.append("")
+
+    # Append multiplier decomposition reminder
+    lines.append(
+        "End your ANALYSIS with a 'Compound multiplier decomposition' line: "
+        "base_risk_score x iuu_multiplier x iccat_multiplier x ofac_multiplier x flag_multiplier = risk_score"
+    )
+    lines.append("")
 
     return "\n".join(lines)
 

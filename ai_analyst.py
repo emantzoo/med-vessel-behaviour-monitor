@@ -123,7 +123,7 @@ CODE:
 VESSEL INTELLIGENCE LAYERS (canonical column reference -- use these names verbatim):
 
 MPA intersection (on df, also on fishing_df):
-- in_mpa (bool), mpa_name (str, semicolon-joined), mpa_tier (str: "gfcm_fra" | "eu_site" | "general" | "")
+- in_mpa (bool), mpa (str, semicolon-joined MPA names — column is `mpa` NOT `mpa_name`), mpa_tier (str: "gfcm_fra" | "eu_site" | "general" | "")
 - mpa_tier multiplier is ALREADY baked into base_risk_score (2.0x gfcm_fra, 1.5x eu_site, 1.2x general). Do NOT re-multiply.
 - For MPA queries always state the McDonald et al. 2024 caveat: AIS-based MPA intersection is a lower bound -- ~90% of fishing vessels in MPAs are dark to AIS.
 
@@ -166,7 +166,12 @@ RULES:
 - When asked to investigate a vessel, ALWAYS generate code that filters df for that vessel and displays its key columns as result_df. Follow the investigation template from the knowledge base.
 - Do not fabricate data or make up vessel names/MMSIs
 - CRITICAL ANTI-HALLUCINATION RULE: For IUU, ICCAT, and OFAC status you MUST generate code that reads and displays the actual boolean column values (iuu_matched, iccat_authorized, ofac_sanctioned) for the vessel. Your ANALYSIS section MUST match what the code outputs — do not contradict the data. Do NOT infer or assume a vessel is IUU/ICCAT/OFAC based on its flag, type, or name. An Iranian tanker is NOT necessarily OFAC-sanctioned unless ofac_sanctioned==True. A vessel can be IUU-listed but NOT OFAC-sanctioned — these are independent data sources. When investigating a vessel, your code MUST include these columns in result_df: iuu_matched, ofac_sanctioned, iccat_authorized, iuu_multiplier, ofac_multiplier, iccat_multiplier.
-- When the user asks about a specific vessel (by MMSI or name), you will receive a STRUCTURED EVIDENCE block at the end of this prompt containing the risk tree trace for that vessel. Use it as the primary source for vessel-specific analysis. Ground your narrative in the branches that fired and the severities assigned. If the structured evidence does not appear, answer from the raw data as before.
+- VESSEL INVESTIGATION FORMAT: When the user asks about a specific vessel (by MMSI or name), you will receive a STRUCTURED EVIDENCE block at the end of this prompt containing the deterministic risk tree trace for that vessel. Your ANALYSIS section MUST be structured around this trace:
+  1. Open with a one-line verdict (risk band + primary driver).
+  2. Walk through the risk tree branch by branch, using the EXACT branch names and severities from the trace (e.g., "ais_gap branch fired at HIGH severity"). Only discuss branches present in the trace.
+  3. For each branch, quote the key metrics from the trace (duration, distance, multiplier values).
+  4. End with the compound multiplier decomposition: base_risk_score x IUU x ICCAT x OFAC x flag = final risk_score.
+  The output must make it obvious that a structured risk tree evaluation was performed, not a free-text LLM summary. Do NOT reorganize into your own headings like "Identity & Regulatory Status" — follow the tree structure.
 - When discussing flags, use the domain knowledge to explain risk context
 - When discussing locations, reference relevant Med geography
 
@@ -325,6 +330,8 @@ CRITICAL column-name notes:
 - The fishing-hours column on fishing_df is `{hours_col}` (NOT `duration_h`).
 - Do NOT assume any column called `mpa_name` or `duration_h` exists on fishing_df.
 
+IMPORTANT: mmsi is STRING type on both df and fishing_df. Do NOT cast mmsi to int. Merges on mmsi work directly without type conversion.
+
 Typical patterns:
 - fishing_df[fishing_df["in_mpa"]] -- all fishing inside any MPA
 - fishing_df[fishing_df["mpa_tier"] == "gfcm_fra"] -- fishing inside GFCM Fisheries Restricted Areas
@@ -373,8 +380,9 @@ def is_safe_code(code):
     return True
 
 
+@st.fragment
 def render_ai_analyst(df_filtered, fdi_effort, fdi_landings, knowledge_base, gemini_key, iuu_vessels=None, iccat_vessels=None, ofac_vessels=None, fishing_df=None):
-    """Render the AI Maritime Analyst tab."""
+    """Render the AI Maritime Analyst tab (fragment: interactions rerun only this block)."""
     st.subheader("AI Maritime Analyst")
     st.markdown(
         "Ask questions about the vessel data in natural language. "
@@ -418,6 +426,12 @@ def render_ai_analyst(df_filtered, fdi_effort, fdi_landings, knowledge_base, gem
         "Show me long AIS gaps (>24h) with significant speed changes",
         "Are there any vessels with repeated gap events in the same area?",
         "Which day had the most suspicious activity and why?",
+        # Visual analytics (plots not already in the UI)
+        "Plot base_risk_score vs risk_score per vessel as a scatter — label outliers where the compound multiplier exceeds 3x",
+        "Chart IUU/ICCAT/OFAC multiplier contribution per vessel as a grouped bar — which vessel has the tallest compound stack?",
+        "Plot a timeline of all events coloured by risk_band — are Critical events clustered in time?",
+        "Scatter plot: event duration vs distance_from_shore_km, coloured by event_type — where do long offshore gaps cluster?",
+        "Box plot of risk_score by flag state (top 10 flags by event count) — which flags have the widest spread?",
     ]
 
     picked = st.selectbox(
@@ -472,11 +486,11 @@ def render_ai_analyst(df_filtered, fdi_effort, fdi_landings, knowledge_base, gem
                         trace_text = f"(Risk tree trace unavailable: {e})"
                     system_ctx += (
                         "\n\n---\n"
-                        "STRUCTURED EVIDENCE — risk tree evaluation for the vessel referenced in the query.\n"
-                        "When the query is about this specific vessel, use this evaluation as the "
-                        "primary evidence. Reference the branches that fired and the severity assigned. "
-                        "Do not contradict the deterministic rule evaluation. You may comment on its "
-                        "implications or add context, but do not overwrite which rules fired.\n\n"
+                        "STRUCTURED EVIDENCE — deterministic risk tree evaluation for the vessel referenced in the query.\n"
+                        "YOUR ANALYSIS MUST FOLLOW THE TREE STRUCTURE BELOW. Walk branch by branch, "
+                        "quoting severities and metrics verbatim. Do NOT reorganize into your own categories. "
+                        "Do NOT omit branches that fired. Do NOT add branches that did not fire. "
+                        "The reader must see that a rule-based evaluation drove the output, not free-form LLM reasoning.\n\n"
                         f"{trace_text}"
                     )
 
@@ -535,7 +549,7 @@ def render_ai_analyst(df_filtered, fdi_effort, fdi_landings, knowledge_base, gem
                                 "iuu_vessels": iuu_vessels.copy() if iuu_vessels is not None and not iuu_vessels.empty else pd.DataFrame(),
                                 "iccat_vessels": iccat_vessels.copy() if iccat_vessels is not None and not iccat_vessels.empty else pd.DataFrame(),
                                 "ofac_vessels": ofac_vessels.copy() if ofac_vessels is not None and not ofac_vessels.empty else pd.DataFrame(),
-                                "fishing_df": fishing_df.copy() if fishing_df is not None and not fishing_df.empty else pd.DataFrame(),
+                                "fishing_df": (lambda _f: _f.assign(mmsi=_f["mmsi"].astype(str)) if "mmsi" in _f.columns else _f)(fishing_df.copy()) if fishing_df is not None and not fishing_df.empty else pd.DataFrame(),
                             }
                             exec(code, exec_ns)
 
