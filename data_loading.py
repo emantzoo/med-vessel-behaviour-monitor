@@ -36,7 +36,7 @@ def load_knowledge_base():
 
 @st.cache_data
 def load_static_data():
-    """Rich static fallback dataset (80 realistic Med events with extended fields)."""
+    """Rich static fallback dataset (95 realistic Med events with extended fields)."""
     csv_path = os.path.join(os.path.dirname(__file__), "data", "med_events_static.csv")
     if os.path.exists(csv_path):
         df = pd.read_csv(csv_path, parse_dates=["date"], dtype={"imo": str})

@@ -23,7 +23,7 @@ These elements sit above the four tabs because they carry the highest-priority s
 **Interactions:**
 - **Hover** a dot for a tooltip: vessel name, event type, flag, risk score.
 - **Click** a dot to select the vessel for Investigation tab. A toast confirms the selection.
-- **Pill filters** (event type, risk band, flag, vessel class) sit above the map and filter in real time.
+- **Pill filters** (event type, risk band, EU/non-EU flag origin, ICCAT status, GFCM status) sit above the map and filter in real time.
 
 **Scope note:** The map responds to pill filters. When pills are active, fleet metrics show the pill-filtered count with "of N total" context. Alert boxes always show the full sidebar-filtered dataset.
 
@@ -62,7 +62,7 @@ Red alert banner if any event involves an IUU-listed vessel. Expandable table wi
 
 **Data:** Scored GFW events for the selected vessel + IUU vessel list + ICCAT authorized vessels + OFAC SDN list + FDI fishing effort and landings (spatial join by c-square) + fishing-in-MPA events.
 
-**Report sections (15 steps):**
+**Report sections (10 numbered steps + sub-steps + risk tree trace + trajectory):**
 
 1. **Identity confirmation** — vessel name, MMSI, IMO, flag, event count, profile (length/tonnage), industrial badge.
 2. **IUU listing status** — colour-coded alert (red if matched, green if clean), tier (GFCM/Other), match type/confidence.
@@ -112,7 +112,7 @@ Red alert banner if any event involves an IUU-listed vessel. Expandable table wi
 - MPA intersection: `in_mpa`, `mpa_tier`, `fishing_in_mpa_events`, `fishing_in_mpa_hours`.
 - Listing booleans: `iuu_matched`, `iccat_authorized`, `ofac_sanctioned`, `gfcm_registered`.
 
-**Pill filters:** Event type, risk band, flag state, vessel class. Sit above the main map and cascade to the map, metrics, and all Fleet Analytics subtabs.
+**Pill filters:** Event type, risk band, EU/non-EU flag origin, ICCAT status, GFCM status. Sit above the main map and cascade to the map, metrics, and all Fleet Analytics subtabs.
 
 **Interactions:** Use the slider to control how many vessels appear. Use pill filters to narrow the fleet view. Switch to **Vessel Investigation** tab for per-vessel drill-down.
 
@@ -121,7 +121,7 @@ Red alert banner if any event involves an IUU-listed vessel. Expandable table wi
 | Expander | Chart | What it answers |
 |----------|-------|-----------------|
 | Risk band distribution | Bar chart of vessel count per band | What's the shape of the fleet? |
-| Base vs structural-amplifier decomposition | Stacked horizontal bar (fleet total): behavioural base + IUU (black) + ICCAT (blue) + OFAC (dark red) segments | How does the scoring split between behaviour and each lookup source? |
+| Base vs structural-amplifier decomposition | Stacked horizontal bar (fleet total): behavioural base + IUU (black) + ICCAT (amber) + OFAC (dark red) segments | How does the scoring split between behaviour and each lookup source? |
 | Top vessels: base vs structural amplifier | Top-10 horizontal bars, each split base + amplifier | Who are the worst actors and why? |
 
 ### Subtab: Exploration
@@ -136,7 +136,7 @@ Red alert banner if any event involves an IUU-listed vessel. Expandable table wi
 |----------|-------|-----------------|
 | Repeat offenders | Bar of vessels with >=2 events + top-3 timeline | Who keeps coming back? |
 | Encounter analysis -- carrier alerts | Scatter (distance vs duration) + carrier alert + flag pairings | Who's transshipping with whom? |
-| AIS gap behaviour | Speed scatter or histogram + geographic scatter | Who's going dark, and how? |
+| AIS gap behaviour | Speed scatter or histogram + duration-vs-distance chart | Who's going dark, and how? |
 
 ---
 
@@ -251,7 +251,7 @@ Red alert banner if any event involves an IUU-listed vessel. Expandable table wi
 The model operates on copies. It cannot modify the live data, read/write files, or make network calls.
 
 **How to use:**
-1. Pick an example question from the dropdown (16 pre-programmed investigation queries) or type your own.
+1. Pick an example question from the dropdown (22 pre-programmed investigation queries) or type your own.
 2. Click "Ask".
 3. The analyst generates pandas/plotly code, executes it in a sandbox, and renders the output (chart, table, or metric) inline.
 4. The system prompt includes the full `knowledge/` directory as RAG context, so the model knows column names, multiplier tables, the scoring formula, and all methodology.

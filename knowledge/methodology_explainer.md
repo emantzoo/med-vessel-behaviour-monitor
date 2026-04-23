@@ -20,7 +20,7 @@ base = (duration^0.75) × event_weight × flag_multiplier × shore_factor × mpa
 
 - **Duration^0.75** — longer events are riskier, with diminishing returns. A 10-hour gap isn't 10x worse than a 1-hour gap; the exponent dampens linear dominance of long events.
 - **Event weight** — encounters 5.0, gaps 3.2, loitering 2.0. Encounters weighted heaviest because they are the direct transshipment signal.
-- **Flag multiplier** — derived from the Poseidon IUU Fishing Risk Index (152 coastal states, 10 Flag-responsibility indicators averaged, mapped linearly to a multiplier via `1.0 + (mean_score - 1.0) * 0.3`). Sanctions/conflict states score high organically (RUS 1.93x, IRN 1.63x, PRK 1.26x, SYR 1.24x); flags of convenience also score high due to weak oversight indicators (PAN 1.81x, LBR 1.48x, MHL 1.39x). Flags not in the Index receive 1.0x (neutral).
+- **Flag multiplier** — derived from the Poseidon IUU Fishing Risk Index (152 coastal states, up to 10 Flag-responsibility indicators averaged, mapped linearly to a multiplier via `1.0 + (mean_score - 1.0) * 0.3`). Sanctions/conflict states score high organically (RUS 1.93x, IRN 1.63x, PRK 1.26x, SYR 1.24x); flags of convenience also score high due to weak oversight indicators (PAN 1.81x, LBR 1.48x, MHL 1.39x). Flags not in the Index receive 1.0x (neutral).
 - **Shore factor** — offshore events are riskier for transshipment (>20nm gets 1.5x, 10-20nm gets 1.2x, inshore gets 0.8x). Aligned with Miller et al. 2018 criteria.
 - **MPA intersection tier** — applied per event from GFW's `regions.mpa` field (pre-computed point-in-polygon against WDPA). Three regulatory tiers, classified by config substring match on the MPA name:
   - `gfcm_fra` — GFCM Fisheries Restricted Area, legally binding under Council Reg (EC) 1967/2006: **2.0×**
@@ -77,13 +77,12 @@ Because the band is derived from the compounded score, the decomposition lets an
 
 ## Vessel-level aggregation
 
-Event scores are aggregated per vessel with five derived metrics:
+Event scores are aggregated per vessel with four derived metrics:
 
 - `base_score_total` — sum of pre-multiplier scores (behaviour only)
 - `risk_score_total` — sum of post-multiplier scores (behaviour + structural)
 - `compound_multiplier` — the ratio, showing how much risk comes from behaviour vs structural amplifiers
-- `avg_risk` — average per-event risk score. More stable than sum for comparing vessels with different event counts.
-- `peak_risk` — maximum single-event risk score. Identifies the worst individual event.
+- `max_event_risk` — maximum single-event risk score. Identifies the worst individual event.
 
 This decomposition enables the base-vs-compounded narrative move: *"this vessel's risk is 30 from behaviour, compounded to 168 because it's GFCM-listed and ICCAT-authorised as a carrier"*. The analyst sees both numbers side by side, so structural amplification is never hidden inside the final score.
 
@@ -94,7 +93,7 @@ This decomposition enables the base-vs-compounded narrative move: *"this vessel'
 Four compound/temporal flags are computed per vessel and surfaced in the Vessel Summary and Vessel Investigation tabs:
 
 - **`multi_behaviour_flag`** — vessel shows two or more distinct event types (gap, encounter, loitering) in the window. Compound indicator.
-- **`dark_port_call_candidate`** — at least one LOITERING event within 10 km of shore. AIS-inferred, not satellite-verified (hence "candidate"). Also rendered on the Folium map as a dashed amber outline.
+- **`dark_port_call_candidate`** — at least one LOITERING event within 10 km of shore. AIS-inferred, not satellite-verified (hence "candidate").
 - **`repeat_offender_90d`** — two or more events within any 90-day rolling window. Captures exposure drift over time.
 - **`vessel_type_mismatch`** — event-level vessel_type and registry shiptypes map to different canonical classes (e.g. fishing vessel broadcasting as cargo). Identity misrepresentation signal.
 
@@ -155,7 +154,7 @@ The final tier is not a simple sum of branch scores. It follows compound rules w
 
 ### What the risk tree does not do (yet)
 
-5 of the 41 leaf questions remain as future-work stubs, each annotated with
+6 of the 41 leaf questions remain as future-work stubs, each annotated with
 `status: future_work` and a `data_requirement` note in both the YAML and
 `investigation.py` documenting exactly what data source would enable it:
 
@@ -164,8 +163,7 @@ The final tier is not a simple sum of branch scores. It follows compound rules w
 - **`name_history`** (Identity Verification) — requires vessel registry change history beyond what a single GFW snapshot provides.
 - **`eu_sanctioned`** (Regulatory Status) — requires EU consolidated sanctions list (only OFAC SDN currently loaded).
 - **`flag_recent_change`** (Flag State Risk) — requires historical flag data.
-
-Note: `gfcm_authorized` (absence-based authorisation signal) is partially wired — positive-evidence leaves (`gfcm_listed_no_licence`, `gfcm_listed_inactive`) are active in the `authorization` branch, but the absence-based signal requires enrichment of GFCM register MMSI coverage (currently 24%).
+- **`gfcm_authorized`** (Authorization) — absence-based authorisation signal. Positive-evidence leaves (`gfcm_listed_no_licence`, `gfcm_listed_inactive`) are active in the `authorization` branch, but the absence-based signal requires enrichment of GFCM register MMSI coverage (currently 24%).
 
 These are flagged as enrichment opportunities, not hidden gaps. The framework is designed to be extended as new data sources become available — the branch structure and compound logic are in place, waiting for the data layer to catch up.
 
@@ -205,15 +203,15 @@ The behavioural substrate. Three distinct feeds:
 
 ### 6. Poseidon IUU Fishing Risk Index
 
-152 coastal states scored 1-5 across 40 indicators. Drives `flag_multiplier` via `multiplier = 1.0 + (mean_score - 1.0) * 0.3`.
+152 coastal states scored 1-5 across up to 10 Flag-responsibility indicators (varies by country). Drives `flag_multiplier` via `multiplier = 1.0 + (mean_score - 1.0) * 0.3`.
 
 ### 7. GFCM Authorised Vessel Register
 
-77,304 vessels, 24 Med countries. 24% MMSI coverage. Two positive-evidence leaves wired: `gfcm_listed_no_licence` (medium), `gfcm_listed_inactive` (medium). Absence-based signal remains future work due to coverage limitation.
+GFCM register data is pre-joined into the static demo CSV and enriched via GFW Vessels API in live mode (columns: `gfcm_registered`, `gfcm_vrn`, `gfcm_licence_indicator`, `gfcm_operational_status`, `gfcm_authorised_gears`). No standalone GFCM data file or loader — the register is accessed through the GFW integration. Two positive-evidence leaves wired: `gfcm_listed_no_licence` (medium), `gfcm_listed_inactive` (medium). Absence-based signal remains future work due to MMSI coverage limitation (~24%).
 
 ### 8. Curated Closed-Area MPAs
 
-52 named Mediterranean no-take zones and gear-specific closures (GFCM FRAs, national reserves) used as Tier 2 fallback in the `fishing_in_closed_area` leaf. File: `data/closed_area_mpas.csv`. Tier 1 is GFW's `mpaNoTake` field (globally authoritative). The CSV catches Med-specific closures that GFW may not classify as no-take (e.g. gear-specific GFCM restrictions).
+12 named Mediterranean no-take zones and gear-specific closures (GFCM FRAs, national reserves) used as Tier 2 fallback in the `fishing_in_closed_area` leaf. File: `data/closed_area_mpas.csv`. Tier 1 is GFW's `mpaNoTake` field (globally authoritative). The CSV catches Med-specific closures that GFW may not classify as no-take (e.g. gear-specific GFCM restrictions).
 
 ### Data sources not wired (future work)
 
@@ -245,7 +243,7 @@ This is the strongest literature anchor in the model. The GFW Events API impleme
 
 **Duration exponent (0.75)** — a heuristic choice to dampen linear dominance of long-duration events while preserving monotonicity. Not empirically calibrated against enforcement outcomes. Calibration would require a fisheries designation dataset that doesn't exist at comparable scale to Kpler's sanctions data.
 
-**Flag risk multipliers** — derived from the Poseidon IUU Fishing Risk Index (https://iuufishingindex.net/), covering 152 coastal states. The 10 Flag-responsibility indicators per country (vulnerability, prevalence, response) are averaged and mapped linearly to a multiplier: `1.0 + (mean_score - 1.0) * 0.3`. Sanctions/conflict states and flags of convenience score high organically because the Index captures weak governance, enforcement gaps, and oversight deficits — no manual flag list is hardcoded. Regenerated from the latest Index via `scripts/prepare_iuu_risk_index.py`.
+**Flag risk multipliers** — derived from the Poseidon IUU Fishing Risk Index (https://iuufishingindex.net/), covering 152 coastal states. The Flag-responsibility indicators per country (up to 10; varies by country — vulnerability, prevalence, response) are averaged and mapped linearly to a multiplier: `1.0 + (mean_score - 1.0) * 0.3`. Sanctions/conflict states and flags of convenience score high organically because the Index captures weak governance, enforcement gaps, and oversight deficits — no manual flag list is hardcoded. Regenerated from the latest Index via `scripts/prepare_iuu_risk_index.py`.
 
 **ICCAT risk tiers** — hierarchy reflects domain judgement about opportunity for IUU behaviour: carriers > bluefin (highest-value Med species) > swordfish/albacore. The "opportunity not exoneration" framing is an analytical choice grounded in the conditional-multiplier principle.
 

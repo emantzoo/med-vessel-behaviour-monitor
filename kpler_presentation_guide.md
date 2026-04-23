@@ -33,7 +33,7 @@ Related views are grouped one level down via subtabs, and secondary diagnostic c
 
 ## Suggested demo walkthrough (30 minutes)
 
-1. **Vessel Investigation** — drill into one high-risk vessel. Walk through the three-layer view. This is the AQUARIS-style narrative in fisheries. Lead with the strongest signal.
+1. **Vessel Investigation** — drill into one high-risk vessel. Walk through the four-layer view. This is the AQUARIS-style narrative in fisheries. Lead with the strongest signal.
 
 2. **Fleet Analytics -> Trends & Patterns** — open on the risk heatmap and daily trend. The visual hook. Show monthly event-type trend as a direct analogue to Kpler's Graph 4 in the *Turning Tides* whitepaper.
 
@@ -67,7 +67,7 @@ This demonstrates: multi-source cross-referencing, identity matching, risk compo
 
 ### Show an ICCAT-authorized vessel (60 seconds)
 
-Select FRIO NARUTO from the Vessel Investigation dropdown (or find it in the Ranking table — it carries an ICCAT authorization label). "This vessel is ICCAT-authorized as a carrier — meaning it's legally permitted to transship tuna in the Med. It appeared in an encounter event. The risk model gives it a 1.4x multiplier because authorized carriers have the infrastructure and cover to launder unauthorized catch through legitimate channels. ICCAT-authorized vessels no longer get separate blue map markers — authorization is an opportunity indicator, not a risk signal, so they're rendered like any other vessel by event type. The question an analyst should ask is: was this transshipment under ICCAT Regional Observer Programme coverage? If not, why not?"
+Select FRIO NARUTO from the Vessel Investigation dropdown (or find it in the Ranking table — it carries an ICCAT authorization label). "This is a Bahamas-flagged carrier, ICCAT-authorized — meaning it's legally permitted to transship tuna in the Med. It appeared in an encounter event. The risk model gives it a 1.4x multiplier because authorized carriers have the infrastructure and cover to launder unauthorized catch through legitimate channels. ICCAT-authorized vessels no longer get separate blue map markers — authorization is an opportunity indicator, not a risk signal, so they're rendered like any other vessel by event type. The question an analyst should ask is: was this transshipment under ICCAT Regional Observer Programme coverage? If not, why not?"
 
 This demonstrates: understanding that authorization is an opportunity indicator, not exoneration. This is a nuanced analytical point that shows domain depth.
 
@@ -120,7 +120,7 @@ This is the feature that separates your project from every other "I made a dashb
 
 Switch to the AI Analyst tab. Ask: "Show me IUU-listed vessels in c-squares with high swordfish landings."
 
-Wait for Gemini to generate and execute the code. While it runs, explain: "The AI has access to all five dataframes — GFW events, FDI fisheries data, IUU vessel list, ICCAT authorized vessels, and OFAC sanctions. It can join across them, filter, aggregate, and produce charts. The code it writes runs in a sandboxed environment — only pandas, numpy, and plotly are available, no filesystem or network access."
+Wait for Gemini to generate and execute the code. While it runs, explain: "The AI has access to all seven dataframes — GFW events, FDI effort, FDI landings, IUU vessel list, ICCAT authorized vessels, OFAC sanctions, and fishing events. It can join across them, filter, aggregate, and produce charts. The code it writes runs in a sandboxed environment — only pandas, numpy, and plotly are available, no filesystem or network access."
 
 **Second query — full vessel investigation (the closer):**
 
@@ -316,7 +316,7 @@ config.py           → Constants and pure functions. Event weights, flag risk
                       GFW numeric MRGID region IDs to country names.
 
 data_loading.py     → All data ingestion. Loaders, all @st.cache_data:
-                      - load_static_data() → 88-row CSV or synthetic gen
+                      - load_static_data() → 95-row CSV or synthetic gen
                       - load_live_data() → GFW Events API (async, 3 datasets)
                       - load_fdi_effort() → ~83K rows, Med fishing days
                       - load_fdi_landings() → ~212K rows, Med catch/value
@@ -375,7 +375,7 @@ risk_tree.py        → Med IUU Risk Tree framework rendering:
 
 data/risk_tree_framework.yaml → Analytical framework specification:
                       - 8 branches (gate / additive / contextual types)
-                      - 41 leaf questions (36 wired, 5 future work)
+                      - 41 leaf questions (35 wired, 6 future work)
                       - Compound logic rules for tier assignment
                       - 5 tier outcomes (Critical → Low)
                       - Documented methodology, not executable code
@@ -410,14 +410,17 @@ ai_analyst.py       → Gemini 2.5 Flash integration:
                       - is_safe_code() → sandbox check vs FORBIDDEN_CODE
                       - render_ai_analyst() → UI + API call + exec()
                       - exec namespace: df, fdi_effort, fdi_landings,
-                        iuu_vessels, iccat_vessels, ofac_vessels, pd, np,
-                        px, go
+                        iuu_vessels, iccat_vessels, ofac_vessels, fishing_df,
+                        pd, np, px, go
 
 exports.py          → Export helpers for analyst workflow:
                       - generate_vessel_case_file() → Markdown per vessel
                         (identity, risk summary, events, risk tree, narrative)
+                      - generate_vessel_case_html() → HTML per vessel with
+                        embedded interactive Plotly charts (trajectory + icicle)
                       - generate_fleet_summary() → CSV + Markdown cover
                         (scope, band distribution, top vessels, methodology)
+                      - generate_fleet_summary_html() → HTML fleet report
                       - Wired to download buttons in Investigation + Ranking
 ```
 
@@ -478,8 +481,8 @@ After all multipliers are applied, the final compounded `risk_score` is classifi
 ```
 Low       (<50)       sparse risk signals
 Emerging  (50-59)     first risk flags
-Elevated  (60-80)     multiple risk indicators
-Severe    (81-99)     compounding risk
+Elevated  (60-79)     multiple risk indicators
+Severe    (80-99)     compounding risk
 Critical  (>=100)     threshold breach
 ```
 

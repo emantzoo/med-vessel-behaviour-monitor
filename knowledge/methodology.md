@@ -31,8 +31,8 @@ risk = (duration_h ^ 0.75)
 ### Base Components
 - **Event weights**: ENCOUNTER=5.0 (transshipment), GAP=3.2 (dark activity), LOITERING=2.0 (staging)
 - **Flag multipliers**: Derived from the Poseidon IUU Fishing Risk Index
-  (https://iuufishingindex.net/). The 10 Flag-responsibility indicators per
-  country are averaged (score 1-5) and mapped linearly to a multiplier:
+  (https://iuufishingindex.net/). The Flag-responsibility indicators per
+  country (up to 10, varies by country) are averaged (score 1-5) and mapped linearly to a multiplier:
   `multiplier = 1.0 + (mean_score - 1.0) * 0.3`. Score 1 -> 1.0x, score 3
   -> 1.6x, score 5 -> 2.2x. 152 countries covered. Flags not in the Index
   receive 1.0x (neutral). Replaces earlier hand-curated multipliers inherited
@@ -209,7 +209,7 @@ Risk tree leaves evaluated at this step (behavioural_history branch, additive):
 - **ais_gap_count** -- 2-3 gaps = medium, 4+ = high
 - **encounter_with_carrier** -- medium severity
 - **loitering_in_fishing_grounds** -- medium severity
-- **speed_change_at_gap** -- >3kn drop = high severity
+- **speed_change_at_gap** -- fires on intentional AIS disabling OR implied speed >8kn during gap = high severity
 - **multi_behaviour_compound** -- two or more distinct event types = medium
 - **dark_port_call_candidate** -- loitering within 10 km of shore = medium
 - **repeat_offender_90d** -- two or more events in 90-day window = medium

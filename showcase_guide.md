@@ -47,7 +47,7 @@
 3. Risk tree diagram (coloured branches: red = fired, grey = not)
 4. Cumulative risk trajectory chart
 
-**Say:** "KOOSHA 4 is an Iranian-flagged cargo vessel that appears on the GFCM IUU list. It had a 72-hour AIS gap near the Libyan coast. The base behavioural score captures the event itself — duration, proximity to shore, MPA intersection. Then lookup multipliers compound: IUU listing at 3.0x, Iranian flag risk at 1.8x from the Poseidon IUU Risk Index. The final score lands in Critical band."
+**Say:** "KOOSHA 4 is an Iranian-flagged cargo vessel that appears on the GFCM IUU list. It had a 72-hour AIS gap near the Libyan coast. The base behavioural score captures the event itself — duration, proximity to shore, MPA intersection, flag risk. Then lookup multipliers compound: IUU listing at 3.0x. The final score lands in Critical band."
 
 **Background context:**
 
@@ -92,10 +92,9 @@
 
 **Background context:**
 
-- **Four pill controls** above the map: Event type, Risk band, Flag state, Vessel class.
+- **Five pill controls** above the map: Event type, Risk band, Flag origin (EU/non-EU), ICCAT status, GFCM status.
 - **Pills do NOT re-run the scoring pipeline.** The pipeline result is cached in `st.session_state` with a fingerprint. Pills only filter `df_map_base` from the cached `df_filtered`.
-- **Vessel class** is derived from GFW Vessels API `shiptypes` (registry data), falling back to event-level `vessel_type` (AIS self-reported). Pattern matching: `VESSEL_CLASS_PATTERNS` in config.py.
-  - industrial_fishing, artisanal_fishing, carrier, tanker, cargo, support, passenger, other
+- **Vessel class** is derived from GFW Vessels API `shiptypes` (registry data), falling back to event-level `vessel_type` (AIS self-reported). Pattern matching: `VESSEL_CLASS_PATTERNS` in config.py: industrial_fishing, artisanal_fishing, carrier, tanker, cargo, support, passenger, other.
 - **FDI c-square join:** Each GFW event is assigned to a 0.5-degree c-square via `assign_csquare(lat, lon)`. The FDI context lookup returns: total fishing days, top gear types, top species, known-fishing-ground flag.
 - **Why encounters in high-effort zones matter:** Encounters between fishing vessels and carriers in active fishing grounds suggest at-sea transshipment — a key mechanism for laundering IUU catch.
 
@@ -171,11 +170,11 @@
   - Full dataframe schema (columns, dtypes, shape, sample rows)
   - Value counts for key columns
   - Cross-reference summary (IUU/ICCAT/OFAC per vessel)
-  - 5 RAG knowledge base files (flags, iuu_context, med_geography, methodology, fdi_context)
+  - 9 RAG knowledge base files (flags, iuu_context, med_geography, fdi_context, vessel_intelligence_layers, methodology_explainer, walkthrough, user_guide, methodology)
   - Available DataFrames: df, fdi_effort, fdi_landings, iuu_vessels, iccat_vessels, ofac_vessels, fishing_df
 - **For vessel-specific queries:** A STRUCTURED EVIDENCE block is appended — the full deterministic risk tree trace from `investigation.py`. The LLM is instructed to follow the tree structure in its output.
 - **Code execution sandbox:** Only pandas, numpy, plotly allowed. Filesystem/network access blocked via `FORBIDDEN_CODE` list.
-- **15 preset questions** covering investigation, cross-source intelligence, and visual analytics.
+- **22 preset questions** covering investigation, cross-source intelligence, domain-informed analysis, spatial/temporal patterns, behavioural deep-dives, and visual analytics.
 
 ---
 
@@ -202,13 +201,12 @@
 
 | Vessel | Flag | Story | Key Multipliers |
 |--------|------|-------|-----------------|
-| **KOOSHA 4** | IRN | Cargo on GFCM IUU list | IUU 3.0x, flag 1.8x |
-| **SABITI** | IRN | Oil tanker, OFAC sanctioned | OFAC 2.5x, flag 1.8x |
-| **ADRIAN DARYA 1** | IRN | Tanker, OFAC Iran program | OFAC 2.5x, flag 1.8x |
-| **ACROS NO. 2** | PAN | Carrier, other-RFMO IUU | IUU 2.0x |
-| **FRIO NARUTO** | JPN | Tuna longliner, ICCAT BFT | ICCAT 1.3x |
+| **KOOSHA 4** | IRN | Cargo on GFCM IUU list | IUU 3.0x, flag 1.63x |
+| **SABITI** | IRN | Oil tanker, OFAC sanctioned | OFAC 2.5x, flag 1.63x |
+| **ADRIAN DARYA 1** | IRN | Tanker, OFAC Iran program | OFAC 2.5x, flag 1.63x |
+| **ACROS NO. 2** | HND | Carrier, other-RFMO IUU | IUU 2.0x |
+| **FRIO NARUTO** | BHS | Carrier, ICCAT authorized | ICCAT 1.4x |
 | **LEONARDO PADRE** | ITA | Artisanal, ICCAT authorized | ICCAT 1.2x |
-| **DEYAR 2** | IRN | IUU-listed | IUU multiplier + flag |
 
 ## Risk Score Decomposition Example (KOOSHA 4)
 
@@ -216,17 +214,17 @@
 Base behavioural score:
   (72h ^ 0.75)           = 27.0    (duration)
   × 3.2                  = 86.4    (GAP event weight)
-  × 1.5                  = 129.6   (offshore > 37km)
-  × 1.0                  = 129.6   (no MPA intersection)
-  × 1.5                  = 194.4   (implied speed > 8kn evasion)
-  = base_risk_score ~194
+  × 1.63                 = 140.8   (IRN flag risk)
+  × 1.5                  = 211.2   (offshore > 37km)
+  × 1.0                  = 211.2   (no MPA intersection)
+  × 1.4                  = 295.7   (implied speed > 8kn evasion)
+  = base_risk_score ~296
 
 Lookup multipliers:
-  × 3.0                  = 583.2   (GFCM IUU-listed)
-  × 1.8                  = 1049.8  (IRN flag risk)
-  × 1.0                  = 1049.8  (no ICCAT)
-  × 1.0                  = 1049.8  (no OFAC)
-  = risk_score ~1050 → Critical band
+  × 3.0                  = 887.0   (GFCM IUU-listed)
+  × 1.0                  = 887.0   (no ICCAT)
+  × 1.0                  = 887.0   (no OFAC)
+  = risk_score ~887 → Critical band
 
-Compound multiplier: 1050 / 194 = 5.4x
+Compound multiplier: 887 / 296 = 3.0x
 ```
