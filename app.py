@@ -2,10 +2,7 @@
 
 import streamlit as st
 import pandas as pd
-import folium
-from folium.utilities import normalize
-from streamlit_folium import st_folium
-from branca.element import MacroElement, Template
+import numpy as np
 from datetime import datetime
 
 from config import (
@@ -75,101 +72,6 @@ def _build_fdi_cache(csquares_tuples, fdi_effort_df, fdi_landings_df):
     return cache
 
 
-def _build_map(df_map, fdi_effort_df, show_fdi):
-    """Build a Folium map with markers for df_map. Cached in session state."""
-    from config import RISK_BAND_COLORS
-    m = folium.Map(location=[37.0, 18.0], zoom_start=5, tiles="CartoDB positron")
-    band_size_px = {"Low": 5, "Emerging": 6, "Elevated": 7, "Severe": 9, "Critical": 11}
-
-    fg_iuu = folium.FeatureGroup(name="IUU-Listed", show=True)
-    fg_ofac = folium.FeatureGroup(name="OFAC Sanctioned", show=True)
-    fg_fdi = folium.FeatureGroup(name="FDI Fishing Effort", show=show_fdi)
-
-    # FDI effort rectangles
-    if not fdi_effort_df.empty:
-        for sw_lat, sw_lon, days, color, opacity in _build_fdi_rectangles(fdi_effort_df):
-            folium.Rectangle(
-                bounds=[[sw_lat, sw_lon], [sw_lat + 0.5, sw_lon + 0.5]],
-                color=color, fill=True, fill_color=color,
-                fill_opacity=opacity, weight=0,
-                popup=f"Fishing days: {days:,.0f}",
-            ).add_to(fg_fdi)
-
-    # Split flagged vs clean
-    _is_flagged = (
-        df_map.get("ofac_sanctioned", pd.Series(False, index=df_map.index)).fillna(False).astype(bool)
-        | df_map.get("iuu_matched", pd.Series(False, index=df_map.index)).fillna(False).astype(bool)
-    )
-    df_flagged = df_map[_is_flagged]
-    df_clean = df_map[~_is_flagged]
-    df_clean = df_clean[df_clean.get("risk_band", pd.Series("Low", index=df_clean.index)) != "Low"]
-
-    # Clean events — individual CircleMarkers (no clustering)
-    _event_color_map = {"GAP": "#e74c3c", "LOITERING": "#f39c12", "ENCOUNTER": "#9b59b6"}
-    fg_events = folium.FeatureGroup(name="Events", show=True)
-    if not df_clean.empty:
-        _colors = df_clean["event_type"].map(_event_color_map).fillna("#888")
-        _radii = df_clean.get("risk_band", pd.Series("Low", index=df_clean.index)).map(band_size_px).fillna(5)
-        _names = df_clean.get("vessel_name", pd.Series("", index=df_clean.index)).fillna("(unknown)")
-        _tips = (
-            _names + " | " + df_clean["event_type"] + " | " + df_clean["flag"]
-            + " | risk " + df_clean["risk_score"].round(1).astype(str)
-            + " (" + df_clean.get("risk_band", "").astype(str) + ")"
-        )
-        for lat, lon, color, radius, tip in zip(
-            df_clean["lat"].astype(float),
-            df_clean["lon"].astype(float),
-            _colors, _radii.astype(int), _tips,
-        ):
-            folium.CircleMarker(
-                location=[lat, lon], radius=radius,
-                fill_color=color, color="#333", weight=0.5, fill_opacity=0.7,
-                fill=True, tooltip=tip,
-            ).add_to(fg_events)
-    fg_events.add_to(m)
-
-    # Flagged events — individual DivIcon markers with SVG shapes
-    def _svg_shape(event_type, fill, size, stroke="#222", stroke_w=1.5):
-        s = size
-        half = s / 2
-        if event_type == "LOITERING":
-            body = f'<rect x="1" y="1" width="{s-2}" height="{s-2}" fill="{fill}" stroke="{stroke}" stroke-width="{stroke_w}"/>'
-        elif event_type == "ENCOUNTER":
-            pts = f"{half},1 {s-1},{s-1} 1,{s-1}"
-            body = f'<polygon points="{pts}" fill="{fill}" stroke="{stroke}" stroke-width="{stroke_w}"/>'
-        else:
-            r = half - 1
-            body = f'<circle cx="{half}" cy="{half}" r="{r}" fill="{fill}" stroke="{stroke}" stroke-width="{stroke_w}"/>'
-        return f'<svg width="{s}" height="{s}" xmlns="http://www.w3.org/2000/svg">{body}</svg>'
-
-    _flag_size = 22
-    for _, row in df_flagged.iterrows():
-        if pd.isna(row.get("lat")) or pd.isna(row.get("lon")):
-            continue
-        is_ofac = row.get("ofac_sanctioned", False)
-        is_iuu = row.get("iuu_matched", False)
-        vname = row.get("vessel_name", "")
-        fill = "#8B0000" if is_ofac else "#000000"
-        target = fg_ofac if is_ofac else fg_iuu
-        listings = []
-        if is_ofac:
-            listings.append("OFAC")
-        if is_iuu:
-            listings.append("IUU")
-        tooltip = f"{vname or '(unknown)'} | {row['event_type']} | {row['flag']} | risk {row['risk_score']:.1f} | {', '.join(listings)}"
-        svg = _svg_shape(row["event_type"], fill, _flag_size)
-        icon = folium.DivIcon(
-            html=f'<div style="width:{_flag_size}px;height:{_flag_size}px">{svg}</div>',
-            icon_size=(_flag_size, _flag_size),
-            icon_anchor=(_flag_size // 2, _flag_size // 2),
-        )
-        folium.Marker(location=[row["lat"], row["lon"]], icon=icon, tooltip=tooltip).add_to(target)
-
-    fg_fdi.add_to(m)
-    fg_iuu.add_to(m)
-    fg_ofac.add_to(m)
-    folium.LayerControl(collapsed=True).add_to(m)
-    return m
 
 
 # ========================= PAGE CONFIG =========================
@@ -561,173 +463,123 @@ with col1:
             )
             fdi_cache = _build_fdi_cache(csq_pairs, fdi_effort, fdi_landings)
 
-        # Cache the Folium map in session state; rebuild only when filters change.
-        # Uses render=False on subsequent reruns to skip expensive HTML serialization.
-        _map_fingerprint = (
-            tuple(sorted(_pill_events or [])),
-            tuple(sorted(_pill_bands or [])),
-            tuple(sorted(_pill_flags or [])),
-            tuple(sorted(_pill_class or [])),
-            show_fdi_layer,
-            len(df_map),
-        )
-        _prev_fp = st.session_state.get("_map_fingerprint")
-        _map_changed = _prev_fp != _map_fingerprint or "_cached_map" not in st.session_state
-        if _map_changed:
-            m = _build_map(df_map, fdi_effort, show_fdi_layer)
-            st.session_state["_cached_map"] = m
-            st.session_state["_map_fingerprint"] = _map_fingerprint
-        else:
-            m = st.session_state["_cached_map"]
+        # ---- PyDeck map (GPU-accelerated, no iframe rerenders) ----
+        import pydeck as pdk
 
-        map_data = st_folium(
-            m, height=500, use_container_width=True,
-            returned_objects=["last_object_clicked"],
+        _event_rgb = {"GAP": [231, 76, 60], "LOITERING": [243, 156, 18], "ENCOUNTER": [155, 89, 182]}
+        _band_radius = {"Low": 3000, "Emerging": 4500, "Elevated": 6000, "Severe": 8000, "Critical": 11000}
+
+        # Prepare map dataframe with colour & radius columns
+        _df_deck = df_map.copy()
+        _df_deck = _df_deck.dropna(subset=["lat", "lon"])
+        # Exclude Low-band unless flagged
+        _is_flagged_deck = (
+            _df_deck.get("ofac_sanctioned", pd.Series(False, index=_df_deck.index)).fillna(False).astype(bool)
+            | _df_deck.get("iuu_matched", pd.Series(False, index=_df_deck.index)).fillna(False).astype(bool)
+        )
+        _df_deck = _df_deck[_is_flagged_deck | (_df_deck.get("risk_band", "Low") != "Low")]
+
+        def _get_color(row):
+            if row.get("ofac_sanctioned"):
+                return [139, 0, 0, 220]
+            if row.get("iuu_matched"):
+                return [0, 0, 0, 220]
+            return _event_rgb.get(row.get("event_type", ""), [136, 136, 136]) + [180]
+
+        _df_deck["_color"] = _df_deck.apply(_get_color, axis=1)
+        _df_deck["_radius"] = _df_deck.get("risk_band", "Low").map(_band_radius).fillna(3000).astype(int)
+        _df_deck["_label"] = (
+            _df_deck.get("vessel_name", "").fillna("(unknown)").astype(str)
+            + " | " + _df_deck["event_type"].astype(str)
+            + " | " + _df_deck["flag"].astype(str)
+            + " | risk " + _df_deck["risk_score"].round(1).astype(str)
+        )
+
+        _layers = [
+            pdk.Layer(
+                "ScatterplotLayer",
+                id="events",
+                data=_df_deck,
+                get_position=["lon", "lat"],
+                get_color="_color",
+                get_radius="_radius",
+                pickable=True,
+                auto_highlight=True,
+                radius_min_pixels=4,
+                radius_max_pixels=18,
+            ),
+        ]
+
+        # FDI effort rectangles as a separate layer
+        if show_fdi_layer and not fdi_effort.empty:
+            _fdi_rects = _build_fdi_rectangles(fdi_effort)
+            if _fdi_rects:
+                _fdi_data = []
+                for sw_lat, sw_lon, days, color, opacity in _fdi_rects:
+                    # Convert hex color to RGB
+                    _hex = color.lstrip("#")
+                    _r, _g, _b = int(_hex[:2], 16), int(_hex[2:4], 16), int(_hex[4:6], 16)
+                    _fdi_data.append({
+                        "lat": sw_lat + 0.25, "lon": sw_lon + 0.25,
+                        "days": days,
+                        "_color": [_r, _g, _b, int(opacity * 255)],
+                    })
+                _fdi_df = pd.DataFrame(_fdi_data)
+                _layers.append(
+                    pdk.Layer(
+                        "ScatterplotLayer",
+                        id="fdi",
+                        data=_fdi_df,
+                        get_position=["lon", "lat"],
+                        get_color="_color",
+                        get_radius=25000,
+                        radius_min_pixels=6,
+                        radius_max_pixels=20,
+                        pickable=False,
+                    )
+                )
+
+        _view = pdk.ViewState(latitude=37.0, longitude=18.0, zoom=4.5, pitch=0)
+        _deck = pdk.Deck(
+            layers=_layers,
+            initial_view_state=_view,
+            map_style="light",
+            tooltip={"text": "{_label}"},
+        )
+
+        event = st.pydeck_chart(
+            _deck, height=500,
+            on_select="rerun",
+            selection_mode="single-object",
             key="main_map",
-            render=_map_changed,
         )
 
-        # Dual-encoding legend: shape = behaviour, fill = listing, size = risk band
-        def _legend_svg(shape, fill="#888", size=14, dashed=False):
-            s = size
-            half = s / 2
-            stroke = "#ff9900" if dashed else "#222"
-            sw = 2.0 if dashed else 1.2
-            dash_attr = ' stroke-dasharray="3 2"' if dashed else ""
-            if shape == "square":
-                body = f'<rect x="1" y="1" width="{s-2}" height="{s-2}" fill="{fill}" stroke="{stroke}" stroke-width="{sw}"{dash_attr}/>'
-            elif shape == "triangle":
-                pts = f"{half},1 {s-1},{s-1} 1,{s-1}"
-                body = f'<polygon points="{pts}" fill="{fill}" stroke="{stroke}" stroke-width="{sw}"{dash_attr}/>'
-            else:
-                body = f'<circle cx="{half}" cy="{half}" r="{half-1}" fill="{fill}" stroke="{stroke}" stroke-width="{sw}"{dash_attr}/>'
-            return (
-                f'<span style="display:inline-block;vertical-align:middle;margin-right:4px">'
-                f'<svg width="{s}" height="{s}">{body}</svg></span>'
-            )
+        # Click → set investigate vessel
+        if event and hasattr(event, "selection") and event.selection:
+            _sel_objs = event.selection.get("objects", {})
+            # objects is dict keyed by layer index or "ScatterplotLayer"
+            _picked_list = []
+            for _layer_objs in _sel_objs.values():
+                _picked_list.extend(_layer_objs)
+            if _picked_list:
+                _picked_obj = _picked_list[0]
+                _vname = _picked_obj.get("vessel_name")
+                if _vname and pd.notna(_vname) and str(_vname).strip():
+                    st.session_state["investigate_vessel"] = str(_vname)
+                    st.toast(f"Selected **{_vname}** for investigation")
 
-        from config import RISK_BAND_COLORS as _RBC
-        legend_md = (
-            '<b>Event type</b> (colour):&ensp;'
-            f'{_legend_svg("circle", fill="#e74c3c")} AIS Gap&ensp;'
-            f'{_legend_svg("circle", fill="#f39c12")} Loitering&ensp;'
-            f'{_legend_svg("circle", fill="#9b59b6")} Encounter&emsp;'
-            '<b>Flagged vessels</b> (SVG shapes):&ensp;'
-            f'{_legend_svg("circle", fill="#000000")} IUU&ensp;'
-            f'{_legend_svg("circle", fill="#8B0000")} OFAC<br/>'
-            '<b>Risk band</b> (marker size):&ensp;'
-            f'{_legend_svg("circle", fill="#888", size=10)} Low&ensp;'
-            f'{_legend_svg("circle", fill="#888", size=12)} Emerging&ensp;'
-            f'{_legend_svg("circle", fill="#888", size=14)} Elevated&ensp;'
-            f'{_legend_svg("circle", fill="#888", size=18)} Severe&ensp;'
-            f'{_legend_svg("circle", fill="#888", size=22)} Critical<br/>'
-            '<b>FDI effort</b>:&ensp;'
-            '<span style="display:inline-block;width:11px;height:11px;background:#ffffb2;border:1px solid #ccc;margin-right:3px"></span><small>&lt;50d</small>&ensp;'
-            '<span style="display:inline-block;width:11px;height:11px;background:#fecc5c;border:1px solid #ccc;margin-right:3px"></span><small>50-500d</small>&ensp;'
-            '<span style="display:inline-block;width:11px;height:11px;background:#fd8d3c;border:1px solid #ccc;margin-right:3px"></span><small>500-2kd</small>&ensp;'
-            '<span style="display:inline-block;width:11px;height:11px;background:#e31a1c;border:1px solid #ccc;margin-right:3px"></span><small>&gt;2kd</small>'
+        # Legend
+        _leg = (
+            '<b>Event type</b>:&ensp;'
+            '<span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:#e74c3c;margin-right:3px"></span>AIS Gap&ensp;'
+            '<span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:#f39c12;margin-right:3px"></span>Loitering&ensp;'
+            '<span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:#9b59b6;margin-right:3px"></span>Encounter&emsp;'
+            '<b>Flagged</b>:&ensp;'
+            '<span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:#000;margin-right:3px"></span>IUU&ensp;'
+            '<span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:#8B0000;margin-right:3px"></span>OFAC&emsp;'
+            '<b>Size</b> = risk band'
         )
-        st.markdown(f'<div style="font-size:13px;line-height:2.0">{legend_md}</div>', unsafe_allow_html=True)
-
-        st.caption(
-            "Click a marker for event details. The clicked vessel is also set "
-            "as the default in the **Vessel Investigation** tab."
-        )
-
-        # Event detail card on click
-        clicked = map_data.get("last_object_clicked") if map_data else None
-        if clicked:
-            clat, clng = clicked.get("lat"), clicked.get("lng")
-            if clat is not None and clng is not None:
-                dist = ((df_filtered["lat"] - clat)**2 + (df_filtered["lon"] - clng)**2)
-                nearest_idx = dist.idxmin()
-                if dist[nearest_idx] < 0.01:
-                    ev = df_filtered.loc[nearest_idx]
-                    # Sync clicked vessel to the Vessel Investigation selector.
-                    # We write to a dedicated key (not the selectbox's own key)
-                    # to avoid Streamlit's "can't modify widget state" rule;
-                    # the selectbox reads it on next render.
-                    clicked_vname = ev.get("vessel_name")
-                    if pd.notna(clicked_vname) and clicked_vname:
-                        st.session_state["investigate_vessel"] = clicked_vname
-                    is_ofac_ev = ev.get("ofac_sanctioned", False)
-                    is_iuu_ev = ev.get("iuu_matched", False)
-                    is_iccat_ev = ev.get("iccat_authorized", False)
-
-                    st.markdown("---")
-                    c1, c2, c3 = st.columns(3)
-                    c1.metric("Vessel", ev.get("vessel_name", "Unknown"))
-                    c2.metric("Event", ev["event_type"])
-                    c3.metric("Risk Score", f"{ev['risk_score']:.1f}")
-
-                    c4, c5, c6 = st.columns(3)
-                    c4.metric("Flag", ev["flag"])
-                    c5.metric("Duration", f"{ev['duration_h']} h")
-                    c6.metric("Date", str(ev.get("date", ""))[:10])
-
-                    if is_ofac_ev:
-                        st.error(
-                            f"**OFAC SANCTIONED** | Name: {ev.get('ofac_vessel_name', 'N/A')} | "
-                            f"Program: {ev.get('ofac_sanctions_program', 'N/A')} | "
-                            f"Listed: {ev.get('ofac_listing_date', 'N/A')} | "
-                            f"Match: {ev.get('ofac_match_type', '')} ({ev.get('ofac_match_confidence', '')}) | "
-                            f"Multiplier: {ev.get('ofac_multiplier', 1.0):.1f}x"
-                        )
-
-                    if is_iuu_ev:
-                        tier = "GFCM (Med)" if ev.get("iuu_is_gfcm") else "Other RFMO"
-                        st.error(
-                            f"**IUU-LISTED VESSEL** | Name: {ev.get('iuu_vessel_name', 'N/A')} | "
-                            f"Match: {ev.get('iuu_match_type', '')} ({ev.get('iuu_match_confidence', '')}) | "
-                            f"Tier: {tier} | Listed by: {ev.get('iuu_listing_rfmos', 'N/A')} | "
-                            f"Multiplier: {ev.get('iuu_multiplier', 1.0):.1f}x"
-                        )
-                        reason = ev.get("iuu_listing_reason", "")
-                        if reason and pd.notna(reason) and str(reason).strip().lower() != "nan":
-                            st.caption(f"Reason: {str(reason)[:300]}")
-
-                    if is_iccat_ev:
-                        st.info(
-                            f"**ICCAT AUTHORIZED** | Authorizations: {ev.get('iccat_authorizations', 'N/A')} | "
-                            f"Risk tier: {ev.get('iccat_risk_tier', 'N/A')} | "
-                            f"Multiplier: {ev.get('iccat_multiplier', 1.0):.1f}x"
-                        )
-
-                    # Multi-list combination warnings
-                    if is_ofac_ev and is_iuu_ev and is_iccat_ev:
-                        st.error("**TRIPLE FLAG: OFAC-sanctioned + IUU-listed + ICCAT-authorized**")
-                    elif is_ofac_ev and is_iuu_ev:
-                        st.error("**DUAL FLAG: OFAC-sanctioned + IUU-listed**")
-                    elif is_ofac_ev and is_iccat_ev:
-                        st.warning("**DUAL FLAG: OFAC-sanctioned + ICCAT-authorized**")
-                    elif is_iuu_ev and is_iccat_ev:
-                        st.warning("**DUAL FLAG: IUU-listed + ICCAT-authorized**")
-
-                    if "csq_lon" in ev.index:
-                        ctx = fdi_cache.get((ev["csq_lon"], ev["csq_lat"]))
-                        if ctx and ctx["total_fishing_days"] > 0:
-                            top_sp_str = ", ".join(
-                                SPECIES_NAMES.get(s[0], s[0]) for s in ctx["top_species"][:3]
-                            )
-                            tonnes = ctx["total_landings_tonnes"]
-                            level = "High" if tonnes > 1000 else ("Moderate" if tonnes > 10 else "Low")
-                            st.caption(
-                                f"FDI Baseline: {'Known fishing ground' if ctx['is_known_fishing_ground'] else 'Not a known fishing ground'} | "
-                                f"Fishing days: {ctx['total_fishing_days']:,.0f} | "
-                                f"Top species: {top_sp_str} | "
-                                f"Landings: {tonnes:,.0f} t ({level})"
-                            )
-
-                    # External vessel lookup links
-                    imo_val = str(ev.get("imo", "")).strip()
-                    if imo_val and imo_val not in ("", "0", "nan", "None"):
-                        mt_url = f"https://www.marinetraffic.com/en/ais/details/ships/imo:{imo_val}"
-                        vf_url = f"https://www.vesselfinder.com/vessels?name={imo_val}"
-                        st.markdown(
-                            f"External lookups: "
-                            f"[MarineTraffic]({mt_url}) | "
-                            f"[VesselFinder]({vf_url})"
-                        )
+        st.markdown(f'<div style="font-size:13px;line-height:2.0">{_leg}</div>', unsafe_allow_html=True)
     else:
         st.info("No events match the selected filters.")
 

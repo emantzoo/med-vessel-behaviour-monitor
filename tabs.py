@@ -1157,11 +1157,10 @@ def render_fishing_in_mpa_map(df, fishing_df):
 
     st.subheader("Fishing events with risk signals")
     st.caption(
-        "Three-layer Folium map. Layer 1 — FDI rectangles: EU-declared fishing effort by c-square. "
-        "Layer 2 — grey dot cluster: fishing events inside GFCM-FRA or EU-designated sites (>=0.5h). "
-        "Layer 3 — coloured shapes: events that fired high-signal risk tree leaves. "
-        "Hover for vessel tooltip. Click foreground marker for full event detail. "
-        "Use the layer toggle (top-right) to show/hide layers."
+        "Three-layer map. Layer 1 — FDI dots: EU-declared fishing effort by c-square. "
+        "Layer 2 — grey dots: fishing events inside GFCM-FRA or EU-designated sites (>=0.5h). "
+        "Layer 3 — coloured dots: events that fired high-signal risk tree leaves. "
+        "Hover for vessel tooltip. Click a marker to select vessel."
     )
     with st.expander("How to read this chart", expanded=False):
         st.markdown(
@@ -1308,19 +1307,12 @@ satellite radar inside MPAs do not broadcast AIS. This map captures the tip of t
         else None
     )
 
-    import folium
+    import pydeck as pdk
     import numpy as np
-    from folium.plugins import FastMarkerCluster
-    from streamlit_folium import st_folium
 
-    fmap = folium.Map(
-        location=[38.0, 18.0],
-        zoom_start=5,
-        tiles="CartoDB positron",
-        prefer_canvas=True,
-    )
+    _layers = []
 
-    # --- Layer 1: FDI effort heatmap — single GeoJSON (fast) ---
+    # --- Layer 1: FDI effort heatmap ---
     if os.path.exists(_fdi_path):
         _fdi_bg = pd.read_csv(_fdi_path)
         _fdi_yr = _fdi_bg["year"].max()
@@ -1329,48 +1321,32 @@ satellite radar inside MPAs do not broadcast AIS. This map captures the tip of t
             .groupby(["rectangle_lon", "rectangle_lat"])["totfishdays"]
             .sum().reset_index()
         )
-        def _fdi_color(days):
+        def _fdi_rgba(days):
             if days >= 2000:
-                return "#e31a1c", 0.35
+                return [227, 26, 28, 90]
             elif days >= 500:
-                return "#fd8d3c", 0.30
+                return [253, 141, 60, 77]
             elif days >= 50:
-                return "#fecc5c", 0.25
-            return "#ffffb2", 0.15
+                return [254, 204, 92, 64]
+            return [255, 255, 178, 38]
 
-        _fdi_features = []
-        for _, cell in _fdi_cells.iterrows():
-            lo, la, days = cell["rectangle_lon"], cell["rectangle_lat"], cell["totfishdays"]
-            color, opacity = _fdi_color(days)
-            _fdi_features.append({
-                "type": "Feature",
-                "geometry": {
-                    "type": "Polygon",
-                    "coordinates": [[[lo, la], [lo + 0.5, la], [lo + 0.5, la + 0.5],
-                                     [lo, la + 0.5], [lo, la]]],
-                },
-                "properties": {
-                    "color": color,
-                    "opacity": opacity,
-                    "tooltip": f"FDI effort ({int(_fdi_yr)}): {days:,.0f} fishing days",
-                },
-            })
-        folium.GeoJson(
-            {"type": "FeatureCollection", "features": _fdi_features},
-            name=f"FDI effort ({int(_fdi_yr)})",
-            style_function=lambda f: {
-                "fillColor": f["properties"]["color"],
-                "fillOpacity": f["properties"]["opacity"],
-                "color": "none",
-                "weight": 0,
-            },
-            tooltip=folium.GeoJsonTooltip(fields=["tooltip"], aliases=[""], labels=False),
-            show=True,
-        ).add_to(fmap)
+        _fdi_cells["_color"] = _fdi_cells["totfishdays"].apply(_fdi_rgba)
+        _fdi_cells["lat"] = _fdi_cells["rectangle_lat"] + 0.25
+        _fdi_cells["lon"] = _fdi_cells["rectangle_lon"] + 0.25
+        _fdi_cells["_label"] = "FDI effort (" + _fdi_yr.astype(str) + "): " + _fdi_cells["totfishdays"].apply(lambda d: f"{d:,.0f}") + " fishing days"
+        _layers.append(pdk.Layer(
+            "ScatterplotLayer",
+            id="fdi-effort",
+            data=_fdi_cells,
+            get_position=["lon", "lat"],
+            get_color="_color",
+            get_radius=25000,
+            radius_min_pixels=6,
+            radius_max_pixels=20,
+            pickable=False,
+        ))
 
-    # --- Layer 2: Background clustering — fishing-in-MPA events (>=0.5h, cap 2000) ---
-    # Filter to meaningful detections (>=0.5 fishing hours) to avoid cluttering
-    # the cluster with low-confidence GFW detections.
+    # --- Layer 2: Background fishing events (grey dots) ---
     n_bg_shown = 0
     if n_bg > 0:
         if hours_col and hours_col in bg_df.columns:
@@ -1382,41 +1358,28 @@ satellite radar inside MPAs do not broadcast AIS. This map captures the tip of t
             bg_plot = bg_df.head(2000)
         n_bg_shown = len(bg_plot)
         if n_bg_shown > 0:
-            # Build rows: [lat, lon, tooltip_text]
-            _bg_rows = []
-            for _, _r in bg_plot.iterrows():
-                _vn = _r.get("vessel_name", "") or "Unknown"
-                _fl = _r.get("flag", "N/A")
-                _hr = _r.get(hours_col, 0) if hours_col else 0
-                _mp = _r.get("mpa", "") or ""
-                _tip = f"{_vn} | {_fl} | {float(_hr):.1f}h"
-                if _mp:
-                    _tip += f" | {_mp[:40]}"
-                _bg_rows.append([float(_r["lat"]), float(_r["lon"]), _tip])
-            _bg_callback = """
-            function(row, context) {
-                var svg = '<svg width="10" height="10" xmlns="http://www.w3.org/2000/svg">'
-                        + '<circle cx="5" cy="5" r="4" fill="#888" fill-opacity="0.6" '
-                        + 'stroke="#555" stroke-width="0.5"/></svg>';
-                var icon = L.divIcon({html: svg, iconSize: [10,10], iconAnchor: [5,5], className: ''});
-                var marker = L.marker([row[0], row[1]], {icon: icon});
-                marker.bindTooltip(row[2]);
-                return marker;
-            }
-            """
-            FastMarkerCluster(
-                data=_bg_rows,
-                callback=_bg_callback,
-                name=f"GFCM-FRA / EU-site fishing events ({n_bg_shown:,} shown, {n_bg:,} total)",
-                options={
-                    "maxClusterRadius": 40,
-                    "disableClusteringAtZoom": 9,
-                    "spiderfyOnMaxZoom": True,
-                },
-            ).add_to(fmap)
+            _bg_deck = bg_plot[["lat", "lon"]].copy()
+            _bg_deck["_color"] = [[136, 136, 136, 130]] * len(_bg_deck)
+            _bg_names = bg_plot.get("vessel_name", pd.Series("Unknown", index=bg_plot.index)).fillna("Unknown")
+            _bg_flags = bg_plot.get("flag", pd.Series("N/A", index=bg_plot.index)).fillna("N/A")
+            _bg_hrs = pd.to_numeric(bg_plot.get(hours_col, pd.Series(0, index=bg_plot.index)), errors="coerce").fillna(0)
+            _bg_deck["_label"] = _bg_names.astype(str) + " | " + _bg_flags.astype(str) + " | " + _bg_hrs.round(1).astype(str) + "h"
+            _layers.append(pdk.Layer(
+                "ScatterplotLayer",
+                id="bg-fishing",
+                data=_bg_deck,
+                get_position=["lon", "lat"],
+                get_color="_color",
+                get_radius=2000,
+                radius_min_pixels=3,
+                radius_max_pixels=6,
+                pickable=True,
+            ))
 
-    # --- Layer 3: Foreground — high-signal events with SVG DivIcon shapes ---
+    # --- Layer 3: Foreground high-signal events ---
     if n_fg > 0:
+        _SEV_RGB = {"high": [228, 87, 86], "medium": [245, 133, 24], "low": [76, 120, 168]}
+
         def _fg_primary(row):
             if row.get("leaf_fishing_in_closed_area"):
                 return "fishing_in_closed_area", "high"
@@ -1445,154 +1408,78 @@ satellite radar inside MPAs do not broadcast AIS. This map captures the tip of t
 
         mpa_col = "mpa" if "mpa" in fg_df.columns else None
 
-        # FastMarkerCluster for foreground — JS callback encodes leaf/severity/overlay
-        # into a coloured SVG DivIcon. Clustering collapses nearby points at low zoom.
-        _fg_callback = """
-        function(row, context) {
-            var lat  = row[0], lon = row[1];
-            var leaf = row[2], sev = row[3], ov = row[4], popup = row[5], tip = row[6];
-            var color = sev === 'high' ? '#E45756' : (sev === 'medium' ? '#F58518' : '#4C78A8');
-            var border = ov ? 'white' : '#333';
-            var bw = ov ? 3 : 1;
-            var svg;
-            if (leaf === 'fishing_in_closed_area') {
-                svg = '<svg width="20" height="20" xmlns="http://www.w3.org/2000/svg">'
-                    + '<polygon points="10,2 19,18 1,18" fill="'+color+'" stroke="'+border+'" stroke-width="'+bw+'"/></svg>';
-            } else if (leaf === 'fishing_in_low_effort_cell') {
-                svg = '<svg width="18" height="18" xmlns="http://www.w3.org/2000/svg">'
-                    + '<rect x="1" y="1" width="16" height="16" fill="'+color+'" stroke="'+border+'" stroke-width="'+bw+'"/></svg>';
-            } else if (leaf === 'gfw_no_rfmo_authorization' || leaf === 'unregulated_flag') {
-                svg = '<svg width="20" height="20" xmlns="http://www.w3.org/2000/svg">'
-                    + '<polygon points="10,1 19,10 10,19 1,10" fill="'+color+'" stroke="'+border+'" stroke-width="'+bw+'"/></svg>';
-            } else {
-                svg = '<svg width="14" height="14" xmlns="http://www.w3.org/2000/svg">'
-                    + '<circle cx="7" cy="7" r="6" fill="'+color+'" stroke="'+border+'" stroke-width="'+bw+'"/></svg>';
-            }
-            var icon = L.divIcon({html: svg, iconSize: [20,20], iconAnchor: [10,10], className: ''});
-            var marker = L.marker([lat, lon], {icon: icon});
-            marker.bindPopup(popup, {maxWidth: 280});
-            marker.bindTooltip(tip);
-            return marker;
-        }
-        """
-        _fg_rows = []
-        for _, row in fg_df.iterrows():
-            leaf_id = row["_fg_leaf"]
-            severity = row["_fg_severity"]
-            overlay = 1 if bool(row["_vessel_overlay"]) else 0
-            hours = row["_hours"]
-            popup_lines = [
-                f"<b>{row.get('vessel_name', 'Unknown')}</b>",
-                f"Flag: {row.get('flag', 'N/A')}",
-                f"Date: {str(row.get('date', ''))}",
-                f"Fishing hours: {hours:.1f}h",
-                f"<b>Leaf: {LEAF_LABELS.get(leaf_id, leaf_id)}</b> ({severity})",
-            ]
-            if mpa_col and row.get(mpa_col):
-                popup_lines.append(f"MPA: {row[mpa_col]}")
-            if overlay:
-                ov = []
-                if row.get("vessel_iuu_crosscheck"):
-                    ov.append("IUU crosscheck")
-                if row.get("vessel_stateless"):
-                    ov.append("stateless")
-                if row.get("vessel_unregulated_flag"):
-                    ov.append("unregulated flag")
-                popup_lines.append(f"<b>Vessel signals:</b> {', '.join(ov)}")
-            _fg_rows.append([
-                row["lat"], row["lon"],
-                leaf_id, severity, overlay,
-                "<br>".join(popup_lines),
-                f"{row.get('vessel_name', '?')} — {LEAF_LABELS.get(leaf_id, leaf_id)}",
-            ])
+        _fg_deck = fg_df[["lat", "lon"]].copy()
+        _fg_deck["vessel_name"] = fg_df.get("vessel_name", "Unknown").fillna("Unknown")
+        _fg_deck["mmsi"] = fg_df.get("mmsi", "").astype(str)
+        _fg_deck["_color"] = fg_df["_fg_severity"].map(lambda s: _SEV_RGB.get(s, [136,136,136]) + [200])
+        _fg_deck["_radius"] = fg_df["_fg_severity"].map({"high": 6000, "medium": 5000, "low": 4000}).fillna(4000).astype(int)
+        _fg_deck["_label"] = (
+            _fg_deck["vessel_name"] + " | "
+            + fg_df.get("flag", "N/A").fillna("N/A").astype(str)
+            + " | " + fg_df["_fg_leaf"].map(LEAF_LABELS).fillna(fg_df["_fg_leaf"]).astype(str)
+            + " (" + fg_df["_fg_severity"].astype(str) + ")"
+            + " | " + fg_df["_hours"].round(1).astype(str) + "h"
+        )
 
-        FastMarkerCluster(
-            data=_fg_rows,
-            callback=_fg_callback,
-            name=f"High-signal events ({n_fg:,})",
-            options={
-                "maxClusterRadius": 60,
-                "disableClusteringAtZoom": 11,
-                "spiderfyOnMaxZoom": True,
-            },
-        ).add_to(fmap)
+        _layers.append(pdk.Layer(
+            "ScatterplotLayer",
+            id="fg-signals",
+            data=_fg_deck,
+            get_position=["lon", "lat"],
+            get_color="_color",
+            get_radius="_radius",
+            radius_min_pixels=5,
+            radius_max_pixels=14,
+            pickable=True,
+            auto_highlight=True,
+        ))
 
-    folium.LayerControl(collapsed=True).add_to(fmap)
-    map_data = st_folium(fmap, use_container_width=True, height=520, returned_objects=["last_object_clicked"])
+    _view = pdk.ViewState(latitude=38.0, longitude=18.0, zoom=4.5, pitch=0)
+    _deck = pdk.Deck(
+        layers=_layers,
+        initial_view_state=_view,
+        map_style="light",
+        tooltip={"text": "{_label}"},
+    )
 
-    # Return click data so the caller (app.py) can highlight the vessel table
-    clicked = map_data.get("last_object_clicked") if map_data else None
-    if clicked:
-        clat, clng = clicked.get("lat"), clicked.get("lng")
-        if clat is not None and clng is not None:
-            _all = pd.concat([bg_df if n_bg > 0 else pd.DataFrame(),
-                              fg_df if n_fg > 0 else pd.DataFrame()], ignore_index=True)
-            if not _all.empty and "lat" in _all.columns and "lon" in _all.columns:
-                dist = (_all["lat"] - clat)**2 + (_all["lon"] - clng)**2
-                nearest_idx = dist.idxmin()
-                if dist[nearest_idx] < 0.05:
-                    clicked_mmsi = str(_all.loc[nearest_idx, "mmsi"]) if "mmsi" in _all.columns else None
-                    if clicked_mmsi:
-                        st.session_state["fishing_map_clicked_mmsi"] = clicked_mmsi
+    event = st.pydeck_chart(
+        _deck, height=520,
+        on_select="rerun",
+        selection_mode="single-object",
+        key="fishing_mpa_map",
+    )
 
-    # Inline legend (mirrors main Behavioural Risk Map style)
-    def _fsv(shape, fill="#888", size=14, border="#333", bw=1, dashed_border=False):
-        """Tiny inline SVG for legend swatches."""
-        s = size
-        half = s / 2
-        stroke = "#ff9900" if dashed_border else border
-        dash = 'stroke-dasharray="3,2"' if dashed_border else ""
-        if shape == "triangle":
-            pts = f"10,2 {s-1},{s-1} 1,{s-1}"
-            return (f'<svg width="{s}" height="{s}" xmlns="http://www.w3.org/2000/svg" '
-                    f'style="vertical-align:middle;margin-right:3px">'
-                    f'<polygon points="{pts}" fill="{fill}" stroke="{stroke}" '
-                    f'stroke-width="{bw}" {dash}/></svg>')
-        elif shape == "square":
-            return (f'<svg width="{s}" height="{s}" xmlns="http://www.w3.org/2000/svg" '
-                    f'style="vertical-align:middle;margin-right:3px">'
-                    f'<rect x="1" y="1" width="{s-2}" height="{s-2}" fill="{fill}" '
-                    f'stroke="{stroke}" stroke-width="{bw}" {dash}/></svg>')
-        elif shape == "diamond":
-            pts = f"{half},1 {s-1},{half} {half},{s-1} 1,{half}"
-            return (f'<svg width="{s}" height="{s}" xmlns="http://www.w3.org/2000/svg" '
-                    f'style="vertical-align:middle;margin-right:3px">'
-                    f'<polygon points="{pts}" fill="{fill}" stroke="{stroke}" '
-                    f'stroke-width="{bw}" {dash}/></svg>')
-        else:  # circle
-            return (f'<svg width="{s}" height="{s}" xmlns="http://www.w3.org/2000/svg" '
-                    f'style="vertical-align:middle;margin-right:3px">'
-                    f'<circle cx="{half}" cy="{half}" r="{half-1}" fill="{fill}" '
-                    f'stroke="{stroke}" stroke-width="{bw}" {dash}/></svg>')
+    # Click → store selected vessel MMSI
+    if event and hasattr(event, "selection") and event.selection:
+        _sel_objs = event.selection.get("objects", {})
+        for _layer_objs in _sel_objs.values():
+            if _layer_objs:
+                _picked = _layer_objs[0]
+                _mmsi = _picked.get("mmsi")
+                if _mmsi and str(_mmsi).strip():
+                    st.session_state["fishing_map_clicked_mmsi"] = str(_mmsi)
 
-    _HIGH = "#E45756"
-    _MED  = "#F58518"
-    _LOW  = "#4C78A8"
+    # Inline legend
+    _swatch = lambda color: (
+        f'<span style="display:inline-block;width:11px;height:11px;border-radius:50%;'
+        f'background:{color};margin-right:3px;vertical-align:middle"></span>'
+    )
+    _sq = lambda color: (
+        f'<span style="display:inline-block;width:11px;height:11px;'
+        f'background:{color};border:1px solid #ccc;margin-right:3px;vertical-align:middle"></span>'
+    )
     legend_md = (
-        '<b>Foreground shape</b> (leaf type):&ensp;'
-        f'{_fsv("triangle", fill=_HIGH)} Closed area (no-take)&ensp;'
-        f'{_fsv("square",   fill=_MED)}  Low-effort c-square&ensp;'
-        f'{_fsv("diamond",  fill=_MED)}  No RFMO auth / non-GFCM flag&ensp;'
-        f'{_fsv("circle",   fill=_LOW)}  General MPA (other)<br/>'
-        '<b>Fill colour</b> (severity):&ensp;'
-        f'{_fsv("circle", fill=_HIGH)} High&ensp;'
-        f'{_fsv("circle", fill=_MED)}  Medium&ensp;'
-        f'{_fsv("circle", fill=_LOW)}  Low&emsp;'
-        '<b>White border</b>:&ensp;'
-        f'{_fsv("circle", fill=_HIGH, border="white", bw=3)} Vessel-level concern '
-        f'(IUU crosscheck / stateless / unregulated flag)<br/>'
-        '<b>Background cluster</b>:&ensp;'
-        f'{_fsv("circle", fill="#888", size=10)} '
-        'Fishing in GFCM-FRA or EU-designated sites (meaningful regulatory tiers only)&emsp;'
-        '<b>FDI rectangles</b>:&ensp;'
-        '<span style="display:inline-block;width:11px;height:11px;background:#ffffb2;'
-        'border:1px solid #ccc;margin-right:3px;vertical-align:middle"></span><small>&lt;50d</small>&ensp;'
-        '<span style="display:inline-block;width:11px;height:11px;background:#fecc5c;'
-        'border:1px solid #ccc;margin-right:3px;vertical-align:middle"></span><small>50-500d</small>&ensp;'
-        '<span style="display:inline-block;width:11px;height:11px;background:#fd8d3c;'
-        'border:1px solid #ccc;margin-right:3px;vertical-align:middle"></span><small>500-2kd</small>&ensp;'
-        '<span style="display:inline-block;width:11px;height:11px;background:#e31a1c;'
-        'border:1px solid #ccc;margin-right:3px;vertical-align:middle"></span><small>&gt;2kd</small>'
+        '<b>Signal severity</b>:&ensp;'
+        f'{_swatch("#E45756")} High (closed area)&ensp;'
+        f'{_swatch("#F58518")} Medium (low-effort / no auth / unregulated)&ensp;'
+        f'{_swatch("#4C78A8")} Low (general MPA)&emsp;'
+        '<b>Background</b>:&ensp;'
+        f'{_swatch("#888")} Fishing in GFCM-FRA / EU sites<br/>'
+        '<b>FDI effort</b>:&ensp;'
+        f'{_sq("#ffffb2")}<small>&lt;50d</small>&ensp;'
+        f'{_sq("#fecc5c")}<small>50-500d</small>&ensp;'
+        f'{_sq("#fd8d3c")}<small>500-2kd</small>&ensp;'
+        f'{_sq("#e31a1c")}<small>&gt;2kd</small>'
     )
     st.markdown(
         f'<div style="font-size:13px;line-height:2.2">{legend_md}</div>',
