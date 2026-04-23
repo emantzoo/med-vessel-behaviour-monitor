@@ -50,13 +50,13 @@ def _build_fdi_rectangles(fdi_effort_df):
     for _, cell in fdi_agg.iterrows():
         days = cell["totfishdays"]
         if days >= 2000:
-            color, opacity = "#e31a1c", 0.35
+            color, opacity = "#08306b", 0.35
         elif days >= 500:
-            color, opacity = "#fd8d3c", 0.30
+            color, opacity = "#2171b5", 0.30
         elif days >= 50:
-            color, opacity = "#fecc5c", 0.25
+            color, opacity = "#6baed6", 0.25
         else:
-            color, opacity = "#ffffb2", 0.15
+            color, opacity = "#c6dbef", 0.15
         rects.append((cell["rectangle_lat"], cell["rectangle_lon"], days, color, opacity))
     return rects
 
@@ -510,32 +510,36 @@ with col1:
             ),
         ]
 
-        # FDI effort rectangles as a separate layer
+        # FDI effort choropleth (0.5x0.5 degree filled rectangles)
         if show_fdi_layer and not fdi_effort.empty:
             _fdi_rects = _build_fdi_rectangles(fdi_effort)
             if _fdi_rects:
                 _fdi_data = []
                 for sw_lat, sw_lon, days, color, opacity in _fdi_rects:
-                    # Convert hex color to RGB
                     _hex = color.lstrip("#")
                     _r, _g, _b = int(_hex[:2], 16), int(_hex[2:4], 16), int(_hex[4:6], 16)
                     _fdi_data.append({
-                        "lat": sw_lat + 0.25, "lon": sw_lon + 0.25,
-                        "days": days,
+                        "_polygon": [
+                            [sw_lon, sw_lat],
+                            [sw_lon + 0.5, sw_lat],
+                            [sw_lon + 0.5, sw_lat + 0.5],
+                            [sw_lon, sw_lat + 0.5],
+                        ],
                         "_color": [_r, _g, _b, int(opacity * 255)],
+                        "_label": f"FDI effort: {days:,.0f} fishing days",
                     })
                 _fdi_df = pd.DataFrame(_fdi_data)
-                _layers.append(
+                _layers.insert(0,
                     pdk.Layer(
-                        "ScatterplotLayer",
+                        "PolygonLayer",
                         id="fdi",
                         data=_fdi_df,
-                        get_position=["lon", "lat"],
-                        get_color="_color",
-                        get_radius=25000,
-                        radius_min_pixels=6,
-                        radius_max_pixels=20,
+                        get_polygon="_polygon",
+                        get_fill_color="_color",
+                        get_line_color=[0, 0, 0, 0],
                         pickable=False,
+                        stroked=False,
+                        filled=True,
                     )
                 )
 
@@ -899,11 +903,24 @@ Includes fishing-only vessels not visible in the behavioural Ranking tab.""")
             from config import GFCM_PARTY_FLAGS
 
             # Shared pill filters for both map and table
-            _fc1, _fc2, _fc3, _fc4 = st.columns(4)
-            _pill_mpa = _fc1.toggle("In MPA only", key="fa_mpa")
-            _pill_nongfcm = _fc2.toggle("Non-GFCM flag", key="fa_nongfcm")
-            _pill_beh = _fc3.toggle("With behavioural", key="fa_beh")
-            _pill_fishonly = _fc4.toggle("Fishing-only", key="fa_fishonly")
+            _fc1, _fc2, _fc3 = st.columns(3)
+            _pill_mpa = _fc1.toggle(
+                "In MPA only", key="fa_mpa",
+                help="Show only fishing events inside Marine Protected Areas (GFCM-FRA, EU Natura 2000, etc.).",
+            )
+            _pill_nongfcm = _fc2.toggle(
+                "Non-GFCM flag", key="fa_nongfcm",
+                help="Show only vessels flying flags of non-GFCM member states (potentially unregulated in the Med).",
+            )
+            _vessel_filter = _fc3.radio(
+                "Vessel filter", ["All", "With behavioural", "Fishing-only"],
+                horizontal=True, key="fa_vessel_filter", label_visibility="collapsed",
+                help="All: every fishing vessel. "
+                     "With behavioural: only vessels that also triggered AIS gap/encounter/loitering events. "
+                     "Fishing-only: vessels with fishing activity but NO behavioural events (invisible to the main risk map).",
+            )
+            _pill_beh = _vessel_filter == "With behavioural"
+            _pill_fishonly = _vessel_filter == "Fishing-only"
 
             _beh_mmsi = set(df_tab["mmsi"].astype(str).unique()) if not df_tab.empty else set()
             _fish_filt = fishing_df.copy()

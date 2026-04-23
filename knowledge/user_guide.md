@@ -38,11 +38,11 @@ The sidebar offers three data modes:
 
 ## Map
 
-The Folium map uses FastMarkerCluster for performance (handles 5K+ events). Flagged vessels (IUU/OFAC-matched) keep individual SVG markers for visibility. Low-band (Low risk) events are excluded from the map to reduce noise.
+The PyDeck (deck.gl) map renders via WebGL for GPU-accelerated pan/zoom and native click-to-select. Low-band (Low risk) events are excluded from the map to reduce noise. Click any dot to select the vessel for the Investigation tab.
 
-**Marker priority:** OFAC dark red > IUU black > event type default (GAP=red, LOITERING=orange, ENCOUNTER=purple). ICCAT-authorized vessels are not marked separately — authorization is an opportunity indicator, not a risk signal.
+**Colour priority:** OFAC dark red > IUU black > event type default (GAP=red, LOITERING=orange, ENCOUNTER=purple). ICCAT-authorized vessels are not marked separately — authorization is an opportunity indicator, not a risk signal. **Size** encodes risk band (larger = higher risk).
 
-**FDI choropleth layer (toggleable):** All Mediterranean 0.5-degree c-squares coloured by fishing days with opacity tiers: pale yellow (<50d, 0.15 opacity) → orange (50–500d, 0.25) → orange-red (500–2000d, 0.30) → dark red (>2000d, 0.35). Coverage is fleet-wide, not limited to event proximity.
+**FDI choropleth layer (toggleable):** All Mediterranean 0.5-degree c-squares rendered as filled rectangles (PolygonLayer) coloured by fishing days with a blue scale: light blue (<50d) → medium blue (50–500d) → dark blue (500–2000d) → navy (>2000d). Coverage is fleet-wide, not limited to event proximity.
 
 ---
 
@@ -128,23 +128,20 @@ GFW-classified fishing events (CNN model, `public-global-fishing-events` feed) w
 
 ### Map layers
 
-Three-layer Folium map with collapsible layer control (top-right of map):
+Three-layer PyDeck map (GPU-accelerated):
 
-**Layer 1 — FDI effort rectangles:** EU-declared fishing effort by 0.5° c-square (pale yellow <50d → dark red >2000d). Provides spatial context for where legitimate fishing occurs.
+**Layer 1 — FDI effort rectangles:** EU-declared fishing effort by 0.5° c-square rendered as filled blue rectangles (PolygonLayer). Blue scale: light blue (<50d) → medium blue (50–500d) → dark blue (500–2000d) → navy (>2000d). Provides spatial context for where legitimate fishing occurs.
 
-**Layer 2 — Background cluster (grey dots):** Fishing events inside GFCM Fisheries Restricted Areas or EU Natura 2000 / Barcelona Convention sites (`mpa_tier = gfcm_fra` or `eu_site`), filtered to >=0.5 fishing hours. The noisy "general" WDPA tier is excluded. Hover for vessel name, flag, hours, MPA name. Click a cluster to expand; zoom in to individual dots.
+**Layer 2 — Background dots (grey):** Fishing events inside MPAs, filtered to >=0.5 fishing hours, capped at 2,000 dots. Hover for tooltip.
 
-**Layer 3 — Foreground shapes (clustered):** Events that fired high-signal risk tree leaves. Both layers use FastMarkerCluster — they group at low zoom and uncluster at zoom 11.
+**Layer 3 — Foreground dots (coloured by severity):** Events that fired high-signal risk tree leaves. Colour encodes severity: red = high (closed area), orange = medium (low-effort cell, no RFMO auth, unregulated flag), blue = low (general MPA). Larger dots = higher severity. Click to select a vessel.
 
-| Shape | Colour | Leaf |
+| Colour | Severity | Leaf |
 |---|---|---|
-| Triangle-up | Red (high) | `fishing_in_closed_area` — no-take MPA or curated closed area |
-| Square | Orange (medium) | `fishing_in_low_effort_cell` — bottom 5% FDI effort c-square |
-| Diamond | Orange (medium) | `gfw_no_rfmo_authorization` / `unregulated_flag` — non-GFCM flag or no RFMO auth |
-| Circle | Blue (low) | `fishing_in_mpa` (general) — any other WDPA MPA |
-| White border | — | Vessel-level concern: IUU crosscheck / stateless / unregulated flag |
-
-Hover any marker for a tooltip; click a foreground marker for a full popup (vessel name, flag, date, hours, leaf, MPA name, vessel signals).
+| Red | High | `fishing_in_closed_area` — no-take MPA or curated closed area |
+| Orange | Medium | `fishing_in_low_effort_cell` — bottom 5% FDI effort c-square |
+| Orange | Medium | `gfw_no_rfmo_authorization` / `unregulated_flag` — non-GFCM flag or no RFMO auth |
+| Blue | Low | `fishing_in_mpa` (general) — any other WDPA MPA |
 
 ### Other views
 

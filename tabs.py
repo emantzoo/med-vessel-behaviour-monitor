@@ -1165,34 +1165,27 @@ def render_fishing_in_mpa_map(df, fishing_df):
     with st.expander("How to read this chart", expanded=False):
         st.markdown(
             """
-**Layer 1 — FDI effort** (coloured rectangles):
+**Layer 1 — FDI effort** (blue dots):
 EU-declared fishing effort (days) by 0.5x0.5 degree c-square, JRC FDI spatial data (latest year).
-Colour scale: pale yellow (<50d) → orange (50–500d) → orange-red (500–2000d) → dark red (>2000d).
-Toggle off via the layer control (top-right of map).
+Blue scale: light blue (<50d) -- medium blue (50-500d) -- dark blue (500-2000d) -- navy (>2000d).
 
-**Layer 2 — Background cluster** (grey dots / numbered circles):
+**Layer 2 — Background fishing events** (grey dots):
 Fishing events inside GFCM Fisheries Restricted Areas or EU Natura 2000 / Barcelona Convention sites
 (mpa_tier = `gfcm_fra` or `eu_site`). Filtered to >=0.5 fishing hours; capped at 2,000 events by hours.
 The "general" WDPA tier (nominal designations with no active fishing restriction) is excluded to avoid
-inflating the count. Hover a dot for vessel name, flag, fishing hours, and MPA name. Click a cluster
-circle to expand it; zoom in to see individual dots.
+inflating the count. Hover for vessel name, flag, and fishing hours.
 
-**Layer 3 — Foreground** (coloured shapes, clustered):
-Events that fired one or more high-signal risk tree leaves. Both layers cluster at low zoom
-(maxClusterRadius 60 px) and uncluster at zoom 11.
+**Layer 3 — Foreground high-signal events** (coloured dots):
+Events that fired one or more high-signal risk tree leaves. Colour encodes severity:
 
-| Shape | Colour | Leaf | Meaning |
+| Colour | Severity | Leaves | Meaning |
 |---|---|---|---|
-| Triangle-up | Red (high) | `fishing_in_closed_area` | Fishing in a no-take MPA (GFW `mpaNoTake`) or curated Med closed area |
-| Square | Orange (medium) | `fishing_in_low_effort_cell` | EU vessel fishing in bottom 5% FDI effort c-square |
-| Diamond | Orange (medium) | `gfw_no_rfmo_authorization` / `unregulated_flag` | No RFMO authorisation (GFW Insights) or non-GFCM contracting party flag |
-| Circle | Blue (low) | `fishing_in_mpa` (general) | Fishing in any other WDPA MPA — lower confidence |
-| White border | — | Vessel-level concern | Vessel flagged by `gfw_iuu_crosscheck`, `stateless_vessel`, or `unregulated_flag_in_gfcm_area` |
+| Red | High | `fishing_in_closed_area` | Fishing in a no-take MPA (GFW `mpaNoTake`) or curated Med closed area |
+| Orange | Medium | `fishing_in_low_effort_cell`, `gfw_no_rfmo_authorization`, `unregulated_flag` | Low-effort c-square, no RFMO auth, or non-GFCM flag |
+| Blue | Low | `fishing_in_mpa` (general) | Fishing in any other WDPA MPA -- lower confidence |
 
-Hover any foreground marker for a tooltip; click for a full popup with vessel name, flag, date,
-fishing hours, leaf fired, MPA name, and vessel-level signals.
-
-**Sizing**: foreground markers are fixed size (20px). Fishing hours appear in the popup.
+Larger dots = higher severity. Hover for vessel name, flag, leaf fired, and fishing hours.
+Click a dot to select the vessel (MMSI stored for table highlighting).
 
 **These events are never scored.** They fire risk tree leaves and appear here as display-only context.
 The `risk_score` column is not affected.
@@ -1323,27 +1316,33 @@ satellite radar inside MPAs do not broadcast AIS. This map captures the tip of t
         )
         def _fdi_rgba(days):
             if days >= 2000:
-                return [227, 26, 28, 90]
+                return [8, 48, 107, 90]
             elif days >= 500:
-                return [253, 141, 60, 77]
+                return [33, 113, 181, 77]
             elif days >= 50:
-                return [254, 204, 92, 64]
-            return [255, 255, 178, 38]
+                return [107, 174, 214, 64]
+            return [198, 219, 239, 38]
 
         _fdi_cells["_color"] = _fdi_cells["totfishdays"].apply(_fdi_rgba)
-        _fdi_cells["lat"] = _fdi_cells["rectangle_lat"] + 0.25
-        _fdi_cells["lon"] = _fdi_cells["rectangle_lon"] + 0.25
+        _fdi_cells["_polygon"] = _fdi_cells.apply(
+            lambda r: [
+                [r["rectangle_lon"], r["rectangle_lat"]],
+                [r["rectangle_lon"] + 0.5, r["rectangle_lat"]],
+                [r["rectangle_lon"] + 0.5, r["rectangle_lat"] + 0.5],
+                [r["rectangle_lon"], r["rectangle_lat"] + 0.5],
+            ], axis=1,
+        )
         _fdi_cells["_label"] = "FDI effort (" + _fdi_yr.astype(str) + "): " + _fdi_cells["totfishdays"].apply(lambda d: f"{d:,.0f}") + " fishing days"
         _layers.append(pdk.Layer(
-            "ScatterplotLayer",
+            "PolygonLayer",
             id="fdi-effort",
             data=_fdi_cells,
-            get_position=["lon", "lat"],
-            get_color="_color",
-            get_radius=25000,
-            radius_min_pixels=6,
-            radius_max_pixels=20,
+            get_polygon="_polygon",
+            get_fill_color="_color",
+            get_line_color=[0, 0, 0, 0],
             pickable=False,
+            stroked=False,
+            filled=True,
         ))
 
     # --- Layer 2: Background fishing events (grey dots) ---
@@ -1476,10 +1475,10 @@ satellite radar inside MPAs do not broadcast AIS. This map captures the tip of t
         '<b>Background</b>:&ensp;'
         f'{_swatch("#888")} Fishing in GFCM-FRA / EU sites<br/>'
         '<b>FDI effort</b>:&ensp;'
-        f'{_sq("#ffffb2")}<small>&lt;50d</small>&ensp;'
-        f'{_sq("#fecc5c")}<small>50-500d</small>&ensp;'
-        f'{_sq("#fd8d3c")}<small>500-2kd</small>&ensp;'
-        f'{_sq("#e31a1c")}<small>&gt;2kd</small>'
+        f'{_sq("#c6dbef")}<small>&lt;50d</small>&ensp;'
+        f'{_sq("#6baed6")}<small>50-500d</small>&ensp;'
+        f'{_sq("#2171b5")}<small>500-2kd</small>&ensp;'
+        f'{_sq("#08306b")}<small>&gt;2kd</small>'
     )
     st.markdown(
         f'<div style="font-size:13px;line-height:2.2">{legend_md}</div>',

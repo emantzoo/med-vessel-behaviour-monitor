@@ -10,27 +10,24 @@ These elements sit above the four tabs because they carry the highest-priority s
 
 ### Behavioral Risk Map (left column)
 
-**What it shows:** An interactive Folium map of all filtered GFW behavioural events in the Mediterranean.
+**What it shows:** A GPU-accelerated PyDeck (deck.gl) map of all filtered GFW behavioural events in the Mediterranean.
 
-**Data:** `df_filtered` — scored GFW events (AIS gaps, encounters, loitering) + FDI fishing effort choropleth overlay (optional, toggle in sidebar).
+**Data:** `df_filtered` — scored GFW events (AIS gaps, encounters, loitering) + FDI fishing effort overlay (optional, toggle in sidebar).
 
-**Visual encoding (triple):**
-- **Shape** = behaviour type: circle (AIS gap), square (loitering), triangle (encounter)
-- **Fill colour** = listing status, priority order: OFAC dark red (#8B0000) > IUU black > ICCAT blue > clean (coloured by risk band). Low-band events excluded from map.
-- **Size** = risk band: Low (5 px) → Emerging (6 px) → Elevated (7 px) → Severe (9 px) → Critical (11 px)
-- **Dashed amber outline** = dark port call candidate (loitering within 10 km of shore)
+**Visual encoding:**
+- **Colour** = listing status / event type, priority order: OFAC dark red > IUU black > event type (GAP red, LOITERING orange, ENCOUNTER purple). Low-band events excluded from map.
+- **Size** = risk band: Low (3000m) → Emerging (4500m) → Elevated (6000m) → Severe (8000m) → Critical (11000m). Pixel-clamped: min 4px, max 18px.
 
-**FDI choropleth layer (toggleable):** All Mediterranean 0.5-degree c-squares coloured by fishing days with opacity tiers — pale yellow (<50d, 0.15 opacity), orange (50–500d, 0.25), orange-red (500–2000d, 0.30), dark red (>2000d, 0.35). Coverage is fleet-wide, not limited to event proximity.
+**FDI effort layer (toggleable via sidebar):** Mediterranean 0.5-degree c-squares as filled rectangles (choropleth). Blue scale: light blue (<50d) → medium blue (50-500d) → dark blue (500-2000d) → navy (>2000d). Rendered as a PyDeck PolygonLayer behind the event markers.
 
 **Interactions:**
-- Click a marker to see the event detail card (vessel, event type, risk score, flag, duration, date, listing status, FDI context, external lookup links).
-- Clicking a marker also pre-selects that vessel for the Vessel Investigation tab and filters the map to that vessel's events.
-- Use the layer control (top-right) to toggle IUU-Listed / OFAC Sanctioned / FDI Fishing Effort layers.
-- When a vessel is focused (via row click, marker click, or Investigation dropdown), the map auto-zooms to fit that vessel's events. Use the "Clear map filter" button to return to the full fleet view.
+- **Hover** a dot for a tooltip: vessel name, event type, flag, risk score.
+- **Click** a dot to select the vessel for Investigation tab. A toast confirms the selection.
+- **Pill filters** (event type, risk band, flag, vessel class) sit above the map and filter in real time.
 
-**Scope note:** The map responds to both pill filters (event type, risk band, flag, vessel class) and vessel-level focus (marker click, quick-select row click, investigation dropdown). Pill filter state is read from session state before the map renders, so changing a pill in Fleet Analytics updates the map, the metrics column, and the subtabs on the next rerun. When pills are active, fleet metrics show the pill-filtered count as primary with "of N total" context (e.g., "12 of 38"). Alert boxes always show the full sidebar-filtered dataset.
+**Scope note:** The map responds to pill filters. When pills are active, fleet metrics show the pill-filtered count with "of N total" context. Alert boxes always show the full sidebar-filtered dataset.
 
-**Performance note:** FDI choropleth rectangles and FDI context lookups are cached across reruns (`@st.cache_data`), so only event markers are rebuilt when pills or vessel focus change. The `st_folium` component uses a stable `key` to avoid full unmount/remount cycles.
+**Performance note:** The scoring/matching pipeline is cached in `st.session_state` with a fingerprint — pill changes skip the pipeline entirely and only re-filter the cached result. PyDeck renders via WebGL (GPU), so pan/zoom/click are smooth without iframe re-serialisation.
 
 ### Fleet Metrics (right column)
 
@@ -83,7 +80,7 @@ Red alert banner if any event involves an IUU-listed vessel. Expandable table wi
 11. **Risk tree trace** — per-vessel evaluation of all branches and leaves (expandable by branch).
 12. **Cumulative risk trajectory** — line chart with band threshold lines showing behavioural arc over time.
 
-**Quick-select table:** Expandable compact table with vessel name, flag, events, risk score, risk band, IUU, OFAC. Click a row to switch investigation and filter the map.
+**Quick-select table:** Expandable compact table with vessel name, flag, events, risk score, risk band, IUU, OFAC. Click a row to switch investigation vessel.
 
 **Risk-tree trace** (rendered as steps 11-12 of the investigation report):
 - Expandable by branch (Identity, Flag Risk, Regulatory Status, Authorization, Behavioural History, Spatial/Contextual, Network Exposure, Fishing Activity).
@@ -93,7 +90,7 @@ Red alert banner if any event involves an IUU-listed vessel. Expandable table wi
 
 **Cumulative risk trajectory** (step 12): line chart of cumulative risk score over time with horizontal band-threshold lines (Low/Emerging/Elevated/Severe/Critical).
 
-**Interactions:** Select a vessel from the dropdown, the quick-select table, or click a marker on the map. The dropdown is pre-populated with the highest-risk vessel.
+**Interactions:** Select a vessel from the dropdown, the quick-select table, or click a marker on the main map (sets the vessel via session state). The dropdown is pre-populated with the highest-risk vessel.
 
 ---
 
@@ -115,7 +112,7 @@ Red alert banner if any event involves an IUU-listed vessel. Expandable table wi
 - MPA intersection: `in_mpa`, `mpa_tier`, `fishing_in_mpa_events`, `fishing_in_mpa_hours`.
 - Listing booleans: `iuu_matched`, `iccat_authorized`, `ofac_sanctioned`, `gfcm_registered`.
 
-**Pill filters:** Event type, risk band, flag state, vessel class. Sit above the subtabs and cascade to all five Fleet Analytics subtabs.
+**Pill filters:** Event type, risk band, flag state, vessel class. Sit above the main map and cascade to the map, metrics, and all Fleet Analytics subtabs.
 
 **Interactions:** Use the slider to control how many vessels appear. Use pill filters to narrow the fleet view. Switch to **Vessel Investigation** tab for per-vessel drill-down.
 
@@ -201,20 +198,19 @@ Red alert banner if any event involves an IUU-listed vessel. Expandable table wi
 
 **Data:** `fishing_df` (loaded separately, never merged into `df_filtered`) cross-referenced against WDPA MPAs, FDI low-effort cells, and GFCM party flag list.
 
-**Toggle filters (cascade to both map and table):**
+**Filters (cascade to both map and table):**
 - **In MPA only** — restrict to events with `in_mpa=True`
 - **Non-GFCM flag** — vessels flagged to non-GFCM contracting parties
-- **With behavioural** — vessels that also appear in the scored behavioural events
-- **Fishing-only** — vessels in `fishing_df` not in `df_filtered` (pure fishing detections, no suspicious AIS behaviour)
+- **Vessel filter** (radio, mutually exclusive): All / With behavioural (also in scored events) / Fishing-only (pure fishing detections, no AIS behavioural events)
 
 **Views:**
 
 | View | What it shows |
 |---|---|
-| Scatter map | Background grey dots = all fishing inside MPAs; foreground coloured shapes = events that fired risk tree leaves. Shape encodes leaf type (circle = general MPA, triangle = closed area, square = low-effort cell, diamond = no RFMO auth); colour encodes severity. |
+| PyDeck map | Three layers: (1) blue FDI effort rectangles (0.5-degree choropleth, PolygonLayer), (2) grey background fishing-in-MPA events (>=0.5h, capped 2,000), (3) coloured foreground dots for events firing risk tree leaves. Colour = severity: red (high, closed area), orange (medium, low-effort/no auth/unregulated), blue (low, general MPA). Larger dots = higher severity. Click to select vessel. |
 | Fishing vessel table (expander) | One row per fishing vessel with event counts, total hours, in-MPA events, non-GFCM flag, whether the vessel also appears in the behavioural ranking. Sorted by in-MPA event count descending. |
 
-**Static-demo caveat:** the bundled fishing dataset has ~5 fishing-in-MPA events. Switch to live GFW mode for the full picture.
+**Static-demo caveat:** the bundled fishing dataset has ~5 fishing-in-MPA events. Switch to snapshot or live GFW mode for the full picture.
 
 
 ## Tab 3: Reference & Methodology

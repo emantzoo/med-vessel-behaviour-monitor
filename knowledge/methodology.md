@@ -55,8 +55,8 @@ risk = (duration_h ^ 0.75)
 - **Speed**: avg <2 knots = 1.4x (staging behaviour)
 
 ### Gap-Specific Factors
-- **Speed change**: |speed_before - speed_after| > 5kn = 1.5x (evasion indicator),
-  > 2kn = 1.2x (vessel was moving, went dark, reappeared at different speed)
+- **Intentional disabling**: GFW `gap_intentional_disabling = True` = 1.5x (GFW's own classification of deliberate AIS switch-off)
+- **Implied speed during gap**: `gap_implied_speed_knots > 8 kn` = 1.4x (fast transit while dark — evasion pattern), `> 4 kn` = 1.2x (vessel was underway, not anchored)
 
 ## Vessel Investigation Template
 
