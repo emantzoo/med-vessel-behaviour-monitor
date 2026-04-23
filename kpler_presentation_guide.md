@@ -142,7 +142,7 @@ Explain while it runs: "This is what an analyst would do manually — cross-refe
 
 **If they ask about limitations:**
 
-"Each question is independent — there's no multi-turn memory yet, so you can't say 'now filter that to 2024.' That's a deliberate simplification for the portfolio version. In production you'd maintain conversation history. The AI also can't currently make external lookups — it generates clickable links instead. With Claude's API and web search enabled, the investigation could include live external data pulls during the analysis itself."
+"The AI maintains multi-turn conversation memory — up to 20 messages are passed back to Gemini, so you can say 'now filter that to 2024' and it will carry context forward. The AI also can't currently make external lookups — it generates clickable links instead. With Claude's API and web search enabled, the investigation could include live external data pulls during the analysis itself."
 
 This demonstrates: LLM integration in a production-style app, RAG with domain-specific knowledge AND structured analytical workflows, sandboxed code execution, cross-source data querying, and understanding of where maritime intelligence products are heading. The investigation walkthrough is the moment that turns the dashboard into an intelligence tool.
 
@@ -346,8 +346,6 @@ risk_model.py       → All scoring and matching logic:
                         c-squares for anomalous-location detection
                       - attribute_leaves_to_fishing_events() → per-event
                         leaf attribution for Fishing Activity scatter map
-                      - get_low_effort_csquares() → bottom 5% FDI effort
-                        c-squares for anomalous-location detection
 
 investigation.py    → Deterministic vessel investigation (rule-based, no LLM):
                       - investigate_vessel() → multi-step structured report
@@ -501,7 +499,7 @@ Purple   = ENCOUNTER event
 
 ## Key Numbers to Know
 
-- 6 data sources cross-referenced (GFW, FDI, IUU, ICCAT, OFAC, GFCM register), with GFW providing four distinct feeds (Events API, `regions.mpa` WDPA intersection, `public-global-fishing-events` CNN classifier, Insights API v3)
+- 6 data sources cross-referenced (GFW, FDI, IUU, ICCAT, OFAC, IUU Risk Index), with GFW providing four distinct feeds (Events API, `regions.mpa` WDPA intersection, `public-global-fishing-events` CNN classifier, Insights API v3). GFCM registration is derived metadata from the IUU list and GFW Vessels API, not a standalone source.
 - 95 demo events across 4 top-level tabs (Fleet Analytics has 5 subtabs; secondary charts in expanders)
 - 369 IUU vessels (213 currently listed, 150 GFCM-listed)
 - 9,203 ICCAT Med-authorized vessels
