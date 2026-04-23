@@ -1120,7 +1120,8 @@ methodology (Miller et al. 2018).
 - Avg speed <2kn = 1.4x
 
 **Gap factors** (evasion):
-- Speed change >5kn across gap = 1.5x
+- Intentional disabling (GFW flag) = 1.5x
+- Implied speed >8kn = 1.4x | >4kn = 1.2x
 
 **Shore distance** (all events):
 - >20nm = 1.5x | >10km = 1.2x | <10km = 0.8x
