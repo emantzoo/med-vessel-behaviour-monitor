@@ -75,6 +75,103 @@ def _build_fdi_cache(csquares_tuples, fdi_effort_df, fdi_landings_df):
     return cache
 
 
+def _build_map(df_map, fdi_effort_df, show_fdi):
+    """Build a Folium map with markers for df_map. Cached in session state."""
+    from config import RISK_BAND_COLORS
+    m = folium.Map(location=[37.0, 18.0], zoom_start=5, tiles="CartoDB positron")
+    band_size_px = {"Low": 5, "Emerging": 6, "Elevated": 7, "Severe": 9, "Critical": 11}
+
+    fg_iuu = folium.FeatureGroup(name="IUU-Listed", show=True)
+    fg_ofac = folium.FeatureGroup(name="OFAC Sanctioned", show=True)
+    fg_fdi = folium.FeatureGroup(name="FDI Fishing Effort", show=show_fdi)
+
+    # FDI effort rectangles
+    if not fdi_effort_df.empty:
+        for sw_lat, sw_lon, days, color, opacity in _build_fdi_rectangles(fdi_effort_df):
+            folium.Rectangle(
+                bounds=[[sw_lat, sw_lon], [sw_lat + 0.5, sw_lon + 0.5]],
+                color=color, fill=True, fill_color=color,
+                fill_opacity=opacity, weight=0,
+                popup=f"Fishing days: {days:,.0f}",
+            ).add_to(fg_fdi)
+
+    # Split flagged vs clean
+    _is_flagged = (
+        df_map.get("ofac_sanctioned", pd.Series(False, index=df_map.index)).fillna(False).astype(bool)
+        | df_map.get("iuu_matched", pd.Series(False, index=df_map.index)).fillna(False).astype(bool)
+    )
+    df_flagged = df_map[_is_flagged]
+    df_clean = df_map[~_is_flagged]
+    df_clean = df_clean[df_clean.get("risk_band", pd.Series("Low", index=df_clean.index)) != "Low"]
+
+    # Clean events — individual CircleMarkers (no clustering)
+    _event_color_map = {"GAP": "#e74c3c", "LOITERING": "#f39c12", "ENCOUNTER": "#9b59b6"}
+    fg_events = folium.FeatureGroup(name="Events", show=True)
+    if not df_clean.empty:
+        _colors = df_clean["event_type"].map(_event_color_map).fillna("#888")
+        _radii = df_clean.get("risk_band", pd.Series("Low", index=df_clean.index)).map(band_size_px).fillna(5)
+        _names = df_clean.get("vessel_name", pd.Series("", index=df_clean.index)).fillna("(unknown)")
+        _tips = (
+            _names + " | " + df_clean["event_type"] + " | " + df_clean["flag"]
+            + " | risk " + df_clean["risk_score"].round(1).astype(str)
+            + " (" + df_clean.get("risk_band", "").astype(str) + ")"
+        )
+        for lat, lon, color, radius, tip in zip(
+            df_clean["lat"].astype(float),
+            df_clean["lon"].astype(float),
+            _colors, _radii.astype(int), _tips,
+        ):
+            folium.CircleMarker(
+                location=[lat, lon], radius=radius,
+                fill_color=color, color="#333", weight=0.5, fill_opacity=0.7,
+                fill=True, tooltip=tip,
+            ).add_to(fg_events)
+    fg_events.add_to(m)
+
+    # Flagged events — individual DivIcon markers with SVG shapes
+    def _svg_shape(event_type, fill, size, stroke="#222", stroke_w=1.5):
+        s = size
+        half = s / 2
+        if event_type == "LOITERING":
+            body = f'<rect x="1" y="1" width="{s-2}" height="{s-2}" fill="{fill}" stroke="{stroke}" stroke-width="{stroke_w}"/>'
+        elif event_type == "ENCOUNTER":
+            pts = f"{half},1 {s-1},{s-1} 1,{s-1}"
+            body = f'<polygon points="{pts}" fill="{fill}" stroke="{stroke}" stroke-width="{stroke_w}"/>'
+        else:
+            r = half - 1
+            body = f'<circle cx="{half}" cy="{half}" r="{r}" fill="{fill}" stroke="{stroke}" stroke-width="{stroke_w}"/>'
+        return f'<svg width="{s}" height="{s}" xmlns="http://www.w3.org/2000/svg">{body}</svg>'
+
+    _flag_size = 22
+    for _, row in df_flagged.iterrows():
+        if pd.isna(row.get("lat")) or pd.isna(row.get("lon")):
+            continue
+        is_ofac = row.get("ofac_sanctioned", False)
+        is_iuu = row.get("iuu_matched", False)
+        vname = row.get("vessel_name", "")
+        fill = "#8B0000" if is_ofac else "#000000"
+        target = fg_ofac if is_ofac else fg_iuu
+        listings = []
+        if is_ofac:
+            listings.append("OFAC")
+        if is_iuu:
+            listings.append("IUU")
+        tooltip = f"{vname or '(unknown)'} | {row['event_type']} | {row['flag']} | risk {row['risk_score']:.1f} | {', '.join(listings)}"
+        svg = _svg_shape(row["event_type"], fill, _flag_size)
+        icon = folium.DivIcon(
+            html=f'<div style="width:{_flag_size}px;height:{_flag_size}px">{svg}</div>',
+            icon_size=(_flag_size, _flag_size),
+            icon_anchor=(_flag_size // 2, _flag_size // 2),
+        )
+        folium.Marker(location=[row["lat"], row["lon"]], icon=icon, tooltip=tooltip).add_to(target)
+
+    fg_fdi.add_to(m)
+    fg_iuu.add_to(m)
+    fg_ofac.add_to(m)
+    folium.LayerControl(collapsed=True).add_to(m)
+    return m
+
+
 # ========================= PAGE CONFIG =========================
 st.set_page_config(
     page_title="Med Vessel Behaviour Monitor",
@@ -260,158 +357,177 @@ fishing_mpa_agg = aggregate_fishing_in_mpa(fishing_df)
 _fishing_mmsis = set(fishing_df["mmsi"].astype(str).unique()) if not fishing_df.empty else set()
 
 # ========================= FILTER & SCORE =========================
-# Clip events to selected date range (± 3 day buffer for long-running events)
-if "date" in df.columns and len(date_range) == 2:
-    df["date"] = pd.to_datetime(df["date"], errors="coerce", utc=True).dt.tz_localize(None)
-    buffer_start = pd.Timestamp(date_range[0]) - pd.Timedelta(days=3)
-    buffer_end = pd.Timestamp(date_range[1]) + pd.Timedelta(days=3)
-    df = df[df["date"].between(buffer_start, buffer_end) | df["date"].isna()]
+# Cache the enriched df_filtered in session state so pill-only reruns skip
+# the entire scoring + matching pipeline. The fingerprint covers every
+# sidebar control that affects the pipeline output.
+_pipeline_fingerprint = (
+    "live" if use_live else ("snapshot" if use_snapshot else "static"),
+    tuple(date_range) if isinstance(date_range, (list, tuple)) else date_range,
+    min_duration,
+    include_delisted,
+    resolve_imos,
+    include_fishing,
+    fisheries_only,
+    include_insights if "include_insights" in dir() else False,
+    len(df),
+)
+_pipeline_cached = (
+    st.session_state.get("_pipeline_fp") == _pipeline_fingerprint
+    and "_df_filtered_cache" in st.session_state
+)
 
-# Drop rows with missing coordinates (API may return null positions)
-df = df.dropna(subset=["lat", "lon"])
-df_filtered = df[df["duration_h"] >= min_duration].copy()
-df_filtered["risk_score"] = compute_risk_scores_vec(df_filtered, event_weights, FLAG_RISKS)
-total_risk = df_filtered["risk_score"].sum()
+if _pipeline_cached:
+    df_filtered = st.session_state["_df_filtered_cache"]
+# --- BEGIN pipeline (skipped when _pipeline_cached) ---
+if not _pipeline_cached:
+    # Clip events to selected date range (± 3 day buffer for long-running events)
+    if "date" in df.columns and len(date_range) == 2:
+        df["date"] = pd.to_datetime(df["date"], errors="coerce", utc=True).dt.tz_localize(None)
+        buffer_start = pd.Timestamp(date_range[0]) - pd.Timedelta(days=3)
+        buffer_end = pd.Timestamp(date_range[1]) + pd.Timedelta(days=3)
+        df = df[df["date"].between(buffer_start, buffer_end) | df["date"].isna()]
 
-# Assign c-square cells for FDI joins (vectorized)
-if not df_filtered.empty:
-    csq_lon, csq_lat = assign_csquares_vec(df_filtered["lat"], df_filtered["lon"])
-    df_filtered["csq_lon"] = csq_lon
-    df_filtered["csq_lat"] = csq_lat
+    df = df.dropna(subset=["lat", "lon"])
+    df_filtered = df[df["duration_h"] >= min_duration].copy()
+    df_filtered["risk_score"] = compute_risk_scores_vec(df_filtered, event_weights, FLAG_RISKS)
 
-# Vessel metadata enrichment via GFW Vessels API (live + snapshot mode).
-# Returns dict[mmsi] -> {"imo", "length_m", "tonnage_gt", "shiptypes", "vessel_id"}.
-# Each field is independently optional. Falls back gracefully on cache miss.
-if (use_live or use_snapshot) and resolve_imos and not df_filtered.empty:
-    unique_mmsis = df_filtered["mmsi"].dropna().unique().tolist()
-    # Three-layer cache: session_state → disk JSON → API
-    meta_map = load_vessel_metadata_cache()
-    _cached_mmsis = set(meta_map.keys())
-    _needed = [m for m in unique_mmsis if str(m) not in _cached_mmsis]
-    if _needed and token:
-        progress_bar = st.progress(0, text="Resolving vessel metadata via GFW API...")
-        def _update_progress(current, total):
-            progress_bar.progress(current / total, text=f"Resolving vessel metadata... {current}/{total}")
-        fresh = lookup_vessel_metadata(_needed, token, progress_callback=_update_progress)
-        meta_map.update(fresh)
-        progress_bar.empty()
-    if meta_map:
-        mmsi_str = df_filtered["mmsi"].astype(str)
-        df_filtered["imo"] = mmsi_str.map(lambda m: (meta_map.get(m) or {}).get("imo") or "")
-        df_filtered["length_m"] = mmsi_str.map(lambda m: (meta_map.get(m) or {}).get("length_m"))
-        df_filtered["tonnage_gt"] = mmsi_str.map(lambda m: (meta_map.get(m) or {}).get("tonnage_gt"))
-        df_filtered["shiptypes"] = mmsi_str.map(lambda m: (meta_map.get(m) or {}).get("shiptypes") or "")
-        # GFW identity vessel_id (for Insights API) — overwrites event vessel.id
-        # with the correct identity-dataset UUID that the Insights API accepts.
-        _vid_map = mmsi_str.map(lambda m: (meta_map.get(m) or {}).get("vessel_id") or "")
-        df_filtered["vessel_id"] = _vid_map.where(_vid_map.astype(bool), df_filtered.get("vessel_id", ""))
+    # Assign c-square cells for FDI joins
+    if not df_filtered.empty:
+        csq_lon, csq_lat = assign_csquares_vec(df_filtered["lat"], df_filtered["lon"])
+        df_filtered["csq_lon"] = csq_lon
+        df_filtered["csq_lat"] = csq_lat
 
-# Ensure metadata columns exist (static CSV pre-populates length_m / tonnage_gt /
-# shiptypes; live mode without enrichment skipped or no GFW match leaves them blank).
-if "imo" not in df_filtered.columns:
-    df_filtered["imo"] = ""
-if "vessel_id" not in df_filtered.columns:
-    df_filtered["vessel_id"] = ""
-for _meta_col, _meta_default in [("length_m", None), ("tonnage_gt", None), ("shiptypes", "")]:
-    if _meta_col not in df_filtered.columns:
-        df_filtered[_meta_col] = _meta_default
+    # Vessel metadata enrichment via GFW Vessels API
+    if (use_live or use_snapshot) and resolve_imos and not df_filtered.empty:
+        unique_mmsis = df_filtered["mmsi"].dropna().unique().tolist()
+        meta_map = load_vessel_metadata_cache()
+        _cached_mmsis = set(meta_map.keys())
+        _needed = [m for m in unique_mmsis if str(m) not in _cached_mmsis]
+        if _needed and token:
+            progress_bar = st.progress(0, text="Resolving vessel metadata via GFW API...")
+            def _update_progress(current, total):
+                progress_bar.progress(current / total, text=f"Resolving vessel metadata... {current}/{total}")
+            fresh = lookup_vessel_metadata(_needed, token, progress_callback=_update_progress)
+            meta_map.update(fresh)
+            progress_bar.empty()
+        if meta_map:
+            mmsi_str = df_filtered["mmsi"].astype(str)
+            df_filtered["imo"] = mmsi_str.map(lambda m: (meta_map.get(m) or {}).get("imo") or "")
+            df_filtered["length_m"] = mmsi_str.map(lambda m: (meta_map.get(m) or {}).get("length_m"))
+            df_filtered["tonnage_gt"] = mmsi_str.map(lambda m: (meta_map.get(m) or {}).get("tonnage_gt"))
+            df_filtered["shiptypes"] = mmsi_str.map(lambda m: (meta_map.get(m) or {}).get("shiptypes") or "")
+            _vid_map = mmsi_str.map(lambda m: (meta_map.get(m) or {}).get("vessel_id") or "")
+            df_filtered["vessel_id"] = _vid_map.where(_vid_map.astype(bool), df_filtered.get("vessel_id", ""))
 
-# Preserve base risk score before IUU/ICCAT multipliers
-df_filtered["base_risk_score"] = df_filtered["risk_score"].copy()
+    # Ensure metadata columns exist
+    if "imo" not in df_filtered.columns:
+        df_filtered["imo"] = ""
+    if "vessel_id" not in df_filtered.columns:
+        df_filtered["vessel_id"] = ""
+    for _meta_col, _meta_default in [("length_m", None), ("tonnage_gt", None), ("shiptypes", "")]:
+        if _meta_col not in df_filtered.columns:
+            df_filtered[_meta_col] = _meta_default
 
-# IUU cross-reference (after risk scoring)
-if not df_filtered.empty and not iuu_vessels.empty:
-    df_filtered = match_iuu_vessels(df_filtered, iuu_vessels, include_delisted)
-    total_risk = df_filtered["risk_score"].sum()
+    df_filtered["base_risk_score"] = df_filtered["risk_score"].copy()
 
-# ICCAT cross-reference (after IUU matching)
-if not df_filtered.empty and not iccat_vessels.empty:
-    df_filtered = match_iccat_vessels(df_filtered, iccat_vessels)
-    total_risk = df_filtered["risk_score"].sum()
+    # IUU / ICCAT / OFAC cross-reference
+    if not df_filtered.empty and not iuu_vessels.empty:
+        df_filtered = match_iuu_vessels(df_filtered, iuu_vessels, include_delisted)
+    if not df_filtered.empty and not iccat_vessels.empty:
+        df_filtered = match_iccat_vessels(df_filtered, iccat_vessels)
+    if not df_filtered.empty and not ofac_vessels.empty:
+        df_filtered = match_ofac_vessels(df_filtered, ofac_vessels)
 
-# OFAC SDN cross-reference (after ICCAT matching — highest priority)
-if not df_filtered.empty and not ofac_vessels.empty:
-    df_filtered = match_ofac_vessels(df_filtered, ofac_vessels)
-    total_risk = df_filtered["risk_score"].sum()
+    # Risk bands
+    if not df_filtered.empty:
+        import numpy as _np
+        _s = df_filtered["risk_score"].values
+        df_filtered["risk_band"] = _np.select(
+            [_s < 50, _s < 60, _s < 80, _s < 100],
+            ["Low", "Emerging", "Elevated", "Severe"],
+            default="Critical",
+        )
 
-# Classify final compounded risk into Kpler-aligned bands
-if not df_filtered.empty:
-    import numpy as _np
-    _s = df_filtered["risk_score"].values
-    df_filtered["risk_band"] = _np.select(
-        [_s < 50, _s < 60, _s < 80, _s < 100],
-        ["Low", "Emerging", "Elevated", "Severe"],
-        default="Critical",
-    )
+    # Vessel flags
+    df_filtered = compute_vessel_flags(df_filtered)
 
-# Kpler-aligned display-only behavioural flags (do not multiply into risk_score)
-df_filtered = compute_vessel_flags(df_filtered)
+    # Fishing-in-MPA join
+    if not df_filtered.empty and not fishing_mpa_agg.empty:
+        df_filtered["mmsi"] = df_filtered["mmsi"].astype(str)
+        fishing_mpa_agg["mmsi"] = fishing_mpa_agg["mmsi"].astype(str)
+        df_filtered = df_filtered.merge(fishing_mpa_agg, on="mmsi", how="left")
+    for _col, _default in [("fishing_in_mpa_events", 0), ("fishing_in_mpa_hours", 0.0), ("fishing_in_mpa_top_tier", "")]:
+        if _col not in df_filtered.columns:
+            df_filtered[_col] = _default
+    df_filtered["fishing_in_mpa_events"] = df_filtered["fishing_in_mpa_events"].fillna(0).astype(int)
+    df_filtered["fishing_in_mpa_hours"] = df_filtered["fishing_in_mpa_hours"].fillna(0.0)
+    df_filtered["fishing_in_mpa_top_tier"] = df_filtered["fishing_in_mpa_top_tier"].fillna("")
 
-# Fishing-in-MPA join (display-only, no risk multiplier).
-# fishing_mpa_agg is keyed on mmsi; both event and fishing loaders pull
-# vessel.ssvid as mmsi from GFW so the join key is consistent.
-if not df_filtered.empty and not fishing_mpa_agg.empty:
-    df_filtered["mmsi"] = df_filtered["mmsi"].astype(str)
-    fishing_mpa_agg["mmsi"] = fishing_mpa_agg["mmsi"].astype(str)
-    df_filtered = df_filtered.merge(fishing_mpa_agg, on="mmsi", how="left")
-# Ensure columns exist even when no fishing-in-MPA join hits
-for _col, _default in [
-    ("fishing_in_mpa_events", 0),
-    ("fishing_in_mpa_hours", 0.0),
-    ("fishing_in_mpa_top_tier", ""),
-]:
-    if _col not in df_filtered.columns:
-        df_filtered[_col] = _default
-df_filtered["fishing_in_mpa_events"] = df_filtered["fishing_in_mpa_events"].fillna(0).astype(int)
-df_filtered["fishing_in_mpa_hours"] = df_filtered["fishing_in_mpa_hours"].fillna(0.0)
-df_filtered["fishing_in_mpa_top_tier"] = df_filtered["fishing_in_mpa_top_tier"].fillna("")
+    # GFW Insights join
+    _insights_df = load_snapshot_insights() if (use_snapshot or use_live) else pd.DataFrame()
+    if not df_filtered.empty and not _insights_df.empty and "mmsi" in _insights_df.columns:
+        _ins_cols = ["mmsi", "vessel_id", "ais_coverage_pct", "fishing_events",
+                     "fishing_without_rfmo_auth_events", "fishing_in_no_take_mpa_events",
+                     "iuu_listed", "iuu_times_listed", "gap_events"]
+        _ins_cols = [c for c in _ins_cols if c in _insights_df.columns]
+        df_filtered["mmsi"] = df_filtered["mmsi"].astype(str)
+        _insights_df["mmsi"] = _insights_df["mmsi"].astype(str)
+        df_filtered = df_filtered.merge(
+            _insights_df[_ins_cols].drop_duplicates("mmsi"),
+            on="mmsi", how="left", suffixes=("", "_gfw"),
+        )
+    for _col, _default in [("ais_coverage_pct", None), ("fishing_without_rfmo_auth_events", 0),
+                            ("fishing_in_no_take_mpa_events", 0), ("iuu_listed", False), ("iuu_times_listed", 0)]:
+        if _col not in df_filtered.columns:
+            df_filtered[_col] = _default
 
-# GFW Insights join (display-only + risk tree, no scoring multiplier).
-# Keyed on mmsi (reliable in both df_filtered and insights snapshot).
-_insights_df = load_snapshot_insights() if (use_snapshot or use_live) else pd.DataFrame()
-if not df_filtered.empty and not _insights_df.empty and "mmsi" in _insights_df.columns:
-    _ins_cols = ["mmsi", "vessel_id", "ais_coverage_pct", "fishing_events",
-                 "fishing_without_rfmo_auth_events", "fishing_in_no_take_mpa_events",
-                 "iuu_listed", "iuu_times_listed", "gap_events"]
-    _ins_cols = [c for c in _ins_cols if c in _insights_df.columns]
-    df_filtered["mmsi"] = df_filtered["mmsi"].astype(str)
-    _insights_df["mmsi"] = _insights_df["mmsi"].astype(str)
-    # Drop vessel_id from merge cols to avoid collision with event vessel_id
-    _merge_cols = [c for c in _ins_cols if c != "mmsi"]
-    df_filtered = df_filtered.merge(
-        _insights_df[_ins_cols].drop_duplicates("mmsi"),
-        on="mmsi", how="left", suffixes=("", "_gfw"),
-    )
-# Ensure GFW Insights columns exist with safe defaults
-for _col, _default in [
-    ("ais_coverage_pct", None),
-    ("fishing_without_rfmo_auth_events", 0),
-    ("fishing_in_no_take_mpa_events", 0),
-    ("iuu_listed", False),
-    ("iuu_times_listed", 0),
-]:
-    if _col not in df_filtered.columns:
-        df_filtered[_col] = _default
+    # Fisheries context filter
+    if fisheries_only and not df_filtered.empty:
+        _fisheries_classes = {"industrial_fishing", "artisanal_fishing", "carrier"}
+        _is_fisheries_class = df_filtered["vessel_class"].isin(_fisheries_classes) if "vessel_class" in df_filtered.columns else False
+        _is_iuu = df_filtered["iuu_matched"].fillna(False).astype(bool) if "iuu_matched" in df_filtered.columns else False
+        _is_iccat = df_filtered["iccat_authorized"].fillna(False).astype(bool) if "iccat_authorized" in df_filtered.columns else False
+        _is_gfcm = df_filtered["gfcm_registered"].fillna(False).astype(bool) if "gfcm_registered" in df_filtered.columns else False
+        _in_fishing = df_filtered["mmsi"].astype(str).isin(_fishing_mmsis)
+        df_filtered = df_filtered[_is_fisheries_class | _is_iuu | _is_iccat | _is_gfcm | _in_fishing]
 
-# "Fisheries context only" — keep vessels with any fisheries nexus
-if fisheries_only and not df_filtered.empty:
-    _fisheries_classes = {"industrial_fishing", "artisanal_fishing", "carrier"}
-    _is_fisheries_class = df_filtered["vessel_class"].isin(_fisheries_classes) if "vessel_class" in df_filtered.columns else False
-    _is_iuu = df_filtered["iuu_matched"].fillna(False).astype(bool) if "iuu_matched" in df_filtered.columns else False
-    _is_iccat = df_filtered["iccat_authorized"].fillna(False).astype(bool) if "iccat_authorized" in df_filtered.columns else False
-    _is_gfcm = df_filtered["gfcm_registered"].fillna(False).astype(bool) if "gfcm_registered" in df_filtered.columns else False
-    _in_fishing = df_filtered["mmsi"].astype(str).isin(_fishing_mmsis)
-    df_filtered = df_filtered[_is_fisheries_class | _is_iuu | _is_iccat | _is_gfcm | _in_fishing]
+    # Save to session state cache
+    st.session_state["_df_filtered_cache"] = df_filtered
+    st.session_state["_pipeline_fp"] = _pipeline_fingerprint
+# --- END pipeline ---
 
 # ========================= MAIN MAP & METRICS =========================
 
-# Read pill filter state early (widgets rendered later in Fleet Analytics,
-# but their session-state keys persist across reruns).  This lets the map
-# respond to the same pills that drive the Fleet Analytics subtabs.
-_pill_events = st.session_state.get("pill_event_type", [])
-_pill_bands = st.session_state.get("pill_risk_band", [])
-_pill_flags = st.session_state.get("pill_flag", [])
-_pill_class = st.session_state.get("pill_vessel_class", [])
+# Pill filters — rendered above the map so they're always visible.
+# Same session-state keys are reused by Fleet Analytics for df_tab filtering.
+_pc1, _pc2, _pc3, _pc4 = st.columns(4)
+with _pc1:
+    _event_types_in_data = sorted(df_filtered["event_type"].dropna().unique())
+    _pill_events = st.pills(
+        "Event type", _event_types_in_data,
+        selection_mode="multi", default=None, key="pill_event_type",
+    )
+with _pc2:
+    _band_order = ["Critical", "Severe", "Elevated", "Emerging", "Low"]
+    _bands_in_data = [b for b in _band_order if b in df_filtered["risk_band"].values]
+    _pill_bands = st.pills(
+        "Risk band", _bands_in_data,
+        selection_mode="multi", default=None, key="pill_risk_band",
+    )
+with _pc3:
+    _flags_in_data = sorted(df_filtered["flag"].dropna().unique())
+    _pill_flags = st.pills(
+        "Flag state", _flags_in_data,
+        selection_mode="multi", default=None, key="pill_flag",
+    )
+with _pc4:
+    _classes_in_data = sorted(
+        df_filtered["vessel_class"].dropna().unique()
+    ) if "vessel_class" in df_filtered.columns else []
+    _pill_class = st.pills(
+        "Vessel class", _classes_in_data,
+        selection_mode="multi", default=None, key="pill_vessel_class",
+    ) if _classes_in_data else []
 
 df_map_base = df_filtered
 if _pill_events:
@@ -430,70 +546,12 @@ col1, col2 = st.columns([3, 1])
 with col1:
     st.subheader("Behavioral Risk Map")
     if not df_filtered.empty:
-        # Vessel-scoped map filter: when the user clicks a row in the
-        # Vessel Summary table (or a marker, or picks from the dropdown),
-        # we stash the vessel name in session state. On the next rerun
-        # we filter the map markers to that vessel only and auto-fit
-        # the viewport to its events. df_filtered itself is left alone
-        # so the fleet-level tabs still show the full picture.
-        focus_vessel = st.session_state.get("map_clicked_vessel")
-        if focus_vessel and focus_vessel in df_map_base["vessel_name"].values:
-            df_map = df_map_base[df_map_base["vessel_name"] == focus_vessel]
-            n_focus = len(df_map)
-            fc1, fc2 = st.columns([5, 1])
-            fc1.info(
-                f"Map filtered to **{focus_vessel}** ({n_focus} event"
-                f"{'s' if n_focus != 1 else ''}). Fleet tabs below still "
-                f"show the full filtered fleet."
-            )
-            if fc2.button("Clear map filter", key="clear_map_filter"):
-                st.session_state.pop("map_clicked_vessel", None)
-                st.rerun()
-        else:
-            df_map = df_map_base
+        df_map = df_map_base
         if _pills_active:
             st.caption(
                 f"Map showing {len(df_map)} of {len(df_filtered)} events "
-                f"(pill filters active). Clear pills in Fleet Analytics to reset."
+                f"(pill filters active). Clear pills above to reset."
             )
-
-        # Centre + zoom: fit to the focused vessel's events when filtered,
-        # otherwise default to the whole Med basin.
-        if focus_vessel and len(df_map) > 0:
-            centre_lat = float(df_map["lat"].mean())
-            centre_lon = float(df_map["lon"].mean())
-            zoom = 7 if len(df_map) > 1 else 8
-            m = folium.Map(location=[centre_lat, centre_lon], zoom_start=zoom, tiles="CartoDB positron")
-        else:
-            m = folium.Map(location=[37.0, 18.0], zoom_start=5, tiles="CartoDB positron")
-
-        # Dual visual encoding:
-        #   shape = behaviour (GAP=circle, LOITERING=square, ENCOUNTER=triangle)
-        #   fill colour = listing status (OFAC > IUU > ICCAT > clean-by-risk-band)
-        #   size = Kpler risk band (Low..Critical)
-        # Layer toggles are organised by listing status so the user can isolate,
-        # e.g., all ICCAT-authorised events regardless of behaviour type.
-        from config import RISK_BAND_COLORS
-        from folium.plugins import FastMarkerCluster, MarkerCluster
-
-        band_size_px = {"Low": 5, "Emerging": 6, "Elevated": 7, "Severe": 9, "Critical": 11}
-
-        fg_iuu = MarkerCluster(name="IUU-Listed", show=True)
-        fg_ofac = MarkerCluster(name="OFAC Sanctioned", show=True)
-        fg_fdi = folium.FeatureGroup(name="FDI Fishing Effort", show=show_fdi_layer)
-
-        # FDI fishing effort choropleth layer — all Med c-squares (cached)
-        if not fdi_effort.empty:
-            for sw_lat, sw_lon, days, color, opacity in _build_fdi_rectangles(fdi_effort):
-                folium.Rectangle(
-                    bounds=[[sw_lat, sw_lon], [sw_lat + 0.5, sw_lon + 0.5]],
-                    color=color,
-                    fill=True,
-                    fill_color=color,
-                    fill_opacity=opacity,
-                    weight=0,
-                    popup=f"Fishing days: {days:,.0f}",
-                ).add_to(fg_fdi)
 
         # Pre-compute FDI context per unique c-square (cached across reruns)
         fdi_cache = {}
@@ -503,121 +561,30 @@ with col1:
             )
             fdi_cache = _build_fdi_cache(csq_pairs, fdi_effort, fdi_landings)
 
-        # Separate flagged (IUU/OFAC) from clean events.
-        # Flagged vessels get full DivIcon markers with SVG shapes.
-        # Clean events use FastMarkerCluster (client-side JS) for performance.
-        # ICCAT-authorized vessels are compliant — no special map markers.
-        _is_flagged = (
-            df_map.get("ofac_sanctioned", pd.Series(False, index=df_map.index)).fillna(False).astype(bool)
-            | df_map.get("iuu_matched", pd.Series(False, index=df_map.index)).fillna(False).astype(bool)
+        # Cache the Folium map in session state; rebuild only when filters change.
+        # Uses render=False on subsequent reruns to skip expensive HTML serialization.
+        _map_fingerprint = (
+            tuple(sorted(_pill_events or [])),
+            tuple(sorted(_pill_bands or [])),
+            tuple(sorted(_pill_flags or [])),
+            tuple(sorted(_pill_class or [])),
+            show_fdi_layer,
+            len(df_map),
         )
-        df_flagged = df_map[_is_flagged]
-        df_clean = df_map[~_is_flagged]
-
-        # Exclude Low-band clean events from the map (bulk noise, minimal risk signal).
-        # Flagged vessels always show regardless of band.
-        df_clean = df_clean[df_clean.get("risk_band", pd.Series("Low", index=df_clean.index)) != "Low"]
-
-        # --- Clean events: FastMarkerCluster with colour-coded circle markers ---
-        # Each row is [lat, lon, color, radius, tooltip_text]
-        _band_color_map = {b: RISK_BAND_COLORS.get(b, "#2ecc71") for b in ["Low", "Emerging", "Elevated", "Severe", "Critical"]}
-        _event_color_map = {"GAP": "#e74c3c", "LOITERING": "#f39c12", "ENCOUNTER": "#9b59b6"}
-
-        if not df_clean.empty:
-            _clean_data = []
-            for _idx, _r in df_clean.iterrows():
-                _lat_v = float(_r["lat"])
-                _lon_v = float(_r["lon"])
-                _band = _r.get("risk_band", "Low")
-                _color = _event_color_map.get(_r["event_type"], "#888")
-                _radius = band_size_px.get(_band, 5)
-                _vn = _r.get("vessel_name", "") or "(unknown)"
-                _tip = f"{_vn} | {_r['event_type']} | {_r['flag']} | risk {_r['risk_score']:.1f} ({_band})"
-                _clean_data.append([_lat_v, _lon_v, _color, _radius, _tip])
-
-            _fast_callback = """
-            function (row) {
-                var marker = L.circleMarker(new L.LatLng(row[0], row[1]), {
-                    radius: row[3],
-                    fillColor: row[2],
-                    color: '#333',
-                    weight: 0.5,
-                    fillOpacity: 0.7
-                });
-                marker.bindTooltip(row[4]);
-                return marker;
-            }
-            """
-            FastMarkerCluster(
-                data=_clean_data, callback=_fast_callback, name="Events",
-            ).add_to(m)
-
-        # --- Flagged events: individual DivIcon markers with SVG shapes ---
-        def _svg_shape(event_type, fill, size, stroke="#222", stroke_w=1.5, dashed=False):
-            s = size
-            half = s / 2
-            if dashed:
-                stroke = "#ff9900"
-                stroke_w = 2.0
-                dash_attr = ' stroke-dasharray="3 2"'
-            else:
-                dash_attr = ""
-            if event_type == "LOITERING":
-                body = f'<rect x="1" y="1" width="{s-2}" height="{s-2}" fill="{fill}" stroke="{stroke}" stroke-width="{stroke_w}"{dash_attr}/>'
-            elif event_type == "ENCOUNTER":
-                pts = f"{half},1 {s-1},{s-1} 1,{s-1}"
-                body = f'<polygon points="{pts}" fill="{fill}" stroke="{stroke}" stroke-width="{stroke_w}"{dash_attr}/>'
-            else:
-                r = half - 1
-                body = f'<circle cx="{half}" cy="{half}" r="{r}" fill="{fill}" stroke="{stroke}" stroke-width="{stroke_w}"{dash_attr}/>'
-            return f'<svg width="{s}" height="{s}" xmlns="http://www.w3.org/2000/svg">{body}</svg>'
-
-        _flag_size = 22
-        for _, row in df_flagged.iterrows():
-            if pd.isna(row.get("lat")) or pd.isna(row.get("lon")):
-                continue
-            is_ofac = row.get("ofac_sanctioned", False)
-            is_iuu = row.get("iuu_matched", False)
-            vname = row.get("vessel_name", "")
-
-            if is_ofac:
-                fill = "#8B0000"
-                target = fg_ofac
-            else:
-                fill = "#000000"
-                target = fg_iuu
-
-            listings = []
-            if is_ofac:
-                listings.append("OFAC")
-            if is_iuu:
-                listings.append("IUU")
-            listing_txt = ", ".join(listings)
-
-            tooltip = f"{vname or '(unknown)'} | {row['event_type']} | {row['flag']} | risk {row['risk_score']:.1f} | {listing_txt}"
-
-            svg = _svg_shape(row["event_type"], fill, _flag_size)
-            icon = folium.DivIcon(
-                html=f'<div style="width:{_flag_size}px;height:{_flag_size}px">{svg}</div>',
-                icon_size=(_flag_size, _flag_size),
-                icon_anchor=(_flag_size // 2, _flag_size // 2),
-            )
-            folium.Marker(
-                location=[row["lat"], row["lon"]],
-                icon=icon,
-                tooltip=tooltip,
-            ).add_to(target)
-
-        # Add all layer groups to map (FDI first so it renders behind markers)
-        fg_fdi.add_to(m)
-        fg_iuu.add_to(m)
-        fg_ofac.add_to(m)
-        folium.LayerControl(collapsed=True).add_to(m)
+        _prev_fp = st.session_state.get("_map_fingerprint")
+        _map_changed = _prev_fp != _map_fingerprint or "_cached_map" not in st.session_state
+        if _map_changed:
+            m = _build_map(df_map, fdi_effort, show_fdi_layer)
+            st.session_state["_cached_map"] = m
+            st.session_state["_map_fingerprint"] = _map_fingerprint
+        else:
+            m = st.session_state["_cached_map"]
 
         map_data = st_folium(
             m, height=500, use_container_width=True,
             returned_objects=["last_object_clicked"],
             key="main_map",
+            render=_map_changed,
         )
 
         # Dual-encoding legend: shape = behaviour, fill = listing, size = risk band
@@ -682,7 +649,7 @@ with col1:
                     # the selectbox reads it on next render.
                     clicked_vname = ev.get("vessel_name")
                     if pd.notna(clicked_vname) and clicked_vname:
-                        st.session_state["map_clicked_vessel"] = clicked_vname
+                        st.session_state["investigate_vessel"] = clicked_vname
                     is_ofac_ev = ev.get("ofac_sanctioned", False)
                     is_iuu_ev = ev.get("iuu_matched", False)
                     is_iccat_ev = ev.get("iccat_authorized", False)
@@ -876,35 +843,11 @@ tab_investigation, tab_overview, tab_reference, tab_ai = st.tabs([
 ])
 
 with tab_overview:
-    # ---- Pill filters (shared across all Fleet Analytics subtabs) ----
-    fc1, fc2, fc3, fc4 = st.columns(4)
-    with fc1:
-        event_types_in_data = sorted(df_filtered["event_type"].dropna().unique())
-        pill_events = st.pills(
-            "Event type", event_types_in_data,
-            selection_mode="multi", default=None, key="pill_event_type",
-        )
-    with fc2:
-        band_order = ["Critical", "Severe", "Elevated", "Emerging", "Low"]
-        bands_in_data = [b for b in band_order if b in df_filtered["risk_band"].values]
-        pill_bands = st.pills(
-            "Risk band", bands_in_data,
-            selection_mode="multi", default=None, key="pill_risk_band",
-        )
-    with fc3:
-        flags_in_data = sorted(df_filtered["flag"].dropna().unique())
-        pill_flags = st.pills(
-            "Flag state", flags_in_data,
-            selection_mode="multi", default=None, key="pill_flag",
-        )
-    with fc4:
-        classes_in_data = sorted(
-            df_filtered["vessel_class"].dropna().unique()
-        ) if "vessel_class" in df_filtered.columns else []
-        pill_class = st.pills(
-            "Vessel class", classes_in_data,
-            selection_mode="multi", default=None, key="pill_vessel_class",
-        ) if classes_in_data else []
+    # Pill filters are rendered above the map; read their values here.
+    pill_events = _pill_events
+    pill_bands = _pill_bands
+    pill_flags = _pill_flags
+    pill_class = _pill_class
 
     df_tab = df_filtered.copy()
     if pill_events:

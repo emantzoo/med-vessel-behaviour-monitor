@@ -84,14 +84,23 @@ TRANSSHIPMENT_VESSEL_TYPES = {"CARRIER", "TANKER"}
 # substring-matched against the lowercased input.
 
 VESSEL_CLASS_PATTERNS = [
+    # Order matters: first match wins. More specific patterns first.
+    # "non_fishing" and "not_fishing" must be matched BEFORE "fishing".
+    ("other", ["non_fishing", "not_fishing", "patrol", "dive_vessel",
+               "seismic", "research"]),
     ("artisanal_fishing", ["artisanal", "small_scale", "small scale"]),
     ("industrial_fishing", ["trawler", "fish_factory", "fish factory",
                             "purse_seine", "purse seiner", "purse_seiner",
-                            "longliner", "long_liner", "drifter", "seiner",
-                            "gillnetter", "fishing"]),
+                            "longliner", "long_liner", "longline",
+                            "drifter", "seiner", "seine",
+                            "gillnet", "driftnet", "trollers", "troller",
+                            "pole_and_line", "pots_and_trap",
+                            "set_longline", "dredge_fishing",
+                            "fishing"]),
     ("carrier", ["reefer", "refrigerated_cargo", "refrigerated cargo",
                  "fish_carrier", "fish carrier", "carrier"]),
-    ("tanker", ["oil_tanker", "oil tanker", "chemical_tanker", "tanker"]),
+    ("tanker", ["oil_tanker", "oil tanker", "chemical_tanker", "tanker",
+                "bunker_or_tanker"]),
     ("cargo", ["bulk_carrier", "general_cargo", "general cargo",
                "container", "cargo"]),
     ("support", ["bunker", "supply", "support", "tug", "service"]),

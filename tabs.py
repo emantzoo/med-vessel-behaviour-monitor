@@ -1872,21 +1872,12 @@ def render_vessel_investigation(df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_l
         st.info("No vessels with names available.")
         return
 
-    # Two-way binding between the map click and the dropdown:
-    # - If the user just clicked a new vessel on the map, that click
-    #   (stored under "map_clicked_vessel") overrides any existing
-    #   dropdown selection for this render.
-    # - Otherwise the dropdown's own prior selection is preserved.
-    # - If neither exists, fall back to the highest-risk vessel.
-    # The user can always override the map click by picking a different
-    # vessel from the dropdown afterwards.
-    map_clicked = st.session_state.get("map_clicked_vessel")
+    # Map click or quick-select writes to "investigate_vessel";
+    # we copy it into the selectbox key to sync the dropdown.
+    ext_pick = st.session_state.pop("investigate_vessel", None)
     current_inv = st.session_state.get("investigation_vessel")
-    if map_clicked and map_clicked in vessel_options and map_clicked != current_inv:
-        # Seed the selectbox key so it opens on the map-clicked vessel.
-        # Keep map_clicked_vessel in session state so the map (rendered
-        # above the tabs) stays filtered to this vessel.
-        st.session_state["investigation_vessel"] = map_clicked
+    if ext_pick and ext_pick in vessel_options and ext_pick != current_inv:
+        st.session_state["investigation_vessel"] = ext_pick
     elif "investigation_vessel" not in st.session_state:
         st.session_state["investigation_vessel"] = vessel_options[0]
 
@@ -1946,13 +1937,8 @@ def render_vessel_investigation(df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_l
         if _sel_rows:
             _picked = _compact_df.iloc[_sel_rows[0]]["vessel_name"]
             if _picked and _picked != selected:
-                # Write to map_clicked_vessel only — the selectbox key
-                # cannot be modified after the widget is instantiated.
-                # On rerun the map_clicked logic at the top of this
-                # function will seed investigation_vessel BEFORE the
-                # selectbox renders.
-                st.session_state["map_clicked_vessel"] = _picked
-                st.rerun(scope="app")  # full page rerun so the map updates
+                st.session_state["investigate_vessel"] = _picked
+                st.rerun(scope="app")
 
     report = investigate_vessel(selected, df, iuu_df, iccat_df, ofac_df, fdi_effort, fdi_landings, fishing_df=fishing_df, closed_area_mpas=closed_area_mpas)
 

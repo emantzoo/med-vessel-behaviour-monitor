@@ -846,7 +846,8 @@ def lookup_vessel_metadata(mmsi_list, token, progress_callback=None):
                 if tonnage:
                     meta["tonnage_gt"] = tonnage
             if not meta.get("shiptypes"):
-                st_val = entry.get("shiptypes") or entry.get("shiptype")
+                st_val = (entry.get("shiptypes") or entry.get("shiptype")
+                          or entry.get("gear_types") or entry.get("gearTypes"))
                 if isinstance(st_val, list) and st_val:
                     meta["shiptypes"] = ",".join(str(s) for s in st_val if s)
                 elif isinstance(st_val, str) and st_val.strip():
@@ -872,22 +873,30 @@ def lookup_vessel_metadata(mmsi_list, token, progress_callback=None):
                 for _, v in vessels.iterrows():
                     _harvest(v.get("self_reported_info") or v.get("selfReportedInfo"), meta)
 
-                if not meta.get("vessel_id"):
-                    for _, v in vessels.iterrows():
-                        for src_key in ("combined_sources_info", "combinedSourcesInfo",
-                                        "self_reported_info", "selfReportedInfo"):
-                            entries = v.get(src_key)
-                            if isinstance(entries, list):
-                                for entry in entries:
-                                    if isinstance(entry, dict):
-                                        vid = entry.get("vessel_id") or entry.get("vesselId") or entry.get("id")
-                                        if vid and str(vid).strip():
-                                            meta["vessel_id"] = str(vid).strip()
-                                            break
-                            if meta.get("vessel_id"):
-                                break
-                        if meta.get("vessel_id"):
-                            break
+                # Fallback: combined_sources_info for vessel_id and shiptypes
+                for _, v in vessels.iterrows():
+                    csi = v.get("combined_sources_info") or v.get("combinedSourcesInfo")
+                    if not isinstance(csi, list):
+                        continue
+                    for entry in csi:
+                        if not isinstance(entry, dict):
+                            continue
+                        # vessel_id
+                        if not meta.get("vessel_id"):
+                            vid = entry.get("vessel_id") or entry.get("vesselId") or entry.get("id")
+                            if vid and str(vid).strip():
+                                meta["vessel_id"] = str(vid).strip()
+                        # shiptypes from gear_types / ship_types (list-of-dicts format)
+                        if not meta.get("shiptypes"):
+                            for gt_key in ("gear_types", "gearTypes", "ship_types", "shipTypes"):
+                                gt_val = entry.get(gt_key)
+                                if isinstance(gt_val, list) and gt_val:
+                                    names = [str(g.get("name", "")) for g in gt_val
+                                             if isinstance(g, dict) and g.get("name")
+                                             and str(g["name"]).upper() not in ("NA", "")]
+                                    if names:
+                                        meta["shiptypes"] = ",".join(names)
+                                        break
 
                 if any(meta.get(k) for k in ("imo", "length_m", "tonnage_gt", "shiptypes", "vessel_id")):
                     result[mmsi] = meta
