@@ -196,15 +196,17 @@ def render_framework_tree(trace=None, tier=None, vessel_label=None):
 def render_scoring_pipeline_diagram():
     """Render the end-to-end scoring pipeline as a graphviz flowchart.
 
-    Mirrors the mental model a reviewer needs to audit the risk score:
-    one AIS event -> base behavioural score -> compounding multipliers ->
-    per-event score -> vessel-level aggregation -> risk band. A separate
-    dashed side-chain shows the four vessel-level Kpler-aligned flags
-    (industrial profile, multi-behaviour, dark port call candidate,
-    repeat offender) which are computed independently and fed to the
-    Vessel Summary as display-only signals (never multiplied into the
-    score). Industrial profile is the only structural flag of the four;
-    the other three are temporal/compound.
+    Three clear lanes, read top-to-bottom:
+
+    1. CENTRE (blue tones): the multiplicative scoring chain.
+       AIS event -> base behavioural score (snapshot) -> list-lookup
+       multipliers (IUU / ICCAT / OFAC) -> per-event risk_score.
+    2. CENTRE-BOTTOM (green tones): vessel-level aggregation.
+       Sum per-event scores -> risk_score_total -> risk_band.
+       Compound multiplier = risk_score_total / base_score_total.
+    3. RIGHT (grey, dashed): four display-only vessel flags.
+       Computed separately, never multiplied into the score.
+       Feed into the Ranking table as parallel indicators.
     """
     dot = graphviz.Digraph(
         "scoring_pipeline",
@@ -213,9 +215,9 @@ def render_scoring_pipeline_diagram():
             "fontname": "Helvetica",
             "fontsize": "13",
             "bgcolor": "white",
-            "splines": "ortho",
-            "nodesep": "0.4",
-            "ranksep": "0.5",
+            "splines": "line",
+            "nodesep": "0.6",
+            "ranksep": "0.55",
         },
         node_attr={
             "fontname": "Helvetica",
@@ -224,7 +226,7 @@ def render_scoring_pipeline_diagram():
             "style": "rounded,filled",
             "fillcolor": "white",
             "color": "#555",
-            "margin": "0.15,0.1",
+            "margin": "0.18,0.1",
         },
         edge_attr={
             "fontname": "Helvetica",
@@ -233,127 +235,107 @@ def render_scoring_pipeline_diagram():
         },
     )
 
-    # --- Main pipeline (per-event scoring) ---
+    # ── LANE 1: Per-event scoring chain ──────────────────────────────
     dot.node(
-        "A",
-        "AIS Event\\n(gap / encounter / loitering)",
-        fillcolor="#ECEFF1",
-    )
-    dot.node(
-        "B",
-        "Base Behavioural Score\\n"
-        "duration^0.75 x event_weight\\n"
-        "x flag x shore x mpa_tier x event_factors",
-        fillcolor="#E8F4F8",
-    )
-    dot.node(
-        "C",
-        "base_risk_score\\n(snapshot)",
-        fillcolor="#FFFFFF",
-    )
-    dot.node(
-        "D",
-        "x IUU multiplier\\nGFCM 3.0x / other 2.0x",
-        fillcolor="#FFF4E6",
-    )
-    dot.node(
-        "E",
-        "x ICCAT multiplier\\ncarrier 1.4x / BFT 1.3x / SWO-ALB 1.2x",
-        fillcolor="#FFF4E6",
-    )
-    dot.node(
-        "F",
-        "x OFAC multiplier\\n2.5x",
-        fillcolor="#FFF4E6",
-    )
-    dot.node(
-        "G",
-        "risk_score\\n(per event)",
-        fillcolor="#FFF4E6",
+        "evt",
+        "AIS EVENT\\ngap | encounter | loitering",
+        fillcolor="#ECEFF1", shape="box",
     )
 
-    dot.edge("A", "B")
-    dot.edge("B", "C", label="snapshot")
-    dot.edge("B", "D")
-    dot.edge("D", "E")
-    dot.edge("E", "F")
-    dot.edge("F", "G")
-
-    # --- Vessel-level aggregation ---
     dot.node(
-        "H",
-        "Sum events per vessel",
-        fillcolor="#FFFFFF",
-    )
-    dot.node(
-        "I",
-        "Sum base per vessel",
-        fillcolor="#FFFFFF",
-    )
-    dot.node(
-        "J",
-        "risk_score_total",
-        fillcolor="#E8F8E8",
-    )
-    dot.node(
-        "K",
-        "base_score_total",
-        fillcolor="#E8F8E8",
-    )
-    dot.node(
-        "L",
-        "compound_multiplier\\n= risk_score_total / base_score_total",
-        fillcolor="#E8F8E8",
-    )
-    dot.node(
-        "M",
-        "risk_band\\nLow / Emerging / Elevated / Severe / Critical",
-        fillcolor="#F8E8E8",
-    )
-
-    dot.edge("G", "H")
-    dot.edge("C", "I")
-    dot.edge("H", "J")
-    dot.edge("I", "K")
-    dot.edge("J", "L")
-    dot.edge("K", "L")
-    dot.edge("J", "M")
-
-    # --- Vessel-level flags (computed separately, dashed to show they
-    # do not multiply into the risk score) ---
-    dot.node(
-        "N",
-        "Vessel-level flags\\n(computed separately)",
-        fillcolor="#F0F0F0",
-    )
-    dot.node("N1", "is_industrial\\n(>=24m or >=100GT)", fillcolor="#FAFAFA")
-    dot.node("O", "multi_behaviour_flag", fillcolor="#FAFAFA")
-    dot.node("P", "dark_port_call_candidate", fillcolor="#FAFAFA")
-    dot.node("Q", "repeat_offender_90d", fillcolor="#FAFAFA")
-    dot.node(
-        "R",
-        "Display-only:\\nVessel Summary + Investigation badges\\n+ risk tree rules",
-        fillcolor="#F0F0F0",
-    )
-
-    dot.edge("N", "N1", style="dashed")
-    dot.edge("N", "O", style="dashed")
-    dot.edge("N", "P", style="dashed")
-    dot.edge("N", "Q", style="dashed")
-    dot.edge("N1", "R", style="dashed")
-    dot.edge("O", "R", style="dashed")
-    dot.edge("P", "R", style="dashed")
-    dot.edge("Q", "R", style="dashed")
-
-    # --- Final convergence into the Vessel Summary subtab ---
-    dot.node(
-        "S",
-        "Vessel Summary subtab",
+        "base_calc",
+        "duration^0.75\\n"
+        "x event_weight  x  flag_risk\\n"
+        "x shore_factor  x  mpa_tier\\n"
+        "x event-specific factors",
         fillcolor="#E3F2FD",
-        fontsize="12",
     )
-    dot.edge("M", "S")
-    dot.edge("L", "S")
-    dot.edge("R", "S")
+
+    dot.node(
+        "base_snap",
+        "base_risk_score",
+        fillcolor="#BBDEFB", fontcolor="#0D47A1",
+    )
+
+    # Lookup multipliers as a single compact node
+    dot.node(
+        "lookups",
+        "LOOKUP MULTIPLIERS\\n"
+        "IUU  (GFCM 3.0x / other 2.0x)\\n"
+        "ICCAT  (carrier 1.4x / BFT 1.3x / SWO 1.2x)\\n"
+        "OFAC  (2.5x)",
+        fillcolor="#FFF3E0", color="#E65100",
+    )
+
+    dot.node(
+        "evt_score",
+        "risk_score  (per event)\\n"
+        "= base  x  IUU  x  ICCAT  x  OFAC",
+        fillcolor="#FFE0B2", color="#E65100",
+    )
+
+    dot.edge("evt", "base_calc")
+    dot.edge("base_calc", "base_snap")
+    dot.edge("base_snap", "lookups")
+    dot.edge("lookups", "evt_score")
+
+    # ── LANE 2: Vessel-level aggregation ─────────────────────────────
+    dot.node(
+        "agg",
+        "SUM per vessel",
+        fillcolor="#E8F5E9",
+    )
+
+    dot.node(
+        "totals",
+        "risk_score_total          base_score_total\\n"
+        "compound_multiplier = total / base",
+        fillcolor="#C8E6C9", color="#2E7D32",
+    )
+
+    dot.node(
+        "band",
+        "RISK BAND\\n"
+        "Low <50 | Emerging 50-59 | Elevated 60-79\\n"
+        "Severe 80-99 | Critical >=100",
+        fillcolor="#A5D6A7", color="#1B5E20", fontcolor="#1B5E20",
+    )
+
+    dot.edge("evt_score", "agg")
+    dot.edge("base_snap", "agg", style="dashed", color="#90A4AE",
+             label="  base preserved")
+    dot.edge("agg", "totals")
+    dot.edge("totals", "band")
+
+    # ── LANE 3: Display-only vessel flags (dashed, right side) ───────
+    with dot.subgraph(name="cluster_flags") as flags:
+        flags.attr(
+            label="DISPLAY-ONLY FLAGS\n(not in score)",
+            style="dashed", color="#9E9E9E",
+            fontname="Helvetica", fontsize="10", fontcolor="#616161",
+        )
+        flags.node("f1", "industrial\n>=24m or >=100 GT",
+                    fillcolor="#F5F5F5", color="#BDBDBD", fontsize="10")
+        flags.node("f2", "multi_behaviour\n>=2 event types",
+                    fillcolor="#F5F5F5", color="#BDBDBD", fontsize="10")
+        flags.node("f3", "dark_port_call\nloitering <10 km shore",
+                    fillcolor="#F5F5F5", color="#BDBDBD", fontsize="10")
+        flags.node("f4", "repeat_offender\n>=2 events in 90 days",
+                    fillcolor="#F5F5F5", color="#BDBDBD", fontsize="10")
+
+    # Invisible edges to align flags beside the main column
+    dot.edge("evt", "f1", style="invis")
+
+    # ── Convergence: Ranking table ───────────────────────────────────
+    dot.node(
+        "ranking",
+        "RANKING TABLE\\n"
+        "score triplet + flags + listings + vessel identity",
+        fillcolor="#E3F2FD", color="#1565C0", fontcolor="#0D47A1",
+        shape="box",
+    )
+
+    dot.edge("band", "ranking")
+    dot.edge("f4", "ranking", style="dashed", color="#9E9E9E")
 
     return dot

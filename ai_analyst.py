@@ -215,6 +215,20 @@ merged = df.merge(fdi_effort.groupby(["rectangle_lon","rectangle_lat"]).agg(tota
 # Pivot/crosstab pattern — always use fill_value=0 and avoid .loc with values that may not exist
 ct = pd.crosstab(df["flag"], df["event_type"]).fillna(0)
 # Use .get() or .reindex() instead of direct column access to avoid KeyError
+
+# Top N vessels ranking pattern (ALWAYS use this for "riskiest vessels" queries)
+vessel_agg = df.groupby("mmsi").agg(
+    vessel_name=("vessel_name", "first"),
+    flag=("flag", "first"),
+    events=("event_type", "count"),
+    risk_score_total=("risk_score", "sum"),
+    base_score_total=("base_risk_score", "sum"),
+    iuu_matched=("iuu_matched", "max"),
+    ofac_sanctioned=("ofac_sanctioned", "max"),
+    iccat_authorized=("iccat_authorized", "max"),
+).reset_index()
+vessel_agg["compound_mult"] = (vessel_agg["risk_score_total"] / vessel_agg["base_score_total"].replace(0, 1)).round(2)
+result_df = vessel_agg.nlargest(5, "risk_score_total")
 ```
 """
 

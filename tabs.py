@@ -652,32 +652,38 @@ metadata in live mode and from the static profile in demo mode.
         )
 
         rows.append({
+            # Identity
             "mmsi": mmsi,
             "vessel_name": _first(g["vessel_name"]) if "vessel_name" in g.columns else "",
             "flag": _first(g["flag"]) if "flag" in g.columns else "",
             "event_count": int(len(g)),
             "event_types": ", ".join(sorted(g["event_type"].dropna().unique())),
-            "vessel_class": vessel_class_val,
-            "type_mismatch": type_mismatch,
+            # Score triplet
+            "risk_score_total": round(risk_total, 1),
+            "base_score_total": round(base_total, 1),
+            "compound_multiplier": compound,
+            "risk_band": classify_risk_band(risk_total),
+            "max_event_risk": round(float(g["risk_score"].max()), 1),
+            # Behavioural flags (display-only)
             "is_industrial": bool(g["is_industrial"].any()) if "is_industrial" in g.columns else False,
-            "length_m": length_m_val,
-            "profile": profile_str,
             "multi_behaviour": bool(g["multi_behaviour_flag"].any()) if "multi_behaviour_flag" in g.columns else False,
             "dark_port_candidates": int(g["dark_port_call_candidate"].sum()) if "dark_port_call_candidate" in g.columns else 0,
             "repeat_offender": bool(g["repeat_offender_90d"].any()) if "repeat_offender_90d" in g.columns else False,
-            "in_mpa": in_mpa_any,
-            "mpa_tier": mpa_tier_top,
-            "fishing_in_mpa_events": fim_events,
-            "fishing_in_mpa_hours": round(fim_hours, 1),
-            "base_score_total": round(base_total, 1),
-            "risk_score_total": round(risk_total, 1),
-            "max_event_risk": round(float(g["risk_score"].max()), 1),
-            "compound_multiplier": compound,
-            "risk_band": classify_risk_band(risk_total),
+            # Listing booleans
             "iuu_matched": bool(g["iuu_matched"].any()) if "iuu_matched" in g.columns else False,
             "iccat_authorized": bool(g["iccat_authorized"].any()) if "iccat_authorized" in g.columns else False,
             "ofac_sanctioned": bool(g["ofac_sanctioned"].any()) if "ofac_sanctioned" in g.columns else False,
             "gfcm_registered": bool(g["gfcm_registered"].any()) if "gfcm_registered" in g.columns else False,
+            # Vessel identity
+            "vessel_class": vessel_class_val,
+            "profile": profile_str,
+            "length_m": length_m_val,
+            "type_mismatch": type_mismatch,
+            # MPA / fishing context
+            "in_mpa": in_mpa_any,
+            "mpa_tier": mpa_tier_top,
+            "fishing_in_mpa_events": fim_events,
+            "fishing_in_mpa_hours": round(fim_hours, 1),
         })
 
     vessel_df = (pd.DataFrame(rows)
