@@ -402,7 +402,7 @@ if not _pipeline_cached:
 
 # Pill filters — rendered above the map so they're always visible.
 # Same session-state keys are reused by Fleet Analytics for df_tab filtering.
-_pc1, _pc2, _pc3, _pc4 = st.columns(4)
+_pc1, _pc2 = st.columns(2)
 with _pc1:
     _event_types_in_data = sorted(df_filtered["event_type"].dropna().unique())
     _pill_events = st.pills(
@@ -416,32 +416,49 @@ with _pc2:
         "Risk band", _bands_in_data,
         selection_mode="multi", default=None, key="pill_risk_band",
     )
+_pc3, _pc4, _pc5 = st.columns(3)
 with _pc3:
-    _flags_in_data = sorted(df_filtered["flag"].dropna().unique())
-    _pill_flags = st.pills(
-        "Flag state", _flags_in_data,
-        selection_mode="multi", default=None, key="pill_flag",
+    _pill_eu = st.pills(
+        "Flag origin", ["EU", "non-EU"],
+        selection_mode="multi", default=None, key="pill_eu_flag",
     )
 with _pc4:
-    _classes_in_data = sorted(
-        df_filtered["vessel_class"].dropna().unique()
-    ) if "vessel_class" in df_filtered.columns else []
-    _pill_class = st.pills(
-        "Vessel class", _classes_in_data,
-        selection_mode="multi", default=None, key="pill_vessel_class",
-    ) if _classes_in_data else []
+    _pill_iccat = st.pills(
+        "ICCAT status", ["ICCAT", "non-ICCAT"],
+        selection_mode="multi", default=None, key="pill_iccat",
+    ) if "iccat_authorized" in df_filtered.columns else []
+with _pc5:
+    _pill_gfcm = st.pills(
+        "GFCM status", ["GFCM", "non-GFCM"],
+        selection_mode="multi", default=None, key="pill_gfcm",
+    ) if "gfcm_registered" in df_filtered.columns else []
 
 df_map_base = df_filtered
 if _pill_events:
     df_map_base = df_map_base[df_map_base["event_type"].isin(_pill_events)]
 if _pill_bands:
     df_map_base = df_map_base[df_map_base["risk_band"].isin(_pill_bands)]
-if _pill_flags:
-    df_map_base = df_map_base[df_map_base["flag"].isin(_pill_flags)]
-if _pill_class and "vessel_class" in df_map_base.columns:
-    df_map_base = df_map_base[df_map_base["vessel_class"].isin(_pill_class)]
+if _pill_eu:
+    from config import EU_FLAGS
+    _is_eu = df_map_base["flag"].isin(EU_FLAGS)
+    if _pill_eu == ["EU"]:
+        df_map_base = df_map_base[_is_eu]
+    elif _pill_eu == ["non-EU"]:
+        df_map_base = df_map_base[~_is_eu]
+if _pill_iccat:
+    _iccat_col = df_map_base["iccat_authorized"].fillna(False).astype(bool)
+    if _pill_iccat == ["ICCAT"]:
+        df_map_base = df_map_base[_iccat_col]
+    elif _pill_iccat == ["non-ICCAT"]:
+        df_map_base = df_map_base[~_iccat_col]
+if _pill_gfcm:
+    _gfcm_col = df_map_base["gfcm_registered"].fillna(False).astype(bool)
+    if _pill_gfcm == ["GFCM"]:
+        df_map_base = df_map_base[_gfcm_col]
+    elif _pill_gfcm == ["non-GFCM"]:
+        df_map_base = df_map_base[~_gfcm_col]
 
-_pills_active = bool(_pill_events or _pill_bands or _pill_flags or _pill_class)
+_pills_active = bool(_pill_events or _pill_bands or _pill_eu or _pill_iccat or _pill_gfcm)
 
 col1, col2 = st.columns([3, 1])
 
@@ -700,20 +717,30 @@ tab_investigation, tab_overview, tab_reference, tab_ai = st.tabs([
 
 with tab_overview:
     # Pill filters are rendered above the map; read their values here.
-    pill_events = _pill_events
-    pill_bands = _pill_bands
-    pill_flags = _pill_flags
-    pill_class = _pill_class
-
     df_tab = df_filtered.copy()
-    if pill_events:
-        df_tab = df_tab[df_tab["event_type"].isin(pill_events)]
-    if pill_bands:
-        df_tab = df_tab[df_tab["risk_band"].isin(pill_bands)]
-    if pill_flags:
-        df_tab = df_tab[df_tab["flag"].isin(pill_flags)]
-    if pill_class:
-        df_tab = df_tab[df_tab["vessel_class"].isin(pill_class)]
+    if _pill_events:
+        df_tab = df_tab[df_tab["event_type"].isin(_pill_events)]
+    if _pill_bands:
+        df_tab = df_tab[df_tab["risk_band"].isin(_pill_bands)]
+    if _pill_eu:
+        from config import EU_FLAGS
+        _tab_eu = df_tab["flag"].isin(EU_FLAGS)
+        if _pill_eu == ["EU"]:
+            df_tab = df_tab[_tab_eu]
+        elif _pill_eu == ["non-EU"]:
+            df_tab = df_tab[~_tab_eu]
+    if _pill_iccat and "iccat_authorized" in df_tab.columns:
+        _tab_iccat = df_tab["iccat_authorized"].fillna(False).astype(bool)
+        if _pill_iccat == ["ICCAT"]:
+            df_tab = df_tab[_tab_iccat]
+        elif _pill_iccat == ["non-ICCAT"]:
+            df_tab = df_tab[~_tab_iccat]
+    if _pill_gfcm and "gfcm_registered" in df_tab.columns:
+        _tab_gfcm = df_tab["gfcm_registered"].fillna(False).astype(bool)
+        if _pill_gfcm == ["GFCM"]:
+            df_tab = df_tab[_tab_gfcm]
+        elif _pill_gfcm == ["non-GFCM"]:
+            df_tab = df_tab[~_tab_gfcm]
 
     if len(df_tab) < len(df_filtered):
         st.caption(

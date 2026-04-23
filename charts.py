@@ -711,7 +711,7 @@ def build_base_vs_compound_fig(df: pd.DataFrame) -> go.Figure | None:
     if iccat_delta > 0:
         fig.add_trace(go.Bar(
             y=["Fleet total"], x=[iccat_delta], name="ICCAT authorization",
-            orientation="h", marker_color="#4169E1",
+            orientation="h", marker_color="#E59F00",
             hovertemplate="ICCAT authorization: +%{x:.1f}<extra></extra>",
         ))
     if ofac_delta > 0:
@@ -795,7 +795,7 @@ def build_band_decomposition_fig(df: pd.DataFrame) -> go.Figure | None:
     if any(v > 0 for v in iccats):
         fig.add_trace(go.Bar(
             y=band_order, x=iccats, name="ICCAT authorization",
-            orientation="h", marker_color="#4169E1",
+            orientation="h", marker_color="#E59F00",
             hovertemplate="<b>%{y}</b><br>ICCAT authorization: +%{x:.1f}<extra></extra>",
         ))
     if any(v > 0 for v in ofacs):

@@ -10,6 +10,13 @@ EVENT_COLORS = {"GAP": "#e74c3c", "LOITERING": "#f39c12", "ENCOUNTER": "#8e44ad"
 
 DEFAULT_EVENT_WEIGHTS = {"GAP": 3.2, "LOITERING": 2.0, "ENCOUNTER": 5.0}
 
+# EU member-state ISO3 codes (used for EU / non-EU pill filter)
+EU_FLAGS = {
+    "AUT", "BEL", "BGR", "HRV", "CYP", "CZE", "DNK", "EST", "FIN", "FRA",
+    "DEU", "GRC", "HUN", "IRL", "ITA", "LVA", "LTU", "LUX", "MLT", "NLD",
+    "POL", "PRT", "ROU", "SVK", "SVN", "ESP", "SWE",
+}
+
 # ========================= FLAG RISK MULTIPLIERS =========================
 # Derived from the Poseidon IUU Fishing Risk Index (iuufishingindex.net).
 # The Index scores coastal states across 40 indicators; for flag-level
