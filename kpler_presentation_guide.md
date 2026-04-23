@@ -49,7 +49,7 @@ Related views are grouped one level down via subtabs, and secondary diagnostic c
 
 ### Open with the map (30 seconds)
 
-Open the live app. Let the map load with the static dataset. Point out the color-coded markers: "Red is AIS gaps — vessels going dark. Orange is loitering. Purple is encounters between vessels. The black markers are vessels matched against the IUU vessel blacklist. The dark red markers are OFAC-sanctioned vessels — the highest compliance priority. Low-risk events are filtered out of the map to keep the signal clean."
+Open the live app. Let the map load with the static dataset. Point out the colour-coded dots: "Red is AIS gaps — vessels going dark. Orange is loitering. Purple is encounters between vessels. The black dots are vessels matched against the IUU vessel blacklist. The dark red dots are OFAC-sanctioned vessels — the highest compliance priority. Dot size encodes the risk band — larger means higher risk. Low-risk events are filtered out of the map to keep the signal clean."
 
 Don't explain every marker. Let them absorb the visual, then move to specifics.
 
@@ -211,7 +211,7 @@ Their API has four risk categories. Here's how your app maps:
 ```
 KPLER                                    YOUR APP
 -----                                    --------
-OperationalRisks.aisGaps                 GAP events + speed change analysis
+OperationalRisks.aisGaps                 GAP events + intentional disabling + implied speed
 OperationalRisks.darkStsEvents           ENCOUNTER events (vessel meetings)
 OperationalRisks.stsEvents               ENCOUNTER + ICCAT carrier matching
 SanctionRisks.sanctionedVessels          OFAC SDN cross-reference (2.5x multiplier)
@@ -299,8 +299,8 @@ Know this cold. If they ask "walk me through the code" or "how is it structured,
 
 ```
 app.py              → Orchestrator. Loads data, runs filters, applies risk
-                      scoring, renders Folium map, dispatches to the 4
-                      top-level tabs (with subtabs). Entry point.
+                      scoring, renders PyDeck (deck.gl) map, dispatches to
+                      the 4 top-level tabs (with subtabs). Entry point.
 
 config.py           → Constants and pure functions. Event weights, flag risk
                       multipliers (loaded from IUU Risk Index CSV, 152 countries),
@@ -389,7 +389,7 @@ tabs.py             → Render functions invoked from the 4 top-level tabs,
                       1. Vessel Investigation: per-vessel structured
                            report + coloured risk tree + risk trajectory
                            chart + case-file export + quick-select table
-                      2. Fleet Analytics — four subtabs:
+                      2. Fleet Analytics — five subtabs:
                          - Ranking: vessel-level aggregation with
                            pill filters, risk bands and Kpler-aligned flags
                          - Exploration: repeat offenders / encounter
@@ -437,7 +437,7 @@ exports.py          → Export helpers for analyst workflow:
 10. OFAC match        match_ofac_vessels() → ofac_* columns, risk *= ofac_multiplier
 11. Classify band     classify_risk_band() → risk_band column (Low..Critical)
 12. Join fishing      aggregate_fishing_in_mpa() + GFW Insights (optional)
-13. Render map        Folium markers (priority: OFAC > IUU > ICCAT > event type)
+13. Render map        PyDeck ScatterplotLayer (colour: OFAC dark red > IUU black > event type; size = risk band)
 14. Render tabs       4 top-level tabs (with subtabs) dispatched with df_filtered + reference data
 15. AI analyst        Gemini with RAG + sandboxed code execution + 41-leaf risk tree trace
 ```
