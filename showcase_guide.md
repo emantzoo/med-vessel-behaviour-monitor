@@ -23,6 +23,11 @@
 - **Low-band events excluded** from map to reduce noise (risk_score < 50).
 - **FDI layer** (blue choropleth rectangles, toggleable in sidebar): EU Joint Research Centre fishing effort by 0.5x0.5 degree c-square grid, rendered as filled rectangles (PolygonLayer). Blue scale: light < 50 days, medium 50-500, dark 500-2000, navy > 2000 fishing days.
 
+**Methodology at this step:**
+- Event detection criteria follow **Miller et al. 2018** (*Frontiers in Marine Science*): encounter thresholds (<500m, >=2h, <2kn, >=10km from shore), shore distance as empirical discriminator.
+- Marker colour priority (OFAC > IUU > event type) implements the **gate branch logic** from the risk tree — sanctions and IUU status override behavioural classification.
+- Size encoding uses the 5-band Kpler "Turning Tides" (Dec 2025) vocabulary: Low (<50), Emerging (50-60), Elevated (60-80), Severe (80-100), Critical (>=100).
+
 ---
 
 ## Step 2 — Click a Vessel (1 min)
@@ -36,6 +41,10 @@
 - **Click mechanism:** `st.pydeck_chart(on_select="rerun", selection_mode="single-object")`. Returns the full data row of the clicked point. Vessel name is written to `st.session_state["investigate_vessel"]`, which the Investigation tab reads on next render.
 - **Investigation tab** is wrapped in `@st.fragment` — the dropdown/report rerun only within the fragment, not the entire page.
 - **Risk tree** is deterministic (no LLM) — same input always produces same output. Implemented in `investigation.py`.
+
+**Methodology at this step:**
+- The risk tree framework has **8 branches and 41 leaves** (35 wired, 6 future work), defined in `risk_tree_framework.yaml`. Three branch types: **gate** (override — identity, regulatory status, network exposure), **additive** (cumulative — flag risk, behavioural history, spatial context, fishing activity), and **contextual** (direction-dependent — authorization).
+- Investigation follows a structured 10-step workflow adapted from the **EFCA 2018 fisheries compliance risk assessment methodology**.
 
 ---
 
@@ -79,6 +88,15 @@
 - **KOOSHA 4 is a cargo vessel on a fishing IUU list** — this is intentional. IUU lists include reefer/cargo vessels that support illegal fishing operations (transshipment at sea).
 - **Trajectory chart:** Cumulative risk_score over time. Dashed horizontal lines at band thresholds (50, 60, 80, 100). Shows whether risk is accumulating or one-off.
 
+**Methodology at this step:**
+- The formula implements **multiplicative compounding** — independent evidence streams modify belief non-linearly (standard multi-criteria risk assessment).
+- **Duration exponent (0.75)** is a heuristic damping factor — not empirically calibrated, but prevents single extreme events from dominating. Flagged as heuristic in the methodology.
+- **Shore distance factor** aligns with **Miller et al. 2018**: legitimate transshipment rarely occurs close to shore; the >20nm (37km) threshold matches GFW's "likely transshipment" criterion.
+- **MPA multiplier tiers** are anchored in three papers: **Seguin et al. 2025** (*Science*) — industrial fishing in 47% of coastal MPAs; **Raynor et al. 2025** (*Science*) — 9x fewer vessels in fully protected MPAs (anchors GFCM-FRA 2.0x as strictest tier); **McDonald et al. 2024** (*Nature*) — ~90% of fishing vessels inside MPAs are AIS-dark (bounds MPA intersection as lower-bound indicator).
+- **base_risk_score vs risk_score** decomposition enables the narrative: "this vessel is Critical because it's GFCM-listed, but its base behaviour alone would only be Elevated." Structural amplification is made visible.
+- **Risk tree branches evaluated**: identity (IMO gate, type mismatch), regulatory_status (IUU listing gate), flag_risk (IRN high-risk flag), behavioural_history (AIS gap count, speed evasion), spatial_context (offshore location).
+- **IUU list source**: TMT Combined IUU Vessel List, mirrors EU IUU list under Article 30 of Regulation 1005/2008.
+
 ---
 
 ## Step 4 — Pill Filters on Map (1 min)
@@ -97,6 +115,12 @@
 - **Vessel class** is derived from GFW Vessels API `shiptypes` (registry data), falling back to event-level `vessel_type` (AIS self-reported). Pattern matching: `VESSEL_CLASS_PATTERNS` in config.py: industrial_fishing, artisanal_fishing, carrier, tanker, cargo, support, passenger, other.
 - **FDI c-square join:** Each GFW event is assigned to a 0.5-degree c-square via `assign_csquare(lat, lon)`. The FDI context lookup returns: total fishing days, top gear types, top species, known-fishing-ground flag.
 - **Why encounters in high-effort zones matter:** Encounters between fishing vessels and carriers in active fishing grounds suggest at-sea transshipment — a key mechanism for laundering IUU catch.
+
+**Methodology at this step:**
+- **EU/non-EU pill** uses the `EU_FLAGS` set (27 member states) from `config.py`. Relevant because EU vessels are subject to CFP reporting obligations and FDI coverage, while non-EU vessels in the Med may operate under weaker oversight.
+- **ICCAT pill** filters on `iccat_authorized` — ICCAT authorization is an **opportunity indicator, not exoneration** (authorization provides access to high-value species and transshipment infrastructure).
+- **GFCM pill** filters on `gfcm_registered` — GFCM register data comes from GFW Vessels API, with only ~24% MMSI coverage. Absence is treated as unknown, not unauthorised.
+- **FDI spatial join** uses `assign_csquare(lat, lon)` to map each event to the 0.5x0.5 dd JRC FDI grid. The FDI data is compiled annually by EU Member States and reviewed by STECF — statistically processed estimates, not raw declarations.
 
 ---
 
@@ -127,6 +151,12 @@
   - Markdown cover sheet: dataset scope, filter summary, band distribution, methodology
 - **Band colour coding:** rows coloured by risk band (red = Critical, orange = Severe, etc.)
 
+**Methodology at this step:**
+- **Vessel-level aggregation** produces four derived metrics: `base_score_total`, `risk_score_total`, `max_event_risk`, `compound_multiplier`. The compound_multiplier ratio makes structural amplification visible — high compound = mostly lookup-driven, near 1.0 = mostly behavioural.
+- **Four Kpler-aligned flags** are display-only — they mirror four of six core inputs in Kpler's Oct 2025 *Deceptive Shipping Practices* predictive model. Critically, they are **not multiplied into risk_score** — the underlying signals (duration, shore distance, event type, frequency) are already captured at the event level. Folding flags back in would double-count. This is a deliberate discipline: each piece of evidence enters the calculation exactly once.
+- **vessel_type_mismatch** is the open-data equivalent of Kpler's Grey Fleet "irregular vessel information" indicator. Class-level comparison (not string-level) avoids false positives — "TRAWLER" vs "FISHING" both map to `industrial_fishing` and don't trigger.
+- **Exports** include CSV, Markdown cover sheet, and HTML with embedded interactive Plotly charts.
+
 ---
 
 ## Step 6 — Fishing Activity (1.5 min)
@@ -155,6 +185,17 @@
 - **Key caveat:** McDonald et al. 2024 (Nature) — ~90% of satellite-detected fishing vessels inside MPAs are AIS-dark. This map shows a lower-bound signal only.
 - **"Fishing-only" is the key insight:** Vessels with fishing activity but no AIS gaps/encounters/loitering are completely invisible to the behavioural risk pipeline. They only surface through the CNN fishing classifier.
 
+**Methodology at this step:**
+- **Fishing activity branch** of the risk tree has four leaves, all tree-only (no scoring multiplier):
+  - `fishing_in_closed_area` (high) — two-tier detection: GFW's `mpaNoTake` field as primary (globally authoritative via WDPA), curated `closed_area_mpas.csv` (12 Med-specific closures) as fallback.
+  - `gap_then_fishing_sequence` (high) — 4h+ AIS gap followed by fishing within 72h. Classic IUU evasion signature per **Miller et al. 2018**.
+  - `fishing_in_low_effort_cell` (medium) — EU vessel fishing in bottom 5% of JRC FDI effort c-squares. Anomalous location signal.
+  - `fishing_in_mpa` (high) — any MPA intersection on fishing events.
+- **Leaf attribution** per event is computed by `attribute_leaves_to_fishing_events()` in `risk_model.py` — each fishing event gets boolean columns for which leaves fired, enabling the colour-coded scatter map.
+- **GFW fishing classifier** source: **Kroodsma et al. 2018** (*Science* 359, 904-908) — CNN-based fishing activity detection from AIS data.
+- **MPA non-compliance base rate**: **Seguin et al. 2025** (*Science*) found industrial fishing in 47% of coastal MPAs. **McDonald et al. 2024** (*Nature*) found ~90% of fishing vessels inside MPAs are AIS-dark — making this map a lower-bound indicator.
+- **FAO IUU categories covered**: the fishing activity branch + behavioural events + formal listings cover **Illegal** and **Unregulated** fishing. The third category — **Unreported** — requires catch declaration data not available in open sources.
+
 ---
 
 ## Step 7 — AI Analyst (1 min)
@@ -176,11 +217,22 @@
 - **Code execution sandbox:** Only pandas, numpy, plotly allowed. Filesystem/network access blocked via `FORBIDDEN_CODE` list.
 - **22 preset questions** covering investigation, cross-source intelligence, domain-informed analysis, spatial/temporal patterns, behavioural deep-dives, and visual analytics.
 
+**Methodology at this step:**
+- The AI analyst implements a **RAG + structured evidence** architecture: domain knowledge from 9 curated knowledge files provides the conceptual framework, while the deterministic risk tree trace provides vessel-specific ground truth. The LLM is instructed not to contradict the trace.
+- **Anti-hallucination safeguards**: the system prompt includes explicit cross-reference status per vessel (IUU/ICCAT/OFAC booleans) and instructs the model to read actual column values rather than inferring status from flag or name. An Iranian tanker is NOT necessarily OFAC-sanctioned unless `ofac_sanctioned==True`.
+- **Sandboxed execution** blocks filesystem/network access via `FORBIDDEN_CODE` list in `config.py`. Only `pandas`, `numpy`, `plotly` are available — no `os`, `subprocess`, `requests`, `open`, etc.
+- This is conceptually the same pattern as **Kpler's MCP** (early 2026): natural language in, structured maritime intelligence out, with LLM translating queries into executable analysis against underlying data.
+
 ---
 
 ## Step 8 — Close (30 sec)
 
 **Say:** "Six data sources, fully automated scoring pipeline, works with live GFW API or cached snapshots. Every multiplier is auditable through the risk tree. The system surfaces vessels that traditional monitoring misses — fishing-only vessels in MPAs, cargo ships on IUU lists, carrier encounters in high-effort zones."
+
+**Methodology summary:**
+- **One strong literature anchor** (Miller et al. 2018 — event detection criteria) + **three MPA empirical papers** (Seguin, Raynor, McDonald) + **principled-but-not-calibrated** design choices for multiplier values and compounding structure.
+- **Epistemological discipline**: four data source types are separated by status — observed behaviour (GFW AIS), statistical estimates (FDI), enforcement actions (IUU/OFAC), authorisation records (ICCAT/GFCM). They are never collapsed into a single confidence number.
+- **The honest position**: the methodology has the same shape as Kpler's — principled compounding model — minus the calibration dataset, because the fisheries equivalent of Kpler's sanctions designation data doesn't exist at comparable scale.
 
 ---
 
