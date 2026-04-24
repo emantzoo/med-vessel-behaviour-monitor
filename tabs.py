@@ -2345,13 +2345,66 @@ def _load_reference_content():
         return yaml.safe_load(f)
 
 
+def _render_framework_tree_markdown(framework):
+    """Render the risk tree as structured markdown with coloured badges.
+
+    Much more readable than the Graphviz graph for 8 branches x 41 leaves.
+    Each branch is a header with its type badge, and leaves are listed as
+    bullet points with weight/status indicators.
+    """
+    _type_badge = {
+        "gate": ":red[GATE]",
+        "additive": ":green[ADDITIVE]",
+        "contextual": ":violet[CONTEXTUAL]",
+    }
+    _weight_badge = {
+        "high": ":red[HIGH]",
+        "medium": ":orange[MEDIUM]",
+        "low": ":blue[LOW]",
+    }
+
+    for branch in framework["branches"]:
+        badge = _type_badge.get(branch["type"], branch["type"].upper())
+        questions = branch.get("questions", [])
+        st.markdown(f"**{branch['name']}** &ensp; {badge} &ensp; {len(questions)} leaves")
+
+        lines = []
+        for q in questions:
+            name = q["id"].replace("_", " ")
+            parts = [f"**{name}**"]
+            w = q.get("weight", "")
+            if w:
+                parts.append(_weight_badge.get(w, w.upper()))
+            if q.get("status") == "future_work":
+                parts.append(":grey[FUTURE]")
+            lines.append("- " + " &ensp; ".join(parts))
+
+        st.markdown("\n".join(lines))
+
+    # Tier outcomes
+    st.markdown("---")
+    st.markdown("**Tier outcomes**")
+    tier_lines = []
+    for t in framework["tier_outcomes"]:
+        tier_lines.append(f"- **{t['tier']}** -- {t['description']}")
+    st.markdown("\n".join(tier_lines))
+
+    # Tier assignment rules
+    rules = framework.get("tier_assignment_rules", {})
+    if rules.get("rules"):
+        st.markdown("---")
+        st.markdown("**Compound tier rules** (gating branches override additive)")
+        rule_lines = [f"- `{r}`" for r in rules["rules"]]
+        st.markdown("\n".join(rule_lines))
+
+
 def render_reference():
     """Reference & Methodology tab.
 
     Pure rendering: prose from data/reference_content.yaml, numerical tables
     from config.py, framework diagram from risk_tree.render_framework_tree.
     """
-    from risk_tree import load_framework, render_framework_tree, render_scoring_pipeline_diagram
+    from risk_tree import load_framework, render_scoring_pipeline_diagram
 
     content = _load_reference_content()
 
@@ -2360,15 +2413,16 @@ def render_reference():
     # 1. Intro
     st.markdown(content["intro"])
 
-    # 2. Framework diagram (collapsible, open by default)
+    # 2. Framework tree (structured markdown, not Graphviz — 8 branches x 41
+    #    leaves is too large for a graph layout)
     with st.expander("Mediterranean IUU Risk Tree Framework", expanded=True):
         try:
             framework = load_framework()
             st.markdown(f"**{framework['name']}** -- version {framework['version']}")
             st.markdown(framework["description"])
-            st.graphviz_chart(render_framework_tree())
+            _render_framework_tree_markdown(framework)
         except Exception as e:
-            st.warning(f"Could not render framework diagram: {e}")
+            st.warning(f"Could not render framework tree: {e}")
 
     # 2b. Network exposure leaves (associative risk layer)
     with st.expander("Network exposure leaves (associative risk)", expanded=False):

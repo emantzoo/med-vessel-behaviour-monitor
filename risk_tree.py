@@ -54,89 +54,94 @@ def render_framework_tree(trace=None, tier=None, vessel_label=None):
     """
     framework = load_framework()
 
-    dot = graphviz.Digraph(
-        "iuu_risk_tree",
-        graph_attr={
-            "rankdir": "LR",
-            "fontname": "Helvetica",
-            "fontsize": "12",
-            "bgcolor": "white",
-            "splines": "polyline",
-            "nodesep": "0.3",
-            "ranksep": "1.0",
-        },
-        node_attr={
-            "fontname": "Helvetica",
-            "fontsize": "9",
-            "shape": "box",
-            "style": "rounded,filled",
-            "width": "3.0",
-            "height": "0.6",
-            "margin": "0.12,0.08",
-        },
-        edge_attr={
-            "fontname": "Helvetica",
-            "fontsize": "8",
-        },
-    )
-
     # Build trace lookup
     trace_lookup = {}
     if trace:
         for entry in trace:
             trace_lookup[entry["question_id"]] = entry
 
-    # Root node
-    _framework_name_wrapped = _wrap(framework["name"], width=28)
-    if vessel_label:
-        root_label = f"{_framework_name_wrapped}\n{_wrap(vessel_label, width=28)}"
-    else:
-        root_label = f"{_framework_name_wrapped}\nVessel under assessment"
-
-    dot.node(
-        "root",
-        root_label,
-        fillcolor="#1f77b4",
-        fontcolor="white",
-        fontsize="14",
+    # Compact layout: TB (top-down), tight spacing, small nodes
+    dot = graphviz.Digraph(
+        "iuu_risk_tree",
+        graph_attr={
+            "rankdir": "TB",
+            "fontname": "Helvetica",
+            "fontsize": "10",
+            "bgcolor": "white",
+            "splines": "line",
+            "nodesep": "0.15",
+            "ranksep": "0.35",
+            "margin": "0.2",
+        },
+        node_attr={
+            "fontname": "Helvetica",
+            "fontsize": "8",
+            "shape": "box",
+            "style": "rounded,filled",
+            "height": "0.3",
+            "margin": "0.08,0.04",
+        },
+        edge_attr={
+            "fontname": "Helvetica",
+            "fontsize": "7",
+            "arrowsize": "0.5",
+        },
     )
 
-    # Branch nodes
+    # Root node
+    root_label = _wrap(framework["name"], width=24)
+    if vessel_label:
+        root_label += f"\n{_wrap(vessel_label, width=24)}"
+
+    dot.node(
+        "root", root_label,
+        fillcolor="#1f77b4", fontcolor="white", fontsize="11",
+    )
+
+    # Branch type colours
+    _BRANCH_COLORS = {
+        "gate":       ("#C62828", "#FF6B6B"),   # (fired, default)
+        "contextual": ("#6A1B9A", "#9B59B6"),
+        "additive":   ("#00897B", "#4ECDC4"),
+    }
+
     for branch in framework["branches"]:
         branch_id = branch["id"]
+        questions = branch.get("questions", [])
 
-        # Check if any question in this branch fired a rule
+        # Did any question in this branch fire?
         branch_fired = False
         if trace:
-            for q in branch.get("questions", []):
+            for q in questions:
                 entry = trace_lookup.get(q["id"])
                 if entry and entry.get("rule_fired"):
                     branch_fired = True
                     break
 
-        # Branch colour: deepens when a rule fired
-        if branch["type"] == "gate":
-            branch_color = "#C62828" if branch_fired else "#FF6B6B"
-        elif branch["type"] == "contextual":
-            branch_color = "#6A1B9A" if branch_fired else "#9B59B6"
-        else:
-            branch_color = "#00897B" if branch_fired else "#4ECDC4"
+        fired_col, default_col = _BRANCH_COLORS.get(
+            branch["type"], ("#00897B", "#4ECDC4"))
+        branch_color = fired_col if branch_fired else default_col
 
+        # Branch node: short name + type tag + leaf count
+        branch_label = (
+            f"{_wrap(branch['name'], width=20)}\n"
+            f"[{branch['type'].upper()}] {len(questions)} leaves"
+        )
         dot.node(
-            branch_id,
-            f"{_wrap(branch['name'], width=24)}\n[{branch['type'].upper()}]",
-            fillcolor=branch_color,
-            fontcolor="white",
+            branch_id, branch_label,
+            fillcolor=branch_color, fontcolor="white", fontsize="9",
         )
         dot.edge("root", branch_id)
 
-        # Question sub-nodes
-        for q in branch.get("questions", []):
+        # Question leaf nodes — compact single-line labels
+        for q in questions:
             q_id = f"{branch_id}_{q['id']}"
-            # Word-wrap the full question text so nothing is truncated
-            q_text = _wrap(q["text"], width=38)
+            # Short label: just the question id in readable form
+            short_name = q["id"].replace("_", " ")
+            weight = q.get("weight", "")
+            status = q.get("status", "")
 
-            # Colour from trace if available
+            # Colour from trace
             if trace:
                 entry = trace_lookup.get(q["id"])
                 if entry:
@@ -144,29 +149,39 @@ def render_framework_tree(trace=None, tier=None, vessel_label=None):
                     fill = _SEVERITY_FILL.get(severity, "#F0F0F0")
                     fontcolor = _SEVERITY_TEXT.get(severity, "black")
                     answer = entry.get("answer", "unknown")
-                    q_text = f"{q_text}\n[{answer.upper()}]"
+                    leaf_label = f"{short_name}\n[{answer.upper()}]"
                 else:
                     fill = "#F0F0F0"
-                    fontcolor = "black"
+                    fontcolor = "#999"
+                    leaf_label = short_name
             else:
                 fill = "#F0F0F0"
                 fontcolor = "black"
+                # Add weight/status badges
+                badges = []
+                if weight:
+                    badges.append(weight.upper())
+                if status == "future_work":
+                    badges.append("FUTURE")
+                    fill = "#FAFAFA"
+                    fontcolor = "#BDBDBD"
+                suffix = f"  [{', '.join(badges)}]" if badges else ""
+                leaf_label = f"{short_name}{suffix}"
 
             dot.node(
-                q_id,
-                q_text,
-                fillcolor=fill,
-                fontcolor=fontcolor,
-                fontsize="9",
+                q_id, leaf_label,
+                fillcolor=fill, fontcolor=fontcolor,
             )
             dot.edge(branch_id, q_id)
 
-    # Tier outcome nodes
+    # Tier outcome nodes — horizontal row
     with dot.subgraph(name="cluster_tiers") as tiers:
-        tiers.attr(label="Tier Outcomes", style="dashed", color="gray")
+        tiers.attr(
+            label="Tier Outcomes", style="dashed", color="gray",
+            fontsize="9", rank="same",
+        )
         for t in framework["tier_outcomes"]:
             tier_name = t["tier"]
-            # Mute non-assigned tiers when a specific tier is highlighted
             if tier and tier_name.lower() != tier.lower():
                 fillcolor = "#E0E0E0"
                 fontcolor = "#9E9E9E"
@@ -181,13 +196,9 @@ def render_framework_tree(trace=None, tier=None, vessel_label=None):
                 penwidth = "1"
 
             tiers.node(
-                f"tier_{tier_name.lower()}",
-                tier_name,
-                fillcolor=fillcolor,
-                fontcolor=fontcolor,
-                shape="ellipse",
-                fontsize="11",
-                penwidth=penwidth,
+                f"tier_{tier_name.lower()}", tier_name,
+                fillcolor=fillcolor, fontcolor=fontcolor,
+                shape="ellipse", fontsize="9", penwidth=penwidth,
             )
 
     return dot
