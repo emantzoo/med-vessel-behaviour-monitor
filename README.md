@@ -8,6 +8,15 @@ Built as a portfolio demonstration of IUU fishing risk analysis methodology, ali
 
 Live app: [med-vessel-behaviour-monitor.streamlit.app](https://med-vessel-behaviour-monitor-ysq4ipavn5jwnuragca3by.streamlit.app/)
 
+### Presentations
+
+- [Med Vessel Behaviour Monitor](https://docs.google.com/presentation/d/e/2PACX-1vSJpegbge9PTttSADyYuH82J64UVvnXzZdV37S2gfZIYVbB7JdvSv1nUHP_D6MG7i3F6T9CaUnomutz/pub?start=false&loop=false&delayms=3000) -- project overview, architecture, and demo walkthrough
+- [Risk Scoring Methodology](https://docs.google.com/presentation/d/e/2PACX-1vQOG3WJENSN-muXWxK1MREBNA6f7q5B9YXyknM00DxjzEDE_IahYSPnLPSbqDZJne2p_uevNQZabnt_/pub?start=false&loop=false&delayms=3000) -- scoring formula, multiplier chain, risk bands, and data source epistemology
+
+### Documentation
+
+- [User Guide](knowledge/user_guide.md) -- tabs, charts, and how to read them
+
 ---
 
 ## What it does
@@ -94,7 +103,7 @@ Nine-module Streamlit application:
 | `ai_analyst.py` | Google Gemini 2.5 Flash integration with RAG knowledge base, sandboxed pandas/plotly code execution, system prompt builder. |
 | `investigation.py` | Deterministic rule-based vessel investigation (no LLM) -- structured multi-section report used by the Vessel Investigation tab. |
 | `exports.py` | Per-vessel Markdown case file (`generate_vessel_case_file()`) and fleet-level CSV + Markdown cover sheet (`generate_fleet_summary()`). Download buttons in Investigation and Ranking tabs. |
-| `risk_tree.py` | Two Graphviz diagram builders: `render_framework_tree()` for the Med IUU Risk Tree framework loaded from `data/risk_tree_framework.yaml`, and `render_scoring_pipeline_diagram()` for the end-to-end scoring pipeline shown in the Reference tab. |
+| `risk_tree.py` | Risk tree framework loader from `data/risk_tree_framework.yaml`, Graphviz `render_scoring_pipeline_diagram()` for the scoring pipeline, and `render_framework_tree()` for per-vessel investigation traces. The Reference tab renders the full framework (8 branches, 41 leaves) as structured markdown for readability. |
 
 ## Data pipeline
 
@@ -122,11 +131,12 @@ Nine-module Streamlit application:
 Four top-level tabs, organised for a tight 30-minute demo (tab order as rendered in `app.py`):
 
 1. **Vessel Investigation** -- four-layer deep dive for the selected vessel: structured narrative from `investigation.py`, per-branch expander cards over the risk tree trace, an interactive Plotly icicle (click a branch to drill in), the full Graphviz framework diagram in a collapsed expander, a cumulative risk trajectory chart (behavioural arc over time with band threshold lines), a dedicated Behavioural Flags step, and a Markdown case-file export. Quick-select table for vessel switching.
-2. **Fleet Analytics** -- four subtabs covering all fleet-level views:
+2. **Fleet Analytics** -- five subtabs covering all fleet-level views:
    - *Ranking* -- vessel-level aggregation table with pill filters (event type, risk band, flag state, vessel class), risk bands, base vs compounded score decomposition, and the four display-only Kpler-aligned flags (industrial profile, multi-behaviour, dark port call candidate, repeat offender) plus a sortable length / GT profile column.
    - *Exploration* -- behavioural deep dives: repeat offenders, encounter/carrier alerts, AIS gap behaviour. All pill-filtered.
    - *Trends & Patterns* -- risk heatmap, daily and monthly event-type trend, type mismatch by vessel class. Secondary charts (flag breakdown, event types, duration distribution) in collapsed expanders.
    - *Fisheries Context* -- FDI overlay, c-square context, species landings. Geographic risk breakdown in an expander.
+   - *Fishing Activity* -- GFW CNN-classified fishing events with risk tree leaf attribution, scatter map, and per-vessel fishing table.
 3. **Reference & Methodology** -- generic framework documentation: risk tree diagram from `data/risk_tree_framework.yaml`, risk formula, **end-to-end scoring pipeline diagram** (one AIS event to vessel-level risk band, with a dashed side-chain showing the four display-only Kpler-aligned flags), risk-band table, and per-multiplier tables (flag, IUU, ICCAT, OFAC).
 4. **AI Analyst** -- Google Gemini 2.5 Flash interface with RAG knowledge base and sandboxed pandas/plotly code execution.
 
@@ -159,7 +169,11 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-Static demo mode (95 pre-generated events across 88 vessels, including 2 IUU-listed, 6 ICCAT-authorised and 2 OFAC-sanctioned demo vessels, enriched with realistic length / tonnage profiles so all four Kpler-aligned flags -- including industrial profile -- fire visibly across both sides of the 24m / 100 GT threshold) runs without any API credentials. Live mode requires a GFW API JWT token, which can be placed in `.streamlit/secrets.toml` or entered via the sidebar.
+Three data modes, selectable from the sidebar:
+
+- **Static demo** (95 pre-generated events across 88 vessels, including 2 IUU-listed, 6 ICCAT-authorised and 2 OFAC-sanctioned demo vessels, enriched with realistic length / tonnage profiles so all four Kpler-aligned flags fire visibly) -- runs without any API credentials.
+- **API snapshot** (~8,400 live GFW events across ~2,000 vessels, with fishing events and vessel insights) -- bundled in the repo, no credentials needed. Provides a realistic fleet-scale dataset for exploration.
+- **Live mode** -- queries the GFW Events API in real time. Requires a GFW API JWT token, which can be placed in `.streamlit/secrets.toml` or entered via the sidebar.
 
 ### Optional credentials
 
@@ -176,9 +190,9 @@ Both have sidebar text-input fallbacks if the secrets file is missing.
 ## Key numerical values
 
 - 7 multiplicative factors in the base risk formula
-- 4 lookup-based amplifiers applied post-scoring (IUU, ICCAT, OFAC, flag)
+- 3 lookup-based multipliers applied post-scoring (IUU, ICCAT, OFAC)
 - 5 risk bands (Low, Emerging, Elevated, Severe, Critical)
-- 4 top-level tabs (Fleet Analytics has 4 subtabs)
+- 4 top-level tabs (Fleet Analytics has 5 subtabs)
 - 369 IUU vessels, 9,203 ICCAT Med-authorised vessels, 1,008 FDI c-squares
 - 95 static demo events across 88 unique MMSI, including 2 IUU-listed, 6 ICCAT-authorised and 2 OFAC-sanctioned demo vessels
 - 4 Kpler-aligned display-only behavioural flags (industrial profile, multi-behaviour, dark port call candidate, repeat offender 90d) plus vessel_type_mismatch identity signal

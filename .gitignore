@@ -4,5 +4,7 @@ __pycache__/
 .env
 specs/
 data/raw/
-data/api_*_snapshot.csv
 CLAUDE.md
+kpler_presentation_guide.md
+showcase_guide.md
+handout.md
